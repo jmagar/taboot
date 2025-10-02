@@ -1,0 +1,90 @@
+name: taboot
+
+x-common-service: &common-service
+  image: ghcr.io/firecrawl/firecrawl
+  # build: apps/api
+  ulimits:
+    nofile:
+      soft: 65535
+      hard: 65535
+  networks:
+    - taboot-net
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+x-common-env: &common-env
+  REDIS_URL: ${REDIS_URL:-redis://taboot-cache:6379}
+  REDIS_RATE_LIMIT_URL: ${REDIS_URL:-redis://taboot-cache:6379}
+  PLAYWRIGHT_MICROSERVICE_URL: ${PLAYWRIGHT_MICROSERVICE_URL:-http://taboot-playwright:3000/scrape}
+  NUQ_DATABASE_URL: postgres://${POSTGRES_USER:-taboot}:${POSTGRES_PASSWORD:-password}@taboot-db:${POSTGRES_PORT:-5432}/postgres
+  OPENAI_API_KEY: ${OPENAI_API_KEY}
+  MODEL_NAME: ${MODEL_NAME}
+  BULL_AUTH_KEY: ${BULL_AUTH_KEY}
+  LOGGING_LEVEL: ${LOGGING_LEVEL}
+  SEARXNG_ENDPOINT: ${SEARXNG_ENDPOINT}
+  SEARXNG_ENGINES: ${SEARXNG_ENGINES}
+  SEARXNG_CATEGORIES: ${SEARXNG_CATEGORIES}
+  MAX_CPU: ${MAX_CPU}
+  MAX_RAM: ${MAX_RAM}
+
+services:
+  taboot-playwright:
+    image: ghcr.io/firecrawl/playwright-service:latest
+    # build: apps/playwright-service-ts
+    container_name: taboot-playwright
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+    networks:
+      - taboot-net
+
+  taboot-crawler:
+    <<: *common-service
+    container_name: taboot-crawler
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      HOST: "0.0.0.0"
+      PORT: ${INTERNAL_PORT:-3002}
+      WORKER_PORT: ${WORKER_PORT:-3005}
+      ENV: local
+    depends_on:
+      taboot-db:
+        condition: service_healthy
+      taboot-cache:
+        condition: service_started
+      taboot-playwright:
+        condition: service_started
+    ports:
+      - "${PORT:-3002}:${INTERNAL_PORT:-3002}"
+    volumes:
+      - ./defaults.yaml:/app/defaults.yaml:ro
+    command: node dist/src/harness.js --start-docker
+
+  taboot-db:
+    build: apps/nuq-postgres
+    container_name: taboot-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: taboot
+      POSTGRES_PASSWORD: 
+      POSTGRES_DB: taboot
+    volumes:
+      - taboot-db:/var/lib/postgresql/data
+    networks:
+      - taboot-net
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taboot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  taboot-net:
+    driver: bridge
+
+volumes:
+  taboot-db:
+    driver: local

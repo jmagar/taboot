@@ -1,0 +1,217 @@
+# LlamaCrawl Pipeline Configuration
+# Copy this file to config.yaml and adjust settings as needed
+# This file contains non-secret configuration (pipeline settings, feature flags)
+# Secrets belong in .env file
+
+# =============================================================================
+# DATA SOURCES CONFIGURATION
+# =============================================================================
+
+sources:
+  # Firecrawl Web Scraping
+  firecrawl:
+    enabled: true
+    # Default crawl depth for full site crawls
+    default_crawl_depth: 3
+    # Maximum pages per crawl (hard limit)
+    max_pages: 1000
+    # Output formats (markdown recommended for better parsing)
+    formats: [markdown, html]
+    # URLs to scrape (can be added dynamically via CLI)
+    urls: []
+
+  # GitHub Repositories
+  github:
+    enabled: true
+    # List of repositories to sync (format: "owner/repo")
+    repositories:
+      - "owner/repo1"
+      - "owner/repo2"
+    # Include issues in ingestion
+    include_issues: true
+    # Include pull requests in ingestion
+    include_prs: true
+    # Include discussions in ingestion
+    include_discussions: true
+    # File extensions to include (empty = all files)
+    file_extensions: [".md", ".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs"]
+
+  # Reddit Posts and Comments
+  reddit:
+    enabled: true
+    # List of subreddits to monitor
+    subreddits:
+      - "python"
+      - "programming"
+      - "MachineLearning"
+    # Maximum posts per subreddit per sync
+    # Note: Reddit API hard caps at 1000 items
+    post_limit: 1000
+    # Include comments (can be large volume)
+    include_comments: true
+    # Maximum comment depth to traverse
+    max_comment_depth: 5
+
+  # Elasticsearch Document Store
+  elasticsearch:
+    enabled: false
+    # Index patterns to query
+    indices: ["docs-*", "logs-*"]
+    # Field mappings (adjust based on your index schema)
+    field_mappings:
+      title: "title"
+      content: "content"
+      timestamp: "@timestamp"
+    # Query filter (optional, DSL syntax)
+    query_filter: {}
+    # Batch size for bulk loading
+    batch_size: 200
+
+  # Gmail Email Messages
+  gmail:
+    enabled: false
+    # Gmail labels to sync
+    labels: ["INBOX", "SENT"]
+    # Include attachment metadata (not file contents)
+    include_attachments_metadata: true
+    # Query filters using Gmail search operators
+    # Examples: "from:example@gmail.com", "has:attachment", "is:unread"
+    query_filters: []
+
+# =============================================================================
+# INGESTION PIPELINE SETTINGS
+# =============================================================================
+
+ingestion:
+  # Document Chunking
+  # Size in tokens (not characters)
+  chunk_size: 512
+  # Overlap between chunks (prevents losing context at boundaries)
+  chunk_overlap: 50
+
+  # Batch Processing
+  # Number of documents to process per batch
+  batch_size: 100
+  # Maximum concurrent sources to ingest in parallel
+  concurrent_sources: 3
+
+  # Retry Logic (exponential backoff)
+  retry:
+    # Maximum number of retry attempts for transient failures
+    max_attempts: 5
+    # Initial delay before first retry (seconds)
+    initial_delay_seconds: 1
+    # Maximum delay between retries (seconds)
+    max_delay_seconds: 60
+    # Jitter percentage (0.0-1.0) to prevent thundering herd
+    jitter: 0.2
+
+  # Deduplication Strategy
+  deduplication:
+    # Enable content hashing for deduplication
+    enabled: true
+    # Strategy: "hash" (SHA-256 content hash)
+    strategy: hash
+    # Normalize content before hashing (lowercase, strip whitespace)
+    normalize_content: true
+
+  # Dead Letter Queue
+  dlq:
+    # Enable DLQ for failed documents
+    enabled: true
+    # TTL for DLQ entries (days)
+    retention_days: 7
+
+# =============================================================================
+# QUERY PIPELINE SETTINGS
+# =============================================================================
+
+query:
+  # Vector Search Parameters
+  # Number of candidates to retrieve from vector search
+  top_k: 20
+
+  # Reranking Parameters
+  # Number of documents to return after reranking
+  rerank_top_n: 5
+  # Enable reranking (improves relevance but adds latency)
+  enable_reranking: true
+
+  # Graph Traversal
+  # Enable Neo4j graph traversal for related documents
+  enable_graph_traversal: true
+  # Maximum depth for relationship traversal
+  max_graph_depth: 2
+
+  # Answer Synthesis
+  # Ollama model to use for answer generation
+  # Options: llama3.1:8b, llama3.1:70b, mistral:7b, etc.
+  synthesis_model: "llama3.1:8b"
+  # Maximum context length to send to LLM (tokens)
+  max_context_tokens: 4096
+  # Temperature for generation (0.0 = deterministic, 1.0 = creative)
+  temperature: 0.1
+
+  # Source Attribution
+  # Include source snippets in response
+  include_snippets: true
+  # Snippet length (characters)
+  snippet_length: 200
+
+# =============================================================================
+# KNOWLEDGE GRAPH EXTRACTION
+# =============================================================================
+
+graph:
+  # Enable automatic entity extraction during ingestion
+  auto_extract_entities: true
+  # Maximum keywords to extract per document
+  max_keywords_per_document: 10
+  # Enable relationship extraction
+  relationship_extraction: true
+  # Entity types to extract (empty = all types)
+  entity_types:
+    - "PERSON"
+    - "ORGANIZATION"
+    - "LOCATION"
+    - "PRODUCT"
+    - "TECHNOLOGY"
+
+# =============================================================================
+# VECTOR STORE SETTINGS
+# =============================================================================
+
+vector_store:
+  # Qdrant collection name
+  collection_name: "llamacrawl_documents"
+  # Vector dimension (must match embedding model)
+  # Qwen3-Embedding-0.6B outputs 1024-dimensional vectors
+  vector_dimension: 1024
+  # Distance metric: cosine, euclidean, dot
+  distance_metric: "cosine"
+  # Enable scalar quantization (4x memory reduction)
+  enable_quantization: true
+  # HNSW index parameters (performance tuning)
+  hnsw:
+    m: 16
+    ef_construct: 100
+
+# =============================================================================
+# LOGGING AND METRICS
+# =============================================================================
+
+logging:
+  # Format: json or text
+  format: json
+  # Log level (overridden by LOG_LEVEL env var)
+  level: INFO
+  # Include sensitive data in logs (DO NOT enable in production)
+  log_sensitive_data: false
+
+metrics:
+  # Enable Prometheus metrics collection
+  enabled: true
+  # Metrics port (overridden by PROMETHEUS_PORT env var)
+  prometheus_port: 9090
+  # Metrics collection interval (seconds)
+  collection_interval: 60

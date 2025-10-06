@@ -86,3 +86,8 @@ Desktop.ini
 *.bak
 *.tmp
 *.temp
+
+# Project-specific directories
+.specify/
+.todos/
+.docs/

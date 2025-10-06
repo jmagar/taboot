@@ -312,18 +312,21 @@ class FirecrawlReader(BaseReader):
         """
         params: dict[str, Any] = {}
 
-        # Common parameters
-        if formats:
-            params["formats"] = formats
-
         # Mode-specific parameters
         if mode == "crawl":
-            # Crawl mode uses limit and maxDepth (v2 parameter name)
+            # Crawl mode: nest scrape options in scrape_options parameter
+            if formats:
+                params["scrape_options"] = {"formats": formats}
             params["limit"] = limit
             params["maxDepth"] = max_depth
 
+        elif mode == "scrape":
+            # Scrape mode: formats at top level
+            if formats:
+                params["formats"] = formats
+
         elif mode == "map":
-            # Map mode uses limit for URL discovery
+            # Map mode uses limit for URL discovery (no content fetching, so no formats)
             params["limit"] = limit
 
         elif mode == "extract":
@@ -332,6 +335,8 @@ class FirecrawlReader(BaseReader):
                 params["schema"] = kwargs["schema"]
             if "prompt" in kwargs:
                 params["prompt"] = kwargs["prompt"]
+            if formats:
+                params["formats"] = formats
 
         # Merge any additional kwargs
         for key, value in kwargs.items():

@@ -59,11 +59,13 @@ class TEIRerank(BaseNodePostprocessor):
             raw_scores: Return raw logits vs normalized scores (default: False)
             **kwargs: Additional arguments passed to BaseNodePostprocessor
         """
-        super().__init__(**kwargs)
-        self.base_url = base_url
-        self.top_n = top_n
-        self.timeout = timeout
-        self.raw_scores = raw_scores
+        super().__init__(
+            base_url=base_url,
+            top_n=top_n,
+            timeout=timeout,
+            raw_scores=raw_scores,
+            **kwargs
+        )
 
     @classmethod
     def class_name(cls) -> str:

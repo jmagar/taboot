@@ -455,6 +455,7 @@ class Neo4jClient:
              collect(DISTINCT related3) as all_related
 
         UNWIND all_related as related
+        WITH start, related
         WHERE related IS NOT NULL AND related.doc_id <> start.doc_id
 
         // Calculate relevance score based on multiple factors

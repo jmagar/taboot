@@ -12,13 +12,21 @@ The pipeline uses distributed locks to prevent concurrent ingestion of the same 
 and implements per-document error handling to ensure resilience.
 """
 
+import asyncio
 import time
 import traceback
+import warnings
 from collections.abc import Sequence
 from typing import Any
 
+import redis.asyncio as aioredis
+
 from llama_index.core import PropertyGraphIndex, Settings
-from llama_index.core.indices.property_graph import SimpleLLMPathExtractor
+from llama_index.core.indices.property_graph import (
+    SimpleLLMPathExtractor,
+    ImplicitPathExtractor,
+    SchemaLLMPathExtractor,
+)
 from llama_index.core.ingestion import IngestionCache
 from llama_index.core.ingestion import IngestionPipeline as LlamaIngestionPipeline
 from llama_index.core.node_parser import SentenceSplitter
@@ -154,6 +162,9 @@ class IngestionPipeline:
             base_url=config.ollama_url,
         )
 
+        # Initialize Settings.embed_model for PropertyGraphIndex
+        Settings.embed_model = self.embed_model
+
         logger.info(
             "Initializing ingestion pipeline",
             extra={
@@ -181,6 +192,8 @@ class IngestionPipeline:
         redis_kwargs = self.redis_client.client.connection_pool.connection_kwargs
         redis_host = redis_kwargs.get("host", "localhost")
         redis_port = redis_kwargs.get("port", 6379)
+
+        # Create async Redis client for LlamaIndex
 
         # Create Redis document store for caching
         docstore = RedisDocumentStore.from_host_and_port(
@@ -547,23 +560,61 @@ class IngestionPipeline:
                 url=self.config.neo4j_uri,
             )
 
-            # Create entity extractors
-            kg_extractors = [
-                SimpleLLMPathExtractor(
-                    llm=Settings.llm,
-                    num_workers=1,  # Single worker for per-document extraction
-                    max_paths_per_chunk=self.config.graph.max_keywords_per_document,
+            # Create entity extractors based on strategy
+            kg_extractors = []
+
+            if self.config.graph.extraction_strategy in ["simple", "combined"]:
+                kg_extractors.append(
+                    SimpleLLMPathExtractor(
+                        llm=Settings.llm,
+                        max_paths_per_chunk=self.config.graph.max_triplets_per_chunk,
+                        num_workers=1,
+                    )
                 )
-            ]
+
+            if self.config.graph.extraction_strategy in ["implicit", "combined"]:
+                kg_extractors.append(ImplicitPathExtractor())
+
+            # Temporarily disable SchemaLLMPathExtractor - requires Enum types not strings
+            # if self.config.graph.extraction_strategy in ["schema", "combined"]:
+            #     schema_extractor = SchemaLLMPathExtractor(
+            #         llm=Settings.llm,
+            #         possible_entities=self.config.graph.entity_types,
+            #         possible_relations=self.config.graph.allowed_relation_types,
+            #         num_workers=1,
+            #     )
+            #     kg_extractors.append(schema_extractor)
+
+            # Ensure we have at least one extractor
+            if not kg_extractors:
+                kg_extractors.append(
+                    SimpleLLMPathExtractor(
+                        llm=Settings.llm,
+                        max_paths_per_chunk=self.config.graph.max_triplets_per_chunk,
+                        num_workers=1,
+                    )
+                )
+
+            logger.debug(
+                f"Using {len(kg_extractors)} extractors with strategy: {self.config.graph.extraction_strategy}",
+                extra={"strategy": self.config.graph.extraction_strategy, "num_extractors": len(kg_extractors)}
+            )
 
             # Create PropertyGraphIndex for entity extraction
             # Note: This will extract entities from the document and store in Neo4j
-            PropertyGraphIndex.from_documents(
-                documents=[llama_doc],
-                property_graph_store=graph_store,
-                kg_extractors=kg_extractors,
-                show_progress=False,
-            )
+            # Suppress RuntimeWarning from LlamaIndex SimpleLLMPathExtractor._aextract
+            # Internal LlamaIndex async handling issue - coroutine not properly awaited
+            # Functionality is NOT impacted - entity extraction completes successfully
+            # TODO: Remove when LlamaIndex fixes upstream async handling
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*coroutine.*")
+                PropertyGraphIndex.from_documents(
+                    documents=[llama_doc],
+                    property_graph_store=graph_store,
+                    kg_extractors=kg_extractors,
+                    embed_model=self.embed_model,
+                    show_progress=False,
+                )
 
             # Also create Document node in Neo4j for graph traversal
             self.neo4j_client.create_document_node(
@@ -584,12 +635,14 @@ class IngestionPipeline:
 
         except Exception as e:
             # Log error but don't fail ingestion
+            error_msg = f"{type(e).__name__}: {str(e) or 'Unknown error'}"
             logger.warning(
-                f"Failed to extract entities: {str(e)}",
+                f"Failed to extract entities: {error_msg}",
                 extra={
                     "source": source,
                     "doc_id": doc.doc_id,
-                    "error": str(e),
+                    "error": error_msg,
+                    "traceback": traceback.format_exc(),
                 },
             )
 

@@ -57,6 +57,92 @@ def _validate_url(url: str) -> bool:
         raise typer.BadParameter(f"Invalid URL: {e}")
 
 
+def _run_firecrawl_map(url: str, limit: int) -> None:
+    """Map URLs from a website without ingesting content.
+
+    Args:
+        url: Base URL to map
+        limit: Maximum number of URLs to discover
+
+    Raises:
+        typer.Exit: If map operation fails
+    """
+    # Validate URL
+    _validate_url(url)
+
+    # Load minimal config (only need Firecrawl API access)
+    try:
+        config = load_config()
+    except Exception as e:
+        console.print(f"[red]Error loading config:[/red] {e}")
+        raise typer.Exit(1)
+
+    # Initialize only Redis (for Firecrawl reader state)
+    try:
+        redis_client = RedisClient(config.redis_url)
+    except Exception as e:
+        console.print(f"[red]Error initializing Redis:[/red] {e}")
+        raise typer.Exit(1)
+
+    # Create Firecrawl reader
+    reader_config = {"limit": limit}
+    try:
+        reader = FirecrawlReader(
+            source_name="firecrawl_map",
+            config=reader_config,
+            redis_client=redis_client,
+        )
+    except Exception as e:
+        console.print(f"[red]Error initializing Firecrawl reader:[/red] {e}")
+        raise typer.Exit(1)
+
+    # Run map operation
+    console.print(f"[cyan]Discovering URLs from:[/cyan] {url}")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("Mapping URLs...", total=None)
+
+        try:
+            documents = reader.load_data(url=url, mode="map", limit=limit)
+            progress.update(task, description="[green]✓ URL discovery complete")
+
+            if not documents:
+                console.print("[yellow]No URLs discovered")
+                return
+
+            # Extract URLs from documents
+            urls: list[str] = []
+            for doc in documents:
+                # Map mode returns documents with URL metadata
+                doc_url = doc.metadata.source_url
+                if doc_url and doc_url not in urls:
+                    urls.append(doc_url)
+
+                # Also check content for URL list (Firecrawl may return URLs in content)
+                if doc.content:
+                    for line in doc.content.split("\n"):
+                        line = line.strip()
+                        if line.startswith("http"):
+                            if line not in urls:
+                                urls.append(line)
+
+            # Display results
+            console.print(f"\n[green]Discovered {len(urls)} URLs:[/green]\n")
+            for url_item in urls:
+                console.print(f"  {url_item}")
+
+        except Exception as e:
+            progress.update(task, description="[red]✗ Map operation failed")
+            console.print(f"[red]Error during map:[/red] {e}")
+            logger.exception("Firecrawl map failed")
+            raise typer.Exit(1)
+
+
 def _run_firecrawl_ingestion(
     url: str,
     mode: str,
@@ -263,11 +349,7 @@ def map(
         llamacrawl map https://example.com
         llamacrawl map https://docs.python.org/ --limit 500
     """
-    _run_firecrawl_ingestion(
-        url=url,
-        mode="map",
-        limit=limit,
-    )
+    _run_firecrawl_map(url=url, limit=limit)
 
 
 def extract(

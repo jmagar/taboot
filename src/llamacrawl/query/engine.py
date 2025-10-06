@@ -115,6 +115,7 @@ class QueryEngine:
         self.vector_index = VectorStoreIndex.from_vector_store(
             vector_store=qdrant_vector_store,
             storage_context=storage_context,
+            embed_model=self.embed_model,
         )
 
         logger.debug("VectorStoreIndex initialized from Qdrant")
@@ -132,6 +133,7 @@ class QueryEngine:
                 # Create PropertyGraphIndex from existing Neo4j graph
                 self.graph_index: PropertyGraphIndex | None = PropertyGraphIndex.from_existing(
                     property_graph_store=neo4j_graph_store,
+                    embed_model=self.embed_model,
                 )
 
                 logger.debug("PropertyGraphIndex initialized from Neo4j")

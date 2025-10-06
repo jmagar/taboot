@@ -78,7 +78,7 @@ class AnswerSynthesizer:
                 model=self.model_name,
                 base_url=config.ollama_url,
                 temperature=config.query.temperature,
-                request_timeout=60.0,  # 60 second timeout for LLM requests
+                request_timeout=120.0,  # 120 second timeout for LLM requests
             )
 
             logger.info("AnswerSynthesizer initialized successfully")

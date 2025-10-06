@@ -53,8 +53,11 @@ services:
 
   taboot-embed:
     <<: [*common-base, *gpu-deploy]
-    image: ghcr.io/huggingface/text-embeddings-inference:1.8.2
+    image: ghcr.io/huggingface/text-embeddings-inference:latest
     container_name: taboot-embed
+    depends_on:
+      taboot-vectors:
+        condition: service_healthy
     ports:
       - "${TEI_HTTP_PORT:-8080}:80"
     volumes:
@@ -79,38 +82,11 @@ services:
       - --auto-truncate
     environment:
       <<: [*gpu-env, *tei-env]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  taboot-rerank:
-    <<: [*common-base, *gpu-deploy]
-    image: ghcr.io/huggingface/text-embeddings-inference:1.8.2
-    container_name: taboot-rerank
-    ports:
-      - "${TEI_RERANKER_HTTP_PORT:-8081}:80"
-    volumes:
-      - taboot-rerank:/data
-    command:
-      - --model-id
-      - ${TEI_RERANKER_MODEL:-BAAI/bge-reranker-v2-m3}
-      - --dtype
-      - float16
-      - --max-concurrent-requests
-      - "80"
-      - --max-batch-tokens
-      - "163840"
-      - --max-batch-requests
-      - "80"
-      - --max-client-batch-size
-      - "128"
-      - --tokenization-workers
-      - "8"
-      - --auto-truncate
-    environment:
-      <<: [*gpu-env, *tei-env]
+      TEXT_EMBEDDINGS_ROUTER_MULTI_MODELS: |
+        [
+          {"task": "text-embedding", "model_id": "${TEI_EMBEDDING_MODEL:-Qwen/Qwen3-Embedding-0.6B}"},
+          {"task": "rerank", "model_id": "${TEI_RERANKER_MODEL:-BAAI/bge-reranker-v2-m3}"}
+        ]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/health"]
       interval: 30s
@@ -119,7 +95,10 @@ services:
 
   taboot-graph:
     <<: *common-base
-    image: neo4j:5.15-community
+    build:
+      context: ./docker
+      dockerfile: neo4j.Dockerfile
+    image: taboot/neo4j:5.15-community
     container_name: taboot-graph
     ports:
       - "${NEO4J_HTTP_PORT:-7474}:7474"
@@ -231,7 +210,6 @@ services:
 
 volumes:
   taboot-embed:
-  taboot-rerank:
   taboot-vectors:
   taboot-graph_data:
   taboot-graph_logs:

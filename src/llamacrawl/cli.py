@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
+from llama_index.core import Settings
+from llama_index.llms.ollama import Ollama
 from rich.console import Console
 
 from llamacrawl.config import (
@@ -539,6 +541,7 @@ def query(
     from llamacrawl.embeddings.reranker import TEIRerank
     from llamacrawl.embeddings.tei import TEIEmbedding
     from llamacrawl.query.engine import QueryEngine
+    from llamacrawl.query.synthesis import AnswerSynthesizer
     from llamacrawl.storage.neo4j import Neo4jClient
     from llamacrawl.storage.qdrant import QdrantClient
 
@@ -609,6 +612,14 @@ def query(
             top_n=config.query.rerank_top_n,
         )
 
+        # Configure LlamaIndex global settings
+        logger.debug("Configuring LlamaIndex Settings")
+        Settings.llm = Ollama(
+            model=config.graph.extraction_model,
+            base_url=config.ollama_url,
+        )
+        Settings.embed_model = embed_model
+
         # Initialize query engine
         logger.debug("Initializing query engine")
         query_engine = QueryEngine(
@@ -618,6 +629,10 @@ def query(
             embed_model=embed_model,
             reranker=reranker,
         )
+
+        # Initialize answer synthesizer
+        logger.debug("Initializing answer synthesizer")
+        synthesizer = AnswerSynthesizer(config)
 
         # Execute query
         console.print("[bold]Executing query...[/bold]")
@@ -659,10 +674,11 @@ def query(
                 console.print(json_lib.dumps(empty_result, indent=2))
             raise typer.Exit(code=0)
 
-        # Build QueryResult from query engine results
-        # Note: Full synthesis (Task 5.2) is not yet implemented
-        # For now, create a basic answer from top results
-        query_result = _build_query_result_from_engine_output(results)
+        # Build QueryResult from query engine results using AnswerSynthesizer
+        query_result = synthesizer.synthesize(
+            query_text=text,
+            retrieved_docs=results["results"]
+        )
 
         # Format and display output
         if output_format == "text":
@@ -1290,70 +1306,15 @@ def _parse_date(date_str: str) -> datetime:
 
 
 def _build_query_result_from_engine_output(engine_output: dict[str, Any]) -> "QueryResult":
-    """Build QueryResult from QueryEngine output.
-
-    Note: This is a temporary implementation until Task 5.2 (AnswerSynthesizer)
-    is complete. It creates a basic answer by concatenating top result snippets.
-
-    Args:
-        engine_output: Output dictionary from QueryEngine.query()
-
-    Returns:
-        QueryResult model with answer and sources
-    """
-    from llamacrawl.models.document import QueryResult, SourceAttribution
-
-    results = engine_output["results"]
-    metrics = engine_output["metrics"]
-
-    # Build source attributions from results
-    sources: list[SourceAttribution] = []
-    for result in results:
-        # Create snippet from content (first 150 chars)
-        content = result.get("content", "")
-        snippet = content[:150] + "..." if len(content) > 150 else content
-
-        # Parse timestamp (may be string or already datetime)
-        timestamp_val = result.get("timestamp")
-        if isinstance(timestamp_val, str):
-            try:
-                timestamp = datetime.fromisoformat(timestamp_val.replace("Z", "+00:00"))
-            except (ValueError, AttributeError):
-                timestamp = datetime.now()
-        elif isinstance(timestamp_val, datetime):
-            timestamp = timestamp_val
-        else:
-            timestamp = datetime.now()
-
-        source = SourceAttribution(
-            doc_id=result.get("doc_id", ""),
-            source_type=result.get("source_type", ""),
-            title=result.get("title", "Untitled"),
-            url=result.get("source_url", ""),
-            score=float(result.get("score", 0.0)),
-            snippet=snippet,
-            timestamp=timestamp,
-        )
-        sources.append(source)
-
-    # Create basic answer from top results
-    # TODO: Replace with AnswerSynthesizer when Task 5.2 is complete
-    if sources:
-        answer_parts = ["Based on the retrieved documents:\n"]
-        for i, source in enumerate(sources[:3], 1):
-            answer_parts.append(f"[{i}] {source.title}: {source.snippet}")
-        answer = "\n".join(answer_parts)
-        answer += "\n\nNote: Full synthesis not yet implemented. See sources for details."
-    else:
-        answer = "No results found."
-
-    # Build QueryResult
-    return QueryResult(
-        answer=answer,
-        sources=sources,
-        query_time_ms=int(metrics.get("total_time_ms", 0)),
-        retrieved_docs=metrics.get("candidates_retrieved", 0),
-        reranked_docs=metrics.get("results_after_reranking", 0),
+    """Use AnswerSynthesizer for proper synthesis."""
+    from llamacrawl.config import get_config
+    from llamacrawl.query.synthesis import AnswerSynthesizer
+    
+    config = get_config()
+    synthesizer = AnswerSynthesizer(config)
+    return synthesizer.synthesize(
+        query_text=engine_output["query"],
+        retrieved_docs=engine_output["results"]
     )
 
 

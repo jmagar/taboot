@@ -143,7 +143,7 @@ class QueryConfig(BaseModel):
     enable_reranking: bool = True
     enable_graph_traversal: bool = True
     max_graph_depth: int = Field(default=2, ge=1, le=5)
-    synthesis_model: str = "gemma3:12b-it-qat"
+    synthesis_model: str = "llama3.2:3b"
     max_context_tokens: int = Field(default=4096, ge=512, le=16384)
     temperature: float = Field(default=0.1, ge=0.0, le=2.0)
     include_snippets: bool = True
@@ -154,12 +154,18 @@ class GraphConfig(BaseModel):
     """Knowledge graph extraction configuration."""
 
     auto_extract_entities: bool = True
-    extraction_model: str = "sciphi/triplex"
+    extraction_model: str = "qwen2.5:14b-instruct-q4_K_M"
     max_keywords_per_document: int = Field(default=10, ge=1, le=50)
     relationship_extraction: bool = True
     entity_types: list[str] = Field(
         default=["PERSON", "ORGANIZATION", "LOCATION", "PRODUCT", "TECHNOLOGY"]
     )
+    extraction_strategy: Literal["simple", "implicit", "schema", "combined"] = "simple"
+    confidence_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+    max_triplets_per_chunk: int = Field(default=15, ge=1, le=50)
+    include_implicit_relations: bool = True
+    allowed_entity_types: list[str] | None = None
+    allowed_relation_types: list[str] | None = None
 
 
 class HNSWConfig(BaseModel):
@@ -235,9 +241,9 @@ class Config(BaseModel):
     neo4j_user: str = "neo4j"
     neo4j_password: str = "changeme"
     redis_url: str = "redis://localhost:6379"
-    tei_embedding_url: str = "http://localhost:8080"
-    tei_reranker_url: str = "http://localhost:8081"
-    ollama_url: str = "http://localhost:11434"
+    tei_embedding_url: str
+    tei_reranker_url: str
+    ollama_url: str
 
     # Observability (env var overrides)
     log_level: str = "INFO"
@@ -347,9 +353,9 @@ def load_config(
         "neo4j_user": os.getenv("NEO4J_USER", "neo4j"),
         "neo4j_password": os.getenv("NEO4J_PASSWORD", "changeme"),
         "redis_url": os.getenv("REDIS_URL", "redis://localhost:6379"),
-        "tei_embedding_url": os.getenv("TEI_EMBEDDING_URL", "http://localhost:8080"),
-        "tei_reranker_url": os.getenv("TEI_RERANKER_URL", "http://localhost:8081"),
-        "ollama_url": os.getenv("OLLAMA_URL", "http://localhost:11434"),
+        "tei_embedding_url": os.getenv("TEI_EMBEDDING_URL"),
+        "tei_reranker_url": os.getenv("TEI_RERANKER_URL"),
+        "ollama_url": os.getenv("OLLAMA_URL"),
         # Observability (override YAML if env var set)
         "log_level": os.getenv("LOG_LEVEL", yaml_config.get("logging", {}).get("level", "INFO")),
         "prometheus_port": int(
@@ -365,6 +371,14 @@ def load_config(
         config = Config(**config_data)
     except Exception as e:
         raise ValueError(f"Configuration validation failed: {e}") from e
+
+    # Validate required infrastructure URLs
+    if not config.tei_embedding_url:
+        raise ValueError("TEI_EMBEDDING_URL environment variable is required")
+    if not config.tei_reranker_url:
+        raise ValueError("TEI_RERANKER_URL environment variable is required")
+    if not config.ollama_url:
+        raise ValueError("OLLAMA_URL environment variable is required")
 
     # Additional validation: check enabled sources have credentials
     _validate_source_credentials(config)

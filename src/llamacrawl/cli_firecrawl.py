@@ -186,6 +186,7 @@ def _run_firecrawl_ingestion(
             url=config.qdrant_url,
             collection_name=config.vector_store.collection_name,
             vector_dimension=config.vector_store.vector_dimension,
+            distance_metric=config.vector_store.distance_metric,
         )
         neo4j_client = Neo4jClient(config=config)
         embed_model = TEIEmbedding(base_url=config.tei_embedding_url)
@@ -304,7 +305,7 @@ def crawl(
     limit: Annotated[
         int,
         typer.Option(help="Maximum number of pages to crawl")
-    ] = 100,
+    ] = 1000,
     max_depth: Annotated[
         int,
         typer.Option(help="Maximum crawl depth from base URL")

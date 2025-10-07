@@ -27,8 +27,14 @@ class FirecrawlSourceConfig(BaseModel):
     enabled: bool = True
     default_crawl_depth: int = Field(default=3, ge=1, le=10)
     max_pages: int = Field(default=1000, ge=1, le=10000)
-    formats: list[str] = Field(default=["markdown", "html"])
+    formats: list[str] = Field(default=["markdown"])
     urls: list[str] = Field(default_factory=list)
+    include_paths: list[str] = Field(default_factory=list)
+    exclude_paths: list[str] = Field(default_factory=list)
+    concurrency: int | None = Field(default=None, ge=1, le=32)
+    max_retries: int = Field(default=2, ge=0, le=10)
+    retry_delay_ms: int = Field(default=2000, ge=0, le=60000)
+    timeout_ms: int | None = Field(default=None, ge=0, le=120000)
 
 
 class GitHubSourceConfig(BaseModel):
@@ -128,8 +134,10 @@ class IngestionConfig(BaseModel):
 
     chunk_size: int = Field(default=512, ge=128, le=32768)  # Support full Qwen3 32K context
     chunk_overlap: int = Field(default=50, ge=0, le=8192)   # Allow up to 25% overlap at 32K chunks
-    batch_size: int = Field(default=100, ge=1, le=1000)
+    batch_size: int = Field(default=32, ge=1, le=1000)
     concurrent_sources: int = Field(default=3, ge=1, le=10)
+    pipeline_workers: int = Field(default=1, ge=1, le=32)
+    embedding_batch_size: int = Field(default=64, ge=1, le=256)
     retry: RetryConfig = Field(default_factory=RetryConfig)
     deduplication: DeduplicationConfig = Field(default_factory=DeduplicationConfig)
     dlq: DLQConfig = Field(default_factory=DLQConfig)
@@ -143,8 +151,8 @@ class QueryConfig(BaseModel):
     enable_reranking: bool = True
     enable_graph_traversal: bool = True
     max_graph_depth: int = Field(default=2, ge=1, le=5)
-    synthesis_model: str = "llama3.2:3b"
-    max_context_tokens: int = Field(default=4096, ge=512, le=16384)
+    synthesis_model: str = "claude-3-5-haiku-20241022"  # Fast and cheap for RAG synthesis
+    max_context_tokens: int = Field(default=4096, ge=512, le=200000)  # Claude supports up to 200K
     temperature: float = Field(default=0.1, ge=0.0, le=2.0)
     include_snippets: bool = True
     snippet_length: int = Field(default=200, ge=50, le=1000)
@@ -154,16 +162,54 @@ class GraphConfig(BaseModel):
     """Knowledge graph extraction configuration."""
 
     auto_extract_entities: bool = True
-    extraction_model: str = "qwen2.5:14b-instruct-q4_K_M"
+    extraction_model: str = "claude-3-5-haiku-20241022"  # Fast/cheap Claude model for extraction
     max_keywords_per_document: int = Field(default=10, ge=1, le=50)
     relationship_extraction: bool = True
     entity_types: list[str] = Field(
-        default=["PERSON", "ORGANIZATION", "LOCATION", "PRODUCT", "TECHNOLOGY"]
+        default=["PERSON", "ORGANIZATION", "LOCATION", "PRODUCT", "TECHNOLOGY", "EVENT", "FILE", "CONCEPT"]
     )
     extraction_strategy: Literal["simple", "implicit", "schema", "combined"] = "simple"
     confidence_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
-    max_triplets_per_chunk: int = Field(default=15, ge=1, le=50)
+    max_triplets_per_chunk: int = Field(default=30, ge=1, le=100)
     include_implicit_relations: bool = True
+
+    # Entity type schemas with properties
+    entity_properties: dict[str, list[str]] = Field(
+        default={
+            "PERSON": ["email", "role", "title", "company"],
+            "ORGANIZATION": ["industry", "size", "website", "location"],
+            "LOCATION": ["address", "coordinates", "type"],
+            "PRODUCT": ["version", "vendor", "category"],
+            "TECHNOLOGY": ["language", "framework", "version"],
+            "EVENT": ["startTime", "endTime", "location", "type"],
+            "FILE": ["fileId", "source", "format", "lastModified"],
+            "CONCEPT": ["category", "domain", "relatedTo"],
+        }
+    )
+
+    # Relation type schemas with properties
+    relation_types: list[str] = Field(
+        default=[
+            "WORKS_FOR", "CREATED_BY", "LOCATED_IN", "USES", "PART_OF",
+            "RELATED_TO", "IMPLEMENTS", "DEPENDS_ON", "MENTIONS", "REFERENCES"
+        ]
+    )
+
+    relation_properties: dict[str, list[str]] = Field(
+        default={
+            "WORKS_FOR": ["role", "startDate", "endDate"],
+            "CREATED_BY": ["date", "version"],
+            "LOCATED_IN": ["since", "type"],
+            "USES": ["purpose", "frequency"],
+            "PART_OF": ["role", "percentage"],
+            "RELATED_TO": ["strength", "type"],
+            "IMPLEMENTS": ["version", "standard"],
+            "DEPENDS_ON": ["version", "type"],
+            "MENTIONS": ["context", "sentiment"],
+            "REFERENCES": ["page", "section"],
+        }
+    )
+
     allowed_entity_types: list[str] | None = None
     allowed_relation_types: list[str] | None = None
 
@@ -183,6 +229,9 @@ class VectorStoreConfig(BaseModel):
     distance_metric: Literal["cosine", "euclidean", "dot"] = "cosine"
     enable_quantization: bool = True
     hnsw: HNSWConfig = Field(default_factory=HNSWConfig)
+    upsert_batch_size: int = Field(default=256, ge=1, le=1024)
+    upsert_parallel: int = Field(default=4, ge=1, le=16)
+    upsert_max_retries: int = Field(default=3, ge=0, le=10)
 
 
 class LoggingConfig(BaseModel):
@@ -243,7 +292,6 @@ class Config(BaseModel):
     redis_url: str = "redis://localhost:6379"
     tei_embedding_url: str
     tei_reranker_url: str
-    ollama_url: str
 
     # Observability (env var overrides)
     log_level: str = "INFO"
@@ -355,7 +403,6 @@ def load_config(
         "redis_url": os.getenv("REDIS_URL", "redis://localhost:6379"),
         "tei_embedding_url": os.getenv("TEI_EMBEDDING_URL"),
         "tei_reranker_url": os.getenv("TEI_RERANKER_URL"),
-        "ollama_url": os.getenv("OLLAMA_URL"),
         # Observability (override YAML if env var set)
         "log_level": os.getenv("LOG_LEVEL", yaml_config.get("logging", {}).get("level", "INFO")),
         "prometheus_port": int(
@@ -377,8 +424,6 @@ def load_config(
         raise ValueError("TEI_EMBEDDING_URL environment variable is required")
     if not config.tei_reranker_url:
         raise ValueError("TEI_RERANKER_URL environment variable is required")
-    if not config.ollama_url:
-        raise ValueError("OLLAMA_URL environment variable is required")
 
     # Additional validation: check enabled sources have credentials
     _validate_source_credentials(config)

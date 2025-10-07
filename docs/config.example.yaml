@@ -16,9 +16,17 @@ sources:
     # Maximum pages per crawl (hard limit)
     max_pages: 1000
     # Output formats (markdown recommended for better parsing)
-    formats: [markdown, html]
+    formats: [markdown]
     # URLs to scrape (can be added dynamically via CLI)
     urls: []
+    # Optionally restrict crawl scope
+    include_paths: []
+    exclude_paths: []
+    # Worker concurrency and retry behaviour
+    concurrency: 4
+    max_retries: 2
+    retry_delay_ms: 1500
+    timeout_ms: 12000
 
   # GitHub Repositories
   github:
@@ -91,7 +99,11 @@ ingestion:
 
   # Batch Processing
   # Number of documents to process per batch
-  batch_size: 100
+  batch_size: 32
+  # Number of parallel workers for pipeline transformations (leave at 1 unless needed)
+  pipeline_workers: 1
+  # Embedding batch size (controls TEI request payload size)
+  embedding_batch_size: 64
   # Maximum concurrent sources to ingest in parallel
   concurrent_sources: 3
 
@@ -191,6 +203,10 @@ vector_store:
   distance_metric: "cosine"
   # Enable scalar quantization (4x memory reduction)
   enable_quantization: true
+  # Upsert batching configuration
+  upsert_batch_size: 256
+  upsert_parallel: 2
+  upsert_max_retries: 3
   # HNSW index parameters (performance tuning)
   hnsw:
     m: 16

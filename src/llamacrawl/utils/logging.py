@@ -1,7 +1,7 @@
-"""Structured JSON logging setup for LlamaCrawl.
+"""Structured logging setup for LlamaCrawl.
 
-This module provides structured logging with JSON formatting, context management,
-and timing utilities. All logs are formatted as JSON for easy parsing and analysis.
+Supports configurable console output (JSON or rich text), context helpers, and
+execution timing utilities used across the application.
 """
 
 import logging
@@ -14,6 +14,7 @@ from functools import wraps
 from typing import Any, TypeVar, cast
 
 from pythonjsonlogger import jsonlogger
+from rich.logging import RichHandler
 
 # Type variables for decorators
 F = TypeVar("F", bound=Callable[..., Any])
@@ -64,22 +65,30 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):  # type: ignore
                 log_record[key] = value
 
 
-def setup_logging(log_level: str | None = None) -> None:
-    """Configure root logger with JSON formatting and console output.
+def setup_logging(log_level: str | None = None, log_format: str | None = None) -> None:
+    """Configure root logger with console output.
 
     Args:
-        log_level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
-                  If None, reads from LOG_LEVEL environment variable.
-                  Defaults to INFO if not set.
+        log_level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL). If None,
+            reads from LOG_LEVEL environment variable (default INFO).
+        log_format: Output format ("json" or "text"). If None, reads from
+            LOG_FORMAT environment variable (default "json").
     """
     # Determine log level
     if log_level is None:
         log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    else:
+        log_level = log_level.upper()
 
     # Validate log level
     numeric_level = getattr(logging, log_level, logging.INFO)
     if not isinstance(numeric_level, int):
         numeric_level = logging.INFO
+
+    # Determine log format
+    if log_format is None:
+        log_format = os.environ.get("LOG_FORMAT", "json")
+    log_format = (log_format or "json").lower()
 
     # Get root logger
     root_logger = logging.getLogger()
@@ -88,22 +97,34 @@ def setup_logging(log_level: str | None = None) -> None:
     # Remove existing handlers to avoid duplicates
     root_logger.handlers.clear()
 
-    # Create console handler with JSON formatter
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(numeric_level)
+    if log_format == "text":
+        console_handler = RichHandler(
+            rich_tracebacks=True,
+            markup=True,
+            show_path=False,
+            show_time=True,
+            log_time_format="%Y-%m-%d %H:%M:%S",
+        )
+        console_handler.setLevel(numeric_level)
+        formatter: logging.Formatter = logging.Formatter("%(message)s")
+    else:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(numeric_level)
+        formatter = CustomJsonFormatter(
+            "%(timestamp)s %(level)s %(logger)s %(message)s",
+            rename_fields={"levelname": "level", "name": "logger"},
+        )
 
-    # Configure JSON formatter
-    formatter = CustomJsonFormatter(
-        "%(timestamp)s %(level)s %(logger)s %(message)s",
-        rename_fields={"levelname": "level", "name": "logger"},
-    )
     console_handler.setFormatter(formatter)
 
     # Add handler to root logger
     root_logger.addHandler(console_handler)
 
     # Log initial setup message
-    root_logger.info("Logging configured", extra={"log_level": log_level})
+    root_logger.info(
+        "Logging configured",
+        extra={"log_level": log_level, "log_format": log_format},
+    )
 
 
 def get_logger(name: str) -> logging.Logger:

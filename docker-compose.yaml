@@ -136,25 +136,6 @@ services:
       timeout: 10s
       retries: 3
 
-  taboot-ollama:
-    <<: [*common-base, *gpu-deploy]
-    image: ollama/ollama:latest
-    container_name: taboot-ollama
-    ports:
-      - "${OLLAMA_PORT:-11434}:11434"
-    volumes:
-      - taboot-ollama:/root/.ollama
-    environment:
-      <<: *gpu-env
-      OLLAMA_HOST: 0.0.0.0:11434
-      OLLAMA_KEEP_ALIVE: 5m
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
   taboot-playwright:
     <<: *common-base
     image: ghcr.io/firecrawl/playwright-service:latest
@@ -215,7 +196,6 @@ volumes:
   taboot-graph_logs:
   taboot-graph_plugins:
   taboot-cache:
-  taboot-ollama:
   taboot-db:
 
 networks:

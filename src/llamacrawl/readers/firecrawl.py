@@ -52,6 +52,18 @@ class FirecrawlReader(BaseReader):
         ... )
     """
 
+    ALLOWED_METADATA_KEYS = {
+        "title",
+        "description",
+        "language",
+        "keywords",
+        "ogTitle",
+        "ogDescription",
+        "ogImage",
+        "status_code",
+        "content_type",
+    }
+
     def __init__(
         self,
         source_name: str,
@@ -84,17 +96,49 @@ class FirecrawlReader(BaseReader):
                 "Get your API key from your Firecrawl instance admin panel."
             )
 
+        self.include_paths: list[str] = config.get("include_paths", []) or []
+        self.exclude_paths: list[str] = config.get("exclude_paths", []) or []
+        self.concurrency: int | None = config.get("concurrency")
+        self.max_retries: int | None = config.get("max_retries")
+        self.retry_delay_ms: int | None = config.get("retry_delay_ms")
+        self.timeout_ms: int | None = config.get("timeout_ms")
+        self.max_metadata_chars: int = config.get("metadata_max_chars", 256)
+        self.max_metadata_list_items: int = config.get("metadata_max_list_items", 5)
+        self.max_metadata_dict_items: int = config.get("metadata_max_dict_items", 5)
+
+        self._base_params = self._build_base_params()
+
         # Initialize LlamaIndex FireCrawlWebReader
         # Note: FireCrawlWebReader now supports Firecrawl v2 SDK (as of PR #19773)
         self.firecrawl_reader = FireCrawlWebReader(
             api_key=self.api_key,
             api_url=self.api_url,
+            params=self._base_params,
         )
 
         self.logger.info(
             f"FirecrawlReader initialized with API URL: {self.api_url}",
             extra={"source": self.source_name, "api_url": self.api_url},
         )
+
+    def _build_base_params(self) -> dict[str, Any]:
+        """Build base parameters applied to every Firecrawl request."""
+        params: dict[str, Any] = {}
+
+        if self.include_paths:
+            params["includePaths"] = self.include_paths
+        if self.exclude_paths:
+            params["excludePaths"] = self.exclude_paths
+        if self.concurrency is not None:
+            params["concurrency"] = self.concurrency
+        if self.max_retries is not None:
+            params["maxRetries"] = self.max_retries
+        if self.retry_delay_ms is not None:
+            params["retryDelay"] = self.retry_delay_ms
+        if self.timeout_ms is not None:
+            params["timeout"] = self.timeout_ms
+
+        return params
 
     def supports_incremental_sync(self) -> bool:
         """Check if Firecrawl supports incremental synchronization.
@@ -310,13 +354,15 @@ class FirecrawlReader(BaseReader):
         Returns:
             Dictionary of Firecrawl API parameters
         """
-        params: dict[str, Any] = {}
+        params: dict[str, Any] = self._base_params.copy()
 
         # Mode-specific parameters
         if mode == "crawl":
             # Crawl mode: nest scrape options in scrape_options parameter
             if formats:
-                params["scrape_options"] = {"formats": formats}
+                scrape_options = params.get("scrape_options", {})
+                scrape_options["formats"] = formats
+                params["scrape_options"] = scrape_options
             params["limit"] = limit
             params["maxDepth"] = max_depth
 
@@ -364,6 +410,7 @@ class FirecrawlReader(BaseReader):
             # Extract content and metadata
             content = llama_doc.text or llama_doc.get_content()
             llama_metadata = llama_doc.metadata or {}
+            sanitized_metadata = self._sanitize_firecrawl_metadata(llama_metadata)
 
             # Generate unique document ID
             # Use URL from metadata if available, otherwise use source_url
@@ -386,7 +433,7 @@ class FirecrawlReader(BaseReader):
                 source_url=doc_url,
                 timestamp=timestamp,
                 extra={
-                    "firecrawl_metadata": llama_metadata,
+                    "firecrawl_metadata": sanitized_metadata,
                     "index": idx,
                     "total_docs": len(llamaindex_docs),
                 },
@@ -405,6 +452,41 @@ class FirecrawlReader(BaseReader):
             documents.append(document)
 
         return documents
+
+    def _sanitize_firecrawl_metadata(self, metadata: dict[str, Any]) -> dict[str, Any]:
+        """Reduce Firecrawl metadata to a compact subset to avoid oversized chunks."""
+        sanitized: dict[str, Any] = {}
+        if not isinstance(metadata, dict):
+            return sanitized
+
+        for key in self.ALLOWED_METADATA_KEYS:
+            if key in metadata and metadata[key] not in (None, "", [], {}):
+                sanitized[key] = self._truncate_metadata_value(metadata[key])
+
+        return sanitized
+
+    def _truncate_metadata_value(self, value: Any, depth: int = 0) -> Any:
+        """Truncate metadata values to keep payload sizes manageable."""
+        if isinstance(value, str):
+            if len(value) > self.max_metadata_chars:
+                return value[: self.max_metadata_chars] + "..."
+            return value
+        if isinstance(value, (int, float, bool)) or value is None:
+            return value
+        if isinstance(value, list):
+            truncated_items = [
+                self._truncate_metadata_value(item, depth + 1)
+                for item in value[: self.max_metadata_list_items]
+            ]
+            return truncated_items
+        if isinstance(value, dict):
+            truncated_dict: dict[str, Any] = {}
+            for idx, (k, v) in enumerate(value.items()):
+                if idx >= self.max_metadata_dict_items:
+                    break
+                truncated_dict[k] = self._truncate_metadata_value(v, depth + 1)
+            return truncated_dict
+        return str(value)[: self.max_metadata_chars]
 
     def _validate_url(self, url: str) -> bool:
         """Validate URL format.

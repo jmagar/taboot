@@ -189,30 +189,31 @@ class DocumentDeduplicator:
         new_documents: list[Document] = []
         duplicate_documents: list[Document] = []
 
+        hash_set_key = f"hash_content:{source}"
+
         # Use Redis pipeline for batch operations (more efficient than individual calls)
         pipeline = self.redis.client.pipeline()
 
-        # Build list of keys to check
-        doc_keys = [f"hash:{source}:{doc.doc_id}" for doc in documents]
+        doc_hashes: list[str] = []
 
-        # Batch GET all stored hashes
-        for key in doc_keys:
-            pipeline.get(key)
+        for doc in documents:
+            current_hash = compute_content_hash(doc.content, self.remove_punctuation)
+            doc.content_hash = current_hash
+            doc_hashes.append(current_hash)
 
-        # Execute pipeline and get stored hashes
-        stored_hashes = pipeline.execute()
+            hash_key = f"hash:{source}:{doc.doc_id}"
+            pipeline.get(hash_key)
+            pipeline.sismember(hash_set_key, current_hash)
+
+        results = pipeline.execute()
 
         # Process each document
-        for doc, stored_hash in zip(documents, stored_hashes, strict=False):
-            # Compute current content hash
-            current_hash = compute_content_hash(doc.content, self.remove_punctuation)
+        for idx, doc in enumerate(documents):
+            stored_hash = results[2 * idx]
+            hash_seen_before = bool(results[2 * idx + 1])
+            current_hash = doc_hashes[idx]
 
-            # Update document model with computed hash
-            doc.content_hash = current_hash
-
-            # Check if hash matches stored value
             if stored_hash and stored_hash == current_hash:
-                # Document unchanged - duplicate
                 duplicate_documents.append(doc)
                 logger.debug(
                     "Document unchanged (duplicate)",
@@ -222,8 +223,17 @@ class DocumentDeduplicator:
                         "content_hash": current_hash,
                     },
                 )
+            elif not stored_hash and hash_seen_before:
+                duplicate_documents.append(doc)
+                logger.debug(
+                    "Document duplicate based on content hash",
+                    extra={
+                        "source": source,
+                        "doc_id": doc.doc_id,
+                        "content_hash": current_hash,
+                    },
+                )
             else:
-                # Document new or modified
                 new_documents.append(doc)
                 logger.debug(
                     "Document new or modified",
@@ -231,7 +241,7 @@ class DocumentDeduplicator:
                         "source": source,
                         "doc_id": doc.doc_id,
                         "content_hash": current_hash,
-                        "previously_seen": bool(stored_hash),
+                        "previously_seen": bool(stored_hash or hash_seen_before),
                     },
                 )
 
@@ -273,10 +283,13 @@ class DocumentDeduplicator:
         # Use Redis pipeline for batch operations
         pipeline = self.redis.client.pipeline()
 
+        hash_set_key = f"hash_content:{source}"
+
         for doc in documents:
             key = f"hash:{source}:{doc.doc_id}"
             # Use content_hash from document model (already computed)
             pipeline.set(key, doc.content_hash)
+            pipeline.sadd(hash_set_key, doc.content_hash)
 
         # Execute all SET commands at once
         pipeline.execute()

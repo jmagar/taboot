@@ -116,23 +116,42 @@ class TestDocumentDeduplicator:
         mock_pipeline = Mock()
         mock_redis.client.pipeline.return_value = mock_pipeline
 
-        # First 5 docs are new (None), last 5 are duplicates (matching hash)
-        # Pipeline.execute() returns a list of results (one per document)
-        stored_hashes = []
+        results = []
         for i, doc in enumerate(sample_documents):
             if i >= 5:
                 # Return matching hash for duplicate
-                stored_hashes.append(compute_content_hash(doc.content))
+                stored_hashes_hash = compute_content_hash(doc.content)
+                results.extend([stored_hashes_hash, True])
             else:
                 # Return None for new document
-                stored_hashes.append(None)
+                results.extend([None, False])
 
-        mock_pipeline.execute.return_value = stored_hashes
+        mock_pipeline.execute.return_value = results
 
         new_docs, duplicates = dedup.get_deduplicated_documents("test_source", sample_documents)
 
         assert len(new_docs) == 5
         assert len(duplicates) == 5
+
+    def test_dedup_duplicate_content_new_ids(
+        self, dedup: DocumentDeduplicator, mock_redis: Mock, sample_documents: list[Document]
+    ) -> None:
+        """Documents with new IDs but existing content hashes are treated as duplicates."""
+
+        mock_pipeline = Mock()
+        mock_redis.client.pipeline.return_value = mock_pipeline
+
+        # Simulate all stored hashes missing, but content hash already known in set
+        results = []
+        for doc in sample_documents[:2]:
+            results.extend([None, True])  # stored hash missing, hash seen before
+
+        mock_pipeline.execute.return_value = results
+
+        new_docs, duplicates = dedup.get_deduplicated_documents("test_source", sample_documents[:2])
+
+        assert not new_docs
+        assert len(duplicates) == 2
 
 
 @pytest.mark.unit
@@ -170,16 +189,16 @@ class TestDeduplicationMetrics:
 
         # Mock: docs 2, 5, 8 are duplicates (return matching hash)
         # Others are new (return None)
-        stored_hashes = []
+        results = []
         for i, doc in enumerate(docs):
             if i in [2, 5, 8]:
                 # Return matching hash for duplicate
-                stored_hashes.append(doc.content_hash)
+                results.extend([doc.content_hash, True])
             else:
                 # Return None for new document
-                stored_hashes.append(None)
+                results.extend([None, False])
 
-        mock_pipeline.execute.return_value = stored_hashes
+        mock_pipeline.execute.return_value = results
 
         new_docs, duplicates = dedup.get_deduplicated_documents("test_source", docs)
 

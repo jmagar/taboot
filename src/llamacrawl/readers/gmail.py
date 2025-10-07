@@ -319,6 +319,7 @@ class GmailReader(BaseReader):
         Constructs query using Gmail search operators:
         - If cursor exists and not ignored: "after:YYYY/MM/DD label:INBOX label:SENT"
         - If no cursor or cursor ignored (full sync): "label:INBOX label:SENT"
+        - Appends any configured query_filters (e.g., "from:user@example.com", "has:attachment")
 
         Args:
             labels: List of Gmail labels to filter (e.g., ["INBOX", "SENT"])
@@ -339,6 +340,11 @@ class GmailReader(BaseReader):
             >>> # Full re-ingestion (ignore cursor)
             >>> query = reader._build_query(["INBOX"], ignore_cursor=True)
             >>> print(query)  # "label:INBOX"
+            >>>
+            >>> # With query filters
+            >>> # config.yaml: query_filters: ["from:alice@example.com", "has:attachment"]
+            >>> query = reader._build_query(["INBOX"])
+            >>> print(query)  # "label:INBOX from:alice@example.com has:attachment"
         """
         query_parts = []
 
@@ -367,6 +373,15 @@ class GmailReader(BaseReader):
                 # Use OR operator for multiple labels (must be uppercase)
                 label_query = " OR ".join(label_queries)
                 query_parts.append(f"({label_query})")
+
+        # Add configured query filters (e.g., "from:user@example.com", "has:attachment")
+        query_filters = self.config.get("query_filters", [])
+        if query_filters:
+            query_parts.extend(query_filters)
+            self.logger.debug(
+                f"Applied query filters: {query_filters}",
+                extra={"source": self.source_name, "filters": query_filters},
+            )
 
         query = " ".join(query_parts)
 

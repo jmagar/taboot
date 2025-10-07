@@ -199,6 +199,62 @@ class RedisClient:
         # Push to left (head) of list
         self.client.lpush(key, json.dumps(dlq_entry))
 
+    def cleanup_dlq(self, source: str, retention_days: int) -> int:
+        """Remove DLQ entries older than retention period.
+
+        Args:
+            source: Source identifier
+            retention_days: Number of days to retain entries
+
+        Returns:
+            Number of entries removed
+
+        Example:
+            >>> # Remove entries older than 7 days
+            >>> removed = redis_client.cleanup_dlq('gmail', retention_days=7)
+            >>> print(f"Removed {removed} old DLQ entries")
+        """
+        key = f"dlq:{source}"
+
+        # Calculate cutoff timestamp
+        cutoff_time = time.time() - (retention_days * 86400)
+
+        # Get all entries
+        all_entries_json = self.client.lrange(key, 0, -1)
+
+        # Filter entries to keep (newer than cutoff)
+        entries_to_keep = []
+        removed_count = 0
+
+        for entry_json in all_entries_json:
+            try:
+                entry = json.loads(entry_json)
+                entry_time = entry.get("timestamp", 0)
+
+                if entry_time >= cutoff_time:
+                    # Keep entry (within retention period)
+                    entries_to_keep.append(entry_json)
+                else:
+                    # Entry is too old, will be removed
+                    removed_count += 1
+
+            except json.JSONDecodeError:
+                # Skip malformed entries (they will be removed)
+                removed_count += 1
+
+        # Replace list with filtered entries
+        if removed_count > 0:
+            # Delete old list
+            self.client.delete(key)
+
+            # Re-create list with kept entries (if any)
+            if entries_to_keep:
+                # Push in reverse order to maintain FIFO semantics
+                for entry_json in reversed(entries_to_keep):
+                    self.client.rpush(key, entry_json)
+
+        return removed_count
+
     def get_dlq(self, source: str, limit: int = 100) -> list[dict[str, Any]]:
         """Retrieve DLQ entries for inspection or reprocessing.
 

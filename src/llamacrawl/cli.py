@@ -11,6 +11,7 @@ Usage:
     llamacrawl init
 """
 
+import logging
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -18,7 +19,6 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 from llama_index.core import Settings
-from llama_index.llms.ollama import Ollama
 from rich.console import Console
 
 from llamacrawl.config import (
@@ -101,23 +101,18 @@ def main(
     if ctx.invoked_subcommand is None or ctx.invoked_subcommand == "version":
         return
 
-    # Setup logging first (before loading config)
-    if log_level:
-        setup_logging(log_level.upper())
-    else:
-        setup_logging()
-
     # Load configuration
+    config_source = "default paths"
+    config = None
     try:
         if config_path:
             # Load from specified path
             env_file = config_path.parent / ".env"
-            load_config(env_file=env_file, config_file=config_path)
-            logger.info(f"Configuration loaded from {config_path}")
+            config = load_config(env_file=env_file, config_file=config_path)
+            config_source = str(config_path)
         else:
             # Load from default paths (./config.yaml and ./.env)
-            load_config()
-            logger.info("Configuration loaded from default paths")
+            config = load_config()
 
     except FileNotFoundError as e:
         console.print(f"[bold red]Configuration Error:[/bold red] {e}")
@@ -126,9 +121,26 @@ def main(
         console.print(f"[bold red]Configuration Validation Error:[/bold red] {e}")
         raise typer.Exit(code=2) from e
     except Exception as e:
+        if not logging.getLogger().handlers:
+            setup_logging(log_format="text")
         console.print(f"[bold red]Unexpected Error:[/bold red] {e}")
         logger.exception("Failed to load configuration")
         raise typer.Exit(code=1) from e
+
+    if config is None:
+        console.print("[bold red]Failed to load configuration[/bold red]")
+        raise typer.Exit(code=1)
+
+    effective_log_level = log_level.upper() if log_level else config.logging.level.upper()
+    setup_logging(log_level=effective_log_level, log_format=config.logging.format)
+    logger.info(
+        "Configuration loaded",
+        extra={
+            "config_source": config_source,
+            "log_level": effective_log_level,
+            "log_format": config.logging.format,
+        },
+    )
 
 
 # =============================================================================
@@ -406,9 +418,13 @@ def ingest(
                     url=config.qdrant_url,
                     collection_name=config.vector_store.collection_name,
                     vector_dimension=config.vector_store.vector_dimension,
+                    distance_metric=config.vector_store.distance_metric,
                 )
                 neo4j_client = Neo4jClient(config=config)
-                embedding_model = TEIEmbedding(base_url=config.tei_embedding_url)
+                embedding_model = TEIEmbedding(
+                    base_url=config.tei_embedding_url,
+                    embed_batch_size=config.ingestion.embedding_batch_size,
+                )
 
                 # Instantiate IngestionPipeline
                 pipeline = IngestionPipeline(
@@ -601,6 +617,7 @@ def query(
             url=config.qdrant_url,
             collection_name=config.vector_store.collection_name,
             vector_dimension=config.vector_store.vector_dimension,
+            distance_metric=config.vector_store.distance_metric,
         )
         neo4j_client = Neo4jClient(config=config)
 
@@ -611,14 +628,6 @@ def query(
             base_url=config.tei_reranker_url,
             top_n=config.query.rerank_top_n,
         )
-
-        # Configure LlamaIndex global settings
-        logger.debug("Configuring LlamaIndex Settings")
-        Settings.llm = Ollama(
-            model=config.graph.extraction_model,
-            base_url=config.ollama_url,
-        )
-        Settings.embed_model = embed_model
 
         # Initialize query engine
         logger.debug("Initializing query engine")
@@ -674,16 +683,40 @@ def query(
                 console.print(json_lib.dumps(empty_result, indent=2))
             raise typer.Exit(code=0)
 
-        # Build QueryResult from query engine results using AnswerSynthesizer
-        query_result = synthesizer.synthesize(
-            query_text=text,
-            retrieved_docs=results["results"]
-        )
-
-        # Format and display output
+        # Stream answer synthesis for text output, use blocking for JSON
         if output_format == "text":
-            _display_text_output(query_result, console)
+            # Stream the answer token by token
+            console.print("\n[bold]Answer:[/bold]")
+            console.print()
+
+            answer_parts: list[str] = []
+            for delta in synthesizer.stream_synthesize(text, results["results"]):
+                console.print(delta, end="")  # Print immediately without newline
+                answer_parts.append(delta)
+
+            console.print("\n")  # Final newlines after answer
+
+            # Build query result for sources display
+            from llamacrawl.models.document import QueryResult
+            query_result = QueryResult(
+                answer="".join(answer_parts),
+                sources=synthesizer._create_source_attributions(
+                    results["results"],
+                    include_snippets=True
+                ),
+                query_time_ms=int(results["metrics"]["total_time_ms"]),
+                retrieved_docs=len(results["results"]),
+                reranked_docs=len(results["results"]),
+            )
+
+            # Display sources (not answer since we already streamed it)
+            _display_sources_and_stats(query_result, console)
         else:
+            # JSON output - use blocking synthesis
+            query_result = synthesizer.synthesize(
+                query_text=text,
+                retrieved_docs=results["results"]
+            )
             _display_json_output(query_result, console)
 
         logger.info(
@@ -779,6 +812,7 @@ def status(
             url=config.qdrant_url,
             collection_name=config.vector_store.collection_name,
             vector_dimension=config.vector_store.vector_dimension,
+            distance_metric=config.vector_store.distance_metric,
         )
         qdrant_healthy = qdrant_client.health_check()
     except Exception as e:
@@ -832,13 +866,6 @@ def status(
     status_data["services"]["tei_reranker"] = {
         "healthy": tei_reranker_healthy,
         "url": config.tei_reranker_url,
-    }
-
-    # Ollama health check
-    ollama_healthy = check_service_health("Ollama", config.ollama_url, "/api/tags")
-    status_data["services"]["ollama"] = {
-        "healthy": ollama_healthy,
-        "url": config.ollama_url,
     }
 
     # =========================================================================
@@ -1119,6 +1146,7 @@ def init(
             url=config.qdrant_url,
             collection_name=config.vector_store.collection_name,
             vector_dimension=config.vector_store.vector_dimension,
+            distance_metric=config.vector_store.distance_metric,
         )
 
         # Check health
@@ -1318,19 +1346,14 @@ def _build_query_result_from_engine_output(engine_output: dict[str, Any]) -> "Qu
     )
 
 
-def _display_text_output(query_result: "QueryResult", console: Console) -> None:
-    """Display query results in pretty text format.
+def _display_sources_and_stats(query_result: "QueryResult", console: Console) -> None:
+    """Display sources and statistics (for streaming mode where answer already shown).
 
     Args:
         query_result: QueryResult model
         console: Rich console instance
     """
-    from rich.panel import Panel
     from rich.table import Table
-
-    # Display answer
-    console.print("\n[bold cyan]Answer:[/bold cyan]")
-    console.print(Panel(query_result.answer, border_style="cyan"))
 
     # Display sources
     console.print("\n[bold cyan]Sources:[/bold cyan]")
@@ -1367,6 +1390,23 @@ def _display_text_output(query_result: "QueryResult", console: Console) -> None:
     console.print(f"  Retrieved: {query_result.retrieved_docs} documents")
     console.print(f"  Reranked: {query_result.reranked_docs} documents")
     console.print(f"  Query time: {query_result.query_time_ms}ms")
+
+
+def _display_text_output(query_result: "QueryResult", console: Console) -> None:
+    """Display query results in pretty text format (blocking mode).
+
+    Args:
+        query_result: QueryResult model
+        console: Rich console instance
+    """
+    from rich.panel import Panel
+
+    # Display answer
+    console.print("\n[bold cyan]Answer:[/bold cyan]")
+    console.print(Panel(query_result.answer, border_style="cyan"))
+
+    # Display sources and stats
+    _display_sources_and_stats(query_result, console)
 
 
 def _display_json_output(query_result: "QueryResult", console: Console) -> None:

@@ -14,15 +14,19 @@ Usage:
 """
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 from urllib.parse import urlparse
 
 import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from llamacrawl.config import FirecrawlSourceConfig, load_config
+from llamacrawl.config import load_config
 from llamacrawl.embeddings.tei import TEIEmbedding
+from llamacrawl.ingestion.language_filter import (
+    build_language_filter_from_config,
+    filter_documents_by_language,
+)
 from llamacrawl.ingestion.pipeline import IngestionPipeline
 from llamacrawl.readers.firecrawl import FirecrawlReader
 from llamacrawl.storage.neo4j import Neo4jClient
@@ -84,6 +88,11 @@ def _run_firecrawl_map(url: str, limit: int) -> None:
         console.print(f"[red]Error initializing Redis:[/red] {e}")
         raise typer.Exit(1)
 
+    language_filter_component = build_language_filter_from_config(
+        getattr(getattr(config, "ingestion", None), "language_filter", None),
+        log_filtered_override=False,
+    )
+
     # Create Firecrawl reader
     reader_config = {"limit": limit}
     try:
@@ -114,6 +123,38 @@ def _run_firecrawl_map(url: str, limit: int) -> None:
             if not documents:
                 console.print("[yellow]No URLs discovered")
                 return
+
+            original_count = len(documents)
+            filtered_count = 0
+
+            if language_filter_component:
+                filtered_documents = filter_documents_by_language(
+                    documents, language_filter_component
+                )
+                filtered_count = original_count - len(filtered_documents)
+                documents = filtered_documents
+
+                if filtered_count:
+                    logger.info(
+                        "Language filter removed %s Firecrawl map documents",
+                        filtered_count,
+                        extra={
+                            "mode": "map",
+                            "filtered": filtered_count,
+                            "original_count": original_count,
+                        },
+                    )
+
+            if not documents:
+                console.print(
+                    "[yellow]All discovered URLs were filtered out by language settings"
+                )
+                return
+
+            if filtered_count:
+                console.print(
+                    f"[yellow]Language filter kept {len(documents)}/{original_count} URLs"
+                )
 
             # Extract URLs from documents
             urls: list[str] = []
@@ -146,11 +187,16 @@ def _run_firecrawl_map(url: str, limit: int) -> None:
 def _run_firecrawl_ingestion(
     url: str,
     mode: str,
-    limit: Optional[int] = None,
-    max_depth: Optional[int] = None,
-    formats: Optional[list[str]] = None,
-    schema: Optional[str] = None,
-    prompt: Optional[str] = None,
+    limit: int | None = None,
+    max_depth: int | None = None,
+    formats: list[str] | None = None,
+    schema: str | None = None,
+    prompt: str | None = None,
+    include_paths: list[str] | None = None,
+    exclude_paths: list[str] | None = None,
+    location_country: str | None = None,
+    location_languages: list[str] | None = None,
+    filter_non_english_metadata: bool = True,
 ) -> int:
     """Shared ingestion logic for all Firecrawl commands.
 
@@ -162,6 +208,11 @@ def _run_firecrawl_ingestion(
         formats: Output formats for scrape/crawl
         schema: JSON schema for extract mode
         prompt: Extraction prompt for extract mode
+        include_paths: URL path patterns to include (regex)
+        exclude_paths: URL path patterns to exclude (regex)
+        location_country: ISO country code for regional targeting
+        location_languages: Language codes for targeting
+        filter_non_english_metadata: Filter by Firecrawl's detected language
 
     Returns:
         Number of documents ingested
@@ -194,6 +245,14 @@ def _run_firecrawl_ingestion(
         console.print(f"[red]Error initializing clients:[/red] {e}")
         raise typer.Exit(1)
 
+    # Build location config if provided
+    location_config = None
+    if location_country:
+        location_config = {
+            "country": location_country,
+            "languages": location_languages or [f"en-{location_country.upper()}"],
+        }
+
     # Create Firecrawl reader config dict
     reader_config = {
         "url": url,
@@ -203,6 +262,10 @@ def _run_firecrawl_ingestion(
         "formats": formats or ["markdown", "html"],
         "schema": schema,
         "prompt": prompt,
+        "include_paths": include_paths or [],
+        "exclude_paths": exclude_paths or [],
+        "location": location_config,
+        "filter_non_english_metadata": filter_non_english_metadata,
     }
 
     # Initialize reader
@@ -229,8 +292,23 @@ def _run_firecrawl_ingestion(
         console.print(f"[red]Error initializing pipeline:[/red] {e}")
         raise typer.Exit(1)
 
+    language_filter_component = None
+    if filter_non_english_metadata:
+        language_filter_component = build_language_filter_from_config(
+            getattr(getattr(config, "ingestion", None), "language_filter", None),
+            log_filtered_override=False,
+        )
+    else:
+        logger.info(
+            "Language filtering disabled via CLI flag for Firecrawl %s",
+            mode,
+            extra={"mode": mode},
+        )
+
     # Run ingestion with progress
     console.print(f"[cyan]Starting Firecrawl {mode} ingestion for:[/cyan] {url}")
+
+    doc_count = 0
 
     with Progress(
         SpinnerColumn(),
@@ -249,26 +327,71 @@ def _run_firecrawl_ingestion(
                 max_depth=max_depth,
                 formats=formats,
             )
+            original_count = len(documents)
+            filtered_count = 0
+
+            if language_filter_component:
+                filtered_documents = filter_documents_by_language(
+                    documents, language_filter_component
+                )
+                filtered_count = original_count - len(filtered_documents)
+                documents = filtered_documents
+
+                if filtered_count:
+                    logger.info(
+                        "Language filter removed %s Firecrawl documents",
+                        filtered_count,
+                        extra={
+                            "mode": mode,
+                            "filtered": filtered_count,
+                            "original_count": original_count,
+                        },
+                    )
+
             doc_count = len(documents)
 
             if doc_count == 0:
-                progress.update(task, description="[yellow]No documents found")
-                console.print("[yellow]Warning: No documents were retrieved")
+                description = (
+                    "[yellow]All documents filtered by language"
+                    if filtered_count
+                    else "[yellow]No documents found"
+                )
+                progress.update(task, description=description)
+                console.print(
+                    "[yellow]Warning: No documents available after language filtering"
+                    if filtered_count
+                    else "[yellow]Warning: No documents were retrieved"
+                )
                 return 0
 
-            progress.update(task, description=f"Loaded {doc_count} documents, ingesting...")
+            if filtered_count:
+                progress.update(
+                    task,
+                    description=(
+                        f"Language filter kept {doc_count}/{original_count} documents; ingesting..."
+                    ),
+                )
+            else:
+                progress.update(
+                    task,
+                    description=f"Loaded {doc_count} documents, ingesting...",
+                )
 
             # Ingest into pipeline
-            summary = pipeline.ingest_documents(source="firecrawl_scrape", documents=documents)
+            summary = pipeline.ingest_documents(
+                source=f"firecrawl_{mode}", documents=documents
+            )
 
             progress.update(
                 task,
-                description=f"[green]✓ Processed {summary.processed}/{doc_count} documents "
-                f"(deduplicated: {summary.deduplicated}, failed: {summary.failed})"
+                description=(
+                    f"[green]✓ Processed {summary.processed}/{doc_count} documents "
+                    f"(deduplicated: {summary.deduplicated}, failed: {summary.failed})"
+                ),
             )
 
         except Exception as e:
-            progress.update(task, description=f"[red]✗ Ingestion failed")
+            progress.update(task, description="[red]✗ Ingestion failed")
             console.print(f"[red]Error during ingestion:[/red] {e}")
             logger.exception("Firecrawl ingestion failed")
             raise typer.Exit(1)
@@ -280,23 +403,50 @@ def _run_firecrawl_ingestion(
 def scrape(
     url: Annotated[str, typer.Argument(help="URL to scrape")],
     formats: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Option(help="Output formats (markdown, html, links, screenshot)")
     ] = None,
+    include_paths: Annotated[
+        list[str] | None,
+        typer.Option("--include-paths", help="URL patterns to include (regex)")
+    ] = None,
+    exclude_paths: Annotated[
+        list[str] | None,
+        typer.Option("--exclude-paths", help="URL patterns to exclude (regex)")
+    ] = None,
+    location_country: Annotated[
+        str | None,
+        typer.Option("--location-country", help="ISO country code (e.g., US, GB)")
+    ] = None,
+    location_languages: Annotated[
+        list[str] | None,
+        typer.Option("--location-languages", help="Language codes (e.g., en-US)")
+    ] = None,
+    only_english: Annotated[
+        bool,
+        typer.Option("--only-english/--all-languages", help="Filter non-English content")
+    ] = True,
 ) -> None:
-    """Scrape a single URL using Firecrawl.
+    """Scrape a single URL using Firecrawl with language filtering.
 
     This command fetches and processes a single web page, extracting content
-    in the specified formats. Default formats are markdown and html.
+    in the specified formats. Language filtering is enabled by default.
 
     Examples:
         llamacrawl scrape https://example.com
         llamacrawl scrape https://docs.python.org/3/ --formats markdown --formats links
+        llamacrawl scrape https://example.com --only-english
+        llamacrawl scrape https://multilingual.com --all-languages
     """
     _run_firecrawl_ingestion(
         url=url,
         mode="scrape",
         formats=formats,
+        include_paths=include_paths,
+        exclude_paths=exclude_paths,
+        location_country=location_country,
+        location_languages=location_languages,
+        filter_non_english_metadata=only_english,
     )
 
 
@@ -311,19 +461,41 @@ def crawl(
         typer.Option(help="Maximum crawl depth from base URL")
     ] = 3,
     formats: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Option(help="Output formats (markdown, html, links, screenshot)")
     ] = None,
+    include_paths: Annotated[
+        list[str] | None,
+        typer.Option("--include-paths", help="URL patterns to include (regex)")
+    ] = None,
+    exclude_paths: Annotated[
+        list[str] | None,
+        typer.Option("--exclude-paths", help="URL patterns to exclude (regex)")
+    ] = None,
+    location_country: Annotated[
+        str | None,
+        typer.Option("--location-country", help="ISO country code (e.g., US, GB)")
+    ] = None,
+    location_languages: Annotated[
+        list[str] | None,
+        typer.Option("--location-languages", help="Language codes (e.g., en-US)")
+    ] = None,
+    only_english: Annotated[
+        bool,
+        typer.Option("--only-english/--all-languages", help="Filter non-English content")
+    ] = True,
 ) -> None:
-    """Crawl an entire website starting from a base URL.
+    """Crawl an entire website with language filtering.
 
     This command recursively crawls a website, following links up to the specified
-    depth and page limit. It extracts content from each page in the specified formats.
+    depth and page limit. Language filtering is enabled by default to save resources.
 
     Examples:
         llamacrawl crawl https://example.com
         llamacrawl crawl https://docs.python.org/ --limit 50 --max-depth 2
-        llamacrawl crawl https://blog.example.com --formats markdown --formats html
+        llamacrawl crawl https://example.com --include-paths "^/en/" --exclude-paths "^/fr/"
+        llamacrawl crawl https://example.com --location-country US --location-languages en-US
+        llamacrawl crawl https://multilingual.com --all-languages
     """
     _run_firecrawl_ingestion(
         url=url,
@@ -331,6 +503,11 @@ def crawl(
         limit=limit,
         max_depth=max_depth,
         formats=formats,
+        include_paths=include_paths,
+        exclude_paths=exclude_paths,
+        location_country=location_country,
+        location_languages=location_languages,
+        filter_non_english_metadata=only_english,
     )
 
 
@@ -356,24 +533,46 @@ def map(
 def extract(
     url: Annotated[str, typer.Argument(help="URL to extract data from")],
     prompt: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(help="Extraction prompt describing what to extract")
     ] = None,
     schema: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(help="JSON schema file path for structured extraction")
     ] = None,
+    include_paths: Annotated[
+        list[str] | None,
+        typer.Option("--include-paths", help="URL patterns to include (regex)")
+    ] = None,
+    exclude_paths: Annotated[
+        list[str] | None,
+        typer.Option("--exclude-paths", help="URL patterns to exclude (regex)")
+    ] = None,
+    location_country: Annotated[
+        str | None,
+        typer.Option("--location-country", help="ISO country code (e.g., US, GB)")
+    ] = None,
+    location_languages: Annotated[
+        list[str] | None,
+        typer.Option("--location-languages", help="Language codes (e.g., en-US)")
+    ] = None,
+    only_english: Annotated[
+        bool,
+        typer.Option("--only-english/--all-languages", help="Filter non-English content")
+    ] = True,
 ) -> None:
-    """Extract structured data from a URL using AI.
+    """Extract structured data from a URL using AI with language filtering.
 
     This command uses AI to extract structured information from a web page based
     on either a natural language prompt or a JSON schema definition.
+    Language filtering is enabled by default.
 
     You must provide either --prompt or --schema (but not both).
 
     Examples:
         llamacrawl extract https://example.com/product --prompt "Extract product name, price, and description"
         llamacrawl extract https://news.example.com/article --schema schema.json
+        llamacrawl extract https://example.com --prompt "Extract data" --only-english
     """
     if not prompt and not schema:
         console.print("[red]Error: Must provide either --prompt or --schema")
@@ -401,4 +600,9 @@ def extract(
         mode="extract",
         prompt=prompt,
         schema=schema_content,
+        include_paths=include_paths,
+        exclude_paths=exclude_paths,
+        location_country=location_country,
+        location_languages=location_languages,
+        filter_non_english_metadata=only_english,
     )

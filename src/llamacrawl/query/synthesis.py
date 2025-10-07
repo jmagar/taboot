@@ -44,7 +44,7 @@ class AnswerSynthesizer:
         config: Configuration object with Claude settings
         llm: ClaudeAgentLLM instance
         model_name: Name of Claude model to use (e.g., "claude-sonnet-4-0")
-        max_context_tokens: Maximum number of tokens for context
+        max_input_tokens: Maximum number of tokens for context
     """
 
     def __init__(self, config: Config):
@@ -58,14 +58,13 @@ class AnswerSynthesizer:
         """
         self.config = config
         self.model_name = config.query.synthesis_model
-        self.max_context_tokens = config.query.max_context_tokens
+        self.max_input_tokens = config.query.max_input_tokens
 
         logger.info(
             "Initializing AnswerSynthesizer",
             extra={
                 "model": self.model_name,
-                "max_context_tokens": self.max_context_tokens,
-                "temperature": config.query.temperature,
+                "max_input_tokens": self.max_input_tokens,
             },
         )
 
@@ -73,8 +72,7 @@ class AnswerSynthesizer:
         try:
             self.llm = ClaudeAgentLLM(
                 model=self.model_name,
-                temperature=config.query.temperature,
-                max_tokens=self.max_context_tokens,
+                max_tokens=self.max_input_tokens,
             )
 
             logger.info("AnswerSynthesizer initialized successfully")
@@ -152,7 +150,7 @@ class AnswerSynthesizer:
         logger.debug("Stage 1: Formatting context from documents")
 
         context = self._format_context(retrieved_docs)
-        truncated_context = self._truncate_context(context, self.max_context_tokens)
+        truncated_context = self._truncate_context(context, self.max_input_tokens)
 
         context_time = (time.time() - stage_start) * 1000
         logger.debug(
@@ -285,7 +283,7 @@ class AnswerSynthesizer:
 
         # Stage 1: Format context from documents
         context = self._format_context(retrieved_docs)
-        truncated_context = self._truncate_context(context, self.max_context_tokens)
+        truncated_context = self._truncate_context(context, self.max_input_tokens)
 
         # Stage 2: Build prompt
         prompt = self._build_prompt(query_text, truncated_context)

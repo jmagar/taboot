@@ -19,6 +19,26 @@ from rich.logging import RichHandler
 # Type variables for decorators
 F = TypeVar("F", bound=Callable[..., Any])
 
+# Sensitive field keys to redact
+SENSITIVE_KEYS = {
+    "api_key",
+    "apikey",
+    "api-key",
+    "password",
+    "passwd",
+    "pwd",
+    "token",
+    "access_token",
+    "refresh_token",
+    "secret",
+    "auth",
+    "authorization",
+    "credentials",
+    "private_key",
+    "session",
+    "cookie",
+}
+
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):  # type: ignore
     """Custom JSON formatter with ISO 8601 timestamps and consistent fields."""
@@ -65,7 +85,90 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):  # type: ignore
                 log_record[key] = value
 
 
-def setup_logging(log_level: str | None = None, log_format: str | None = None) -> None:
+class SensitiveDataFilter(logging.Filter):
+    """Filter to redact sensitive data from log records."""
+
+    def __init__(self, redact_sensitive: bool = True) -> None:
+        """Initialize the filter.
+
+        Args:
+            redact_sensitive: If True, redacts sensitive fields. If False, logs everything.
+        """
+        super().__init__()
+        self.redact_sensitive = redact_sensitive
+
+    def _redact_value(self, value: Any) -> Any:
+        """Redact a value if it appears sensitive.
+
+        Args:
+            value: Value to potentially redact
+
+        Returns:
+            Redacted value or original value if not sensitive
+        """
+        if isinstance(value, str):
+            # Redact if string looks like a token/key (long alphanumeric)
+            if len(value) > 20 and value.replace("-", "").replace("_", "").isalnum():
+                return "[REDACTED]"
+        return value
+
+    def _redact_dict(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Recursively redact sensitive fields in a dictionary.
+
+        Args:
+            data: Dictionary to redact
+
+        Returns:
+            Dictionary with sensitive fields redacted
+        """
+        redacted = {}
+        for key, value in data.items():
+            key_lower = key.lower()
+
+            # Check if key is sensitive
+            if any(sensitive_key in key_lower for sensitive_key in SENSITIVE_KEYS):
+                redacted[key] = "[REDACTED]"
+            elif isinstance(value, dict):
+                redacted[key] = self._redact_dict(value)
+            elif isinstance(value, list):
+                redacted[key] = [
+                    self._redact_dict(item) if isinstance(item, dict) else item
+                    for item in value
+                ]
+            else:
+                redacted[key] = self._redact_value(value)
+
+        return redacted
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Filter log record to redact sensitive data.
+
+        Args:
+            record: Log record to filter
+
+        Returns:
+            True to allow the record to be logged
+        """
+        if not self.redact_sensitive:
+            # Redaction disabled, pass through
+            return True
+
+        # Redact sensitive fields from record attributes
+        for key in list(record.__dict__.keys()):
+            if not key.startswith("_"):
+                value = getattr(record, key, None)
+                if isinstance(value, dict):
+                    setattr(record, key, self._redact_dict(value))
+                elif isinstance(value, str):
+                    # Check if the key itself is sensitive
+                    key_lower = key.lower()
+                    if any(sensitive_key in key_lower for sensitive_key in SENSITIVE_KEYS):
+                        setattr(record, key, "[REDACTED]")
+
+        return True
+
+
+def setup_logging(log_level: str | None = None, log_format: str | None = None, log_sensitive_data: bool = False) -> None:
     """Configure root logger with console output.
 
     Args:
@@ -73,6 +176,8 @@ def setup_logging(log_level: str | None = None, log_format: str | None = None) -
             reads from LOG_LEVEL environment variable (default INFO).
         log_format: Output format ("json" or "text"). If None, reads from
             LOG_FORMAT environment variable (default "json").
+        log_sensitive_data: If False (default), redacts sensitive fields like
+            api_key, password, token. If True, logs everything (NOT for production).
     """
     # Determine log level
     if log_level is None:
@@ -117,13 +222,22 @@ def setup_logging(log_level: str | None = None, log_format: str | None = None) -
 
     console_handler.setFormatter(formatter)
 
+    # Add sensitive data filter if redaction is enabled
+    if not log_sensitive_data:
+        sensitive_filter = SensitiveDataFilter(redact_sensitive=True)
+        console_handler.addFilter(sensitive_filter)
+
     # Add handler to root logger
     root_logger.addHandler(console_handler)
 
     # Log initial setup message
     root_logger.info(
         "Logging configured",
-        extra={"log_level": log_level, "log_format": log_format},
+        extra={
+            "log_level": log_level,
+            "log_format": log_format,
+            "log_sensitive_data": log_sensitive_data,
+        },
     )
 
 

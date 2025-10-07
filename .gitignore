@@ -92,3 +92,6 @@ Desktop.ini
 .todos/
 .docs/
 exports/
+
+# Cache directories
+.cache/

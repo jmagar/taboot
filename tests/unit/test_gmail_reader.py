@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from llamacrawl.models.document import Document
 from llamacrawl.readers.gmail import GmailReader
 
 

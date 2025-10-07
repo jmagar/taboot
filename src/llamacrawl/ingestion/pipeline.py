@@ -19,13 +19,13 @@ from collections import defaultdict
 from collections.abc import Sequence
 from typing import Any
 
+import logging
 import redis.asyncio as aioredis
-
 from llama_index.core import PropertyGraphIndex, Settings
 from llama_index.core.indices.property_graph import (
-    SimpleLLMPathExtractor,
     ImplicitPathExtractor,
     SchemaLLMPathExtractor,
+    SimpleLLMPathExtractor,
 )
 from llama_index.core.ingestion import IngestionCache
 from llama_index.core.ingestion import IngestionPipeline as LlamaIngestionPipeline
@@ -33,28 +33,45 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import BaseNode
 from llama_index.core.schema import Document as LlamaDocument
 from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
-from llama_index.storage.docstore.redis import RedisDocumentStore  # type: ignore[import-not-found]
-from llama_index.storage.kvstore.redis import RedisKVStore  # type: ignore[import-not-found]
+from llama_index.storage.docstore.redis import RedisDocumentStore
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
+from llama_index.core.base.embeddings.base import BaseEmbedding
+
+from llamacrawl.config import Config
+from llamacrawl.embeddings.tei import TEIEmbedding
+from llamacrawl.ingestion.deduplication import DocumentDeduplicator
 from llamacrawl.ingestion.kg_schemas import (
     EntityType,
     RelationType,
     get_all_entity_properties,
     get_all_relation_properties,
 )
-
-from llamacrawl.config import Config
-from llamacrawl.embeddings.tei import TEIEmbedding
 from llamacrawl.llms import ClaudeAgentLLM
-from llamacrawl.ingestion.deduplication import DocumentDeduplicator
 from llamacrawl.models.document import Document
 from llamacrawl.storage.neo4j import Neo4jClient
 from llamacrawl.storage.qdrant import QdrantClient
-from llamacrawl.storage.redis import RedisClient
+from llamacrawl.storage.redis import PickleableRedisKVStore, RedisClient
 from llamacrawl.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+# LlamaIndex emits noisy pickling warnings when multiprocessing serializes
+# the sentence splitter. Suppress them since the attributes are restored lazily.
+warnings.filterwarnings(
+    "ignore",
+    message=r"Removing unpickleable private attribute .*",
+)
+
+_PICKLE_WARNING_SUBSTRING = "Removing unpickleable private attribute"
+
+
+class _SuppressPickleWarnings(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return _PICKLE_WARNING_SUBSTRING not in record.getMessage()
+
+
+logging.getLogger().addFilter(_SuppressPickleWarnings())
 
 
 class IngestionSummary:
@@ -169,8 +186,14 @@ class IngestionPipeline:
             model=config.graph.extraction_model,
         )
 
-        # Initialize Settings.embed_model for PropertyGraphIndex
-        Settings.embed_model = self.embed_model
+        # Initialize Settings.embed_model for PropertyGraphIndex when compatible
+        if isinstance(self.embed_model, BaseEmbedding):
+            Settings.embed_model = self.embed_model
+        else:
+            logger.debug(
+                "Skipping Settings.embed_model assignment; embed_model is not a BaseEmbedding",
+                extra={"embed_model_type": type(self.embed_model).__name__},
+            )
 
         logger.info(
             "Initializing ingestion pipeline",
@@ -209,7 +232,8 @@ class IngestionPipeline:
 
         # Create Redis document store for caching
         docstore = RedisDocumentStore(
-            redis_kvstore=RedisKVStore(
+            redis_kvstore=PickleableRedisKVStore(
+                redis_uri=redis_url,
                 redis_client=self.redis_client.client,
                 async_redis_client=async_redis_client,
             ),
@@ -220,7 +244,8 @@ class IngestionPipeline:
         # Reuse existing Redis client connection with namespace support via **kwargs
         cache = IngestionCache(
             collection="llamacrawl_cache",
-            cache=RedisKVStore(
+            cache=PickleableRedisKVStore(
+                redis_uri=redis_url,
                 redis_client=self.redis_client.client,
                 async_redis_client=async_redis_client,
             ),
@@ -244,9 +269,36 @@ class IngestionPipeline:
                 chunk_overlap=self.config.ingestion.chunk_overlap,
                 separator=" ",
             ),
-            # Embedding transformation
-            self.embed_model,
         ]
+
+        # Add language filter if enabled (BEFORE embedding for cost savings)
+        if self.config.ingestion.language_filter.enabled:
+            from llamacrawl.ingestion.language_filter import LanguageFilter
+
+            language_filter = LanguageFilter(
+                allowed_languages=set(self.config.ingestion.language_filter.allowed_languages),
+                confidence_threshold=self.config.ingestion.language_filter.confidence_threshold,
+                min_content_length=self.config.ingestion.language_filter.min_content_length,
+                log_filtered=self.config.ingestion.language_filter.log_filtered,
+            )
+            transformations.append(language_filter)
+
+            logger.info(
+                "Language filtering enabled in pipeline",
+                extra={
+                    "allowed_languages": self.config.ingestion.language_filter.allowed_languages,
+                    "confidence_threshold": self.config.ingestion.language_filter.confidence_threshold,
+                },
+            )
+
+        # Add embedding transformation (always last) when compatible
+        if isinstance(self.embed_model, BaseEmbedding):
+            transformations.append(self.embed_model)
+        else:
+            logger.debug(
+                "Embed model is not a BaseEmbedding; skipping transformation append",
+                extra={"embed_model_type": type(self.embed_model).__name__},
+            )
 
         # Initialize LlamaIndex IngestionPipeline
         self.llama_pipeline = LlamaIngestionPipeline(
@@ -739,11 +791,27 @@ class IngestionPipeline:
             else None
         )
 
-        nodes = self.llama_pipeline.run(
+        raw_nodes = self.llama_pipeline.run(
             documents=llama_docs,
             show_progress=False,
             num_workers=pipeline_workers,
         )
+
+        # Drop empty or whitespace-only chunks to avoid downstream embedding errors
+        nodes: list[BaseNode] = []
+        skipped_empty_chunks = 0
+        for node in raw_nodes:
+            text_content = node.get_content(metadata_mode="none")
+            if not text_content or not text_content.strip():
+                skipped_empty_chunks += 1
+                continue
+            nodes.append(node)
+
+        if skipped_empty_chunks:
+            logger.debug(
+                "Skipped empty chunks after LlamaIndex pipeline",
+                extra={"skipped_chunks": skipped_empty_chunks},
+            )
 
         nodes_by_doc: dict[str, list[BaseNode]] = defaultdict(list)
         for node in nodes:

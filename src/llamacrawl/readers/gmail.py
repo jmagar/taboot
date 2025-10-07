@@ -35,7 +35,6 @@ from typing import Any
 
 # Note: Not using LlamaIndex GmailReader due to credential handling incompatibility
 # We use Gmail API directly instead
-
 from llamacrawl.models.document import Document, DocumentMetadata
 from llamacrawl.readers.base import BaseReader
 from llamacrawl.storage.redis import RedisClient

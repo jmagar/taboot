@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -83,7 +83,7 @@ def _make_document(doc_id: str, content: str, url: str) -> Document:
     metadata = DocumentMetadata(
         source_type="firecrawl",
         source_url=url,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         extra={},
     )
     return Document(

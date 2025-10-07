@@ -1,10 +1,9 @@
-"""GitHub repository reader for ingesting code, issues, PRs, and discussions.
+"""GitHub repository reader for ingesting code, issues, and PRs.
 
 This module implements GitHubReader that loads data from GitHub repositories including:
 - Repository files (code, documentation)
 - Issues with comments
 - Pull requests with reviews
-- Discussions
 
 Key features:
 - Incremental sync using `since` parameter for issues
@@ -33,7 +32,7 @@ from llamacrawl.utils.retry import retry_with_backoff
 class GitHubReader(BaseReader):
     """GitHub repository reader extending BaseReader.
 
-    Loads repository files, issues, pull requests, and discussions from GitHub.
+    Loads repository files, issues, and pull requests from GitHub.
     Supports incremental sync using timestamps for issues and Search API for PRs.
 
     Attributes:
@@ -45,7 +44,6 @@ class GitHubReader(BaseReader):
                         None (default) loads all files, trusting .gitignore for exclusions.
         include_issues: Whether to load issues
         include_prs: Whether to load pull requests
-        include_discussions: Whether to load discussions
     """
 
     def __init__(
@@ -69,31 +67,41 @@ class GitHubReader(BaseReader):
         # Validate credentials
         self.validate_credentials(["GITHUB_TOKEN"])
 
-        # Extract configuration
-        self.repositories = config.get("repositories", [])
-        if not self.repositories:
-            raise ValueError("GitHub reader requires at least one repository in config")
-
-        self.file_extensions = config.get(
-            "file_extensions",
-            None,  # No filtering by default - trust .gitignore
-        )
-        self.include_issues = config.get("include_issues", True)
-        self.include_prs = config.get("include_prs", True)
-        self.include_discussions = config.get("include_discussions", False)
-
         # Initialize GitHub clients (lazy - created on first use)
         self._github_client: GithubClient | None = None
         self._pygithub_client: Github | None = None
+
+        # Extract configuration
+        configured_targets = [
+            repo for repo in config.get("repositories", []) if repo and repo.strip()
+        ]
+        if not configured_targets:
+            raise ValueError(
+                "GitHub reader requires at least one repository or owner in config"
+            )
+
+        self.configured_targets = configured_targets
+        self.owner_targets = [target for target in configured_targets if "/" not in target]
+        self.repositories = self._resolve_repository_targets(configured_targets)
+        if not self.repositories:
+            raise ValueError(
+                "GitHub reader could not resolve any repositories from configured targets "
+                f"{configured_targets}"
+            )
+
+        self.file_extensions = config.get("file_extensions")
+        self.include_issues = config.get("include_issues", True)
+        self.include_prs = config.get("include_prs", True)
 
         self.logger.info(
             f"Initialized GitHubReader for {len(self.repositories)} repositories",
             extra={
                 "source": self.source_name,
+                "configured_targets": self.configured_targets,
+                "expanded_owner_targets": self.owner_targets,
                 "repositories": self.repositories,
                 "include_issues": self.include_issues,
                 "include_prs": self.include_prs,
-                "include_discussions": self.include_discussions,
             },
         )
 
@@ -121,6 +129,124 @@ class GitHubReader(BaseReader):
             self._pygithub_client = Github(auth=auth)
             self.logger.debug("Initialized PyGithub client")
         return self._pygithub_client
+
+    def _resolve_repository_targets(self, targets: list[str]) -> list[str]:
+        """Expand owner entries to concrete repository identifiers."""
+        resolved: list[str] = []
+        seen: set[str] = set()
+        owners: list[str] = []
+
+        for target in targets:
+            identifier = target.strip()
+            if not identifier:
+                continue
+            if "/" in identifier:
+                if identifier not in seen:
+                    seen.add(identifier)
+                    resolved.append(identifier)
+            else:
+                owners.append(identifier)
+
+        if not owners:
+            return resolved
+
+        for owner in owners:
+            owner_repositories = self._fetch_owner_repositories(owner)
+            if not owner_repositories:
+                self.logger.warning(
+                    f"No repositories found for owner {owner}",
+                    extra={"source": self.source_name, "owner": owner},
+                )
+                continue
+
+            self.logger.info(
+                f"Expanded owner {owner} to {len(owner_repositories)} repositories",
+                extra={
+                    "source": self.source_name,
+                    "owner": owner,
+                    "expanded_count": len(owner_repositories),
+                },
+            )
+            for repo_identifier in owner_repositories:
+                if repo_identifier not in seen:
+                    seen.add(repo_identifier)
+                    resolved.append(repo_identifier)
+
+        return resolved
+
+    def _fetch_owner_repositories(self, owner: str) -> list[str]:
+        """Fetch repositories for a given owner, handling users and organizations."""
+        client = self._get_pygithub_client()
+
+        try:
+            account = client.get_user(owner)
+        except GithubException as user_error:
+            status = getattr(user_error, "status", None)
+            if status != 404:
+                self.logger.error(
+                    f"Failed to look up GitHub user {owner}",
+                    extra={
+                        "source": self.source_name,
+                        "owner": owner,
+                        "status": status,
+                    },
+                )
+                return []
+            try:
+                account = client.get_organization(owner)
+            except GithubException as org_error:
+                self.logger.error(
+                    f"Failed to look up GitHub owner {owner}",
+                    extra={
+                        "source": self.source_name,
+                        "owner": owner,
+                        "status": getattr(org_error, "status", None),
+                    },
+                )
+                return []
+        else:
+            if getattr(account, "type", None) == "Organization":
+                try:
+                    account = client.get_organization(owner)
+                except GithubException:
+                    # Fall back to NamedUser if we cannot get Organization object
+                    pass
+
+        try:
+            repo_iterator = (
+                account.get_repos(type="all")
+                if getattr(account, "type", None) == "Organization"
+                else account.get_repos(type="owner")
+            )
+        except GithubException as repos_error:
+            self.logger.error(
+                f"Failed to list repositories for owner {owner}",
+                extra={
+                    "source": self.source_name,
+                    "owner": owner,
+                    "status": getattr(repos_error, "status", None),
+                },
+            )
+            return []
+        except TypeError:
+            repo_iterator = account.get_repos()
+
+        repositories: list[str] = []
+        try:
+            for repository in repo_iterator:
+                repositories.append(repository.full_name)
+        except GithubException as iteration_error:
+            self.logger.error(
+                f"GitHub API error while iterating repositories for {owner}",
+                extra={
+                    "source": self.source_name,
+                    "owner": owner,
+                    "status": getattr(iteration_error, "status", None),
+                },
+            )
+            return []
+
+        return repositories
 
     def supports_incremental_sync(self) -> bool:
         """GitHub reader supports incremental sync.
@@ -214,6 +340,11 @@ class GitHubReader(BaseReader):
                 "repo": repo_name,
                 "use_parser": False,
                 "verbose": False,
+                # GitHub API occasionally stalls on blob fetches; give it more time and retries.
+                "timeout": 20,
+                "retries": 3,
+                "concurrent_requests": 3,
+                "fail_on_error": False,
             }
 
             # Only filter if extensions are explicitly configured

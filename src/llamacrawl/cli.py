@@ -18,21 +18,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
-from llama_index.core import Settings
 from rich.console import Console
 
+# Import Firecrawl commands for registration
+from llamacrawl import cli_firecrawl
 from llamacrawl.config import (
     ElasticsearchSourceConfig,
     FirecrawlSourceConfig,
-    GmailSourceConfig,
     GitHubSourceConfig,
+    GmailSourceConfig,
     RedditSourceConfig,
     load_config,
 )
 from llamacrawl.utils.logging import get_logger, setup_logging
-
-# Import Firecrawl commands for registration
-from llamacrawl import cli_firecrawl
 
 if TYPE_CHECKING:
     from llamacrawl.models.document import QueryResult
@@ -132,7 +130,11 @@ def main(
         raise typer.Exit(code=1)
 
     effective_log_level = log_level.upper() if log_level else config.logging.level.upper()
-    setup_logging(log_level=effective_log_level, log_format=config.logging.format)
+    setup_logging(
+        log_level=effective_log_level,
+        log_format=config.logging.format,
+        log_sensitive_data=config.logging.log_sensitive_data,
+    )
     logger.info(
         "Configuration loaded",
         extra={
@@ -447,7 +449,7 @@ def ingest(
                 console.print(f"  [red]Failed: {summary.failed}[/red]")
                 console.print(f"  Duration: {summary.duration_seconds:.2f}s")
                 if summary.failed > 0:
-                    console.print(f"  [dim](Check DLQ for failed documents)[/dim]")
+                    console.print("  [dim](Check DLQ for failed documents)[/dim]")
 
                 logger.info(
                     "Ingestion completed",
@@ -1337,7 +1339,7 @@ def _build_query_result_from_engine_output(engine_output: dict[str, Any]) -> "Qu
     """Use AnswerSynthesizer for proper synthesis."""
     from llamacrawl.config import get_config
     from llamacrawl.query.synthesis import AnswerSynthesizer
-    
+
     config = get_config()
     synthesizer = AnswerSynthesizer(config)
     return synthesizer.synthesize(

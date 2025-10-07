@@ -29,12 +29,12 @@ def main() -> None:
     if not client_id:
         client_id = input("Enter your Google Client ID: ").strip()
     else:
-        print(f"Using GOOGLE_CLIENT_ID from .env")
+        print("Using GOOGLE_CLIENT_ID from .env")
 
     if not client_secret:
         client_secret = input("Enter your Google Client Secret: ").strip()
     else:
-        print(f"Using GOOGLE_CLIENT_SECRET from .env")
+        print("Using GOOGLE_CLIENT_SECRET from .env")
 
     if not client_id or not client_secret:
         raise ValueError("Client ID and Client Secret are required")

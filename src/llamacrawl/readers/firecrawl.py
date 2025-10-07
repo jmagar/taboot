@@ -98,6 +98,8 @@ class FirecrawlReader(BaseReader):
 
         self.include_paths: list[str] = config.get("include_paths", []) or []
         self.exclude_paths: list[str] = config.get("exclude_paths", []) or []
+        self.location: dict[str, Any] | None = config.get("location")
+        self.filter_non_english_metadata: bool = config.get("filter_non_english_metadata", True)
         self.concurrency: int | None = config.get("concurrency")
         self.max_retries: int | None = config.get("max_retries")
         self.retry_delay_ms: int | None = config.get("retry_delay_ms")
@@ -125,6 +127,7 @@ class FirecrawlReader(BaseReader):
         """Build base parameters applied to every Firecrawl request."""
         params: dict[str, Any] = {}
 
+        # Firecrawl SDK expects camelCase parameter names
         if self.include_paths:
             params["includePaths"] = self.include_paths
         if self.exclude_paths:
@@ -137,6 +140,9 @@ class FirecrawlReader(BaseReader):
             params["retryDelay"] = self.retry_delay_ms
         if self.timeout_ms is not None:
             params["timeout"] = self.timeout_ms
+        default_formats = self.config.get("formats")
+        if default_formats:
+            params["scrape_options"] = {"formats": default_formats}
 
         return params
 
@@ -356,6 +362,13 @@ class FirecrawlReader(BaseReader):
         """
         params: dict[str, Any] = self._base_params.copy()
 
+        # Add location targeting if configured
+        if self.location:
+            params["location"] = {
+                "country": self.location.get("country", "US"),
+                "languages": self.location.get("languages", ["en-US"]),
+            }
+
         # Mode-specific parameters
         if mode == "crawl":
             # Crawl mode: nest scrape options in scrape_options parameter
@@ -364,7 +377,7 @@ class FirecrawlReader(BaseReader):
                 scrape_options["formats"] = formats
                 params["scrape_options"] = scrape_options
             params["limit"] = limit
-            params["maxDepth"] = max_depth
+            params["max_discovery_depth"] = max_depth  # v2 API uses max_discovery_depth, not maxDepth
 
         elif mode == "scrape":
             # Scrape mode: formats at top level
@@ -404,6 +417,7 @@ class FirecrawlReader(BaseReader):
             List of our Document objects with proper metadata
         """
         documents: list[Document] = []
+        filtered_by_language = 0
         timestamp = datetime.now(UTC)
 
         for idx, llama_doc in enumerate(llamaindex_docs):
@@ -411,6 +425,22 @@ class FirecrawlReader(BaseReader):
             content = llama_doc.text or llama_doc.get_content()
             llama_metadata = llama_doc.metadata or {}
             sanitized_metadata = self._sanitize_firecrawl_metadata(llama_metadata)
+
+            # Filter by metadata language if enabled
+            if self.filter_non_english_metadata:
+                detected_lang = sanitized_metadata.get("language", "").lower()
+                if detected_lang and detected_lang not in ["en", "en-us", "en-gb"]:
+                    filtered_by_language += 1
+                    doc_url = llama_metadata.get("url", source_url)
+                    self.logger.debug(
+                        f"Filtered document by metadata language: {detected_lang}",
+                        extra={
+                            "source": self.source_name,
+                            "source_url": doc_url,
+                            "language": detected_lang,
+                        },
+                    )
+                    continue
 
             # Generate unique document ID
             # Use URL from metadata if available, otherwise use source_url
@@ -451,6 +481,17 @@ class FirecrawlReader(BaseReader):
 
             documents.append(document)
 
+        # Log filtering statistics
+        if filtered_by_language > 0:
+            self.logger.info(
+                f"Filtered {filtered_by_language} non-English documents by metadata",
+                extra={
+                    "source": self.source_name,
+                    "filtered_count": filtered_by_language,
+                    "kept_count": len(documents),
+                },
+            )
+
         return documents
 
     def _sanitize_firecrawl_metadata(self, metadata: dict[str, Any]) -> dict[str, Any]:
@@ -462,6 +503,14 @@ class FirecrawlReader(BaseReader):
         for key in self.ALLOWED_METADATA_KEYS:
             if key in metadata and metadata[key] not in (None, "", [], {}):
                 sanitized[key] = self._truncate_metadata_value(metadata[key])
+
+        # Include additional metadata keys while ensuring payload limits
+        for key, value in metadata.items():
+            if key in sanitized:
+                continue
+            if value in (None, "", [], {}):
+                continue
+            sanitized[key] = self._truncate_metadata_value(value)
 
         return sanitized
 

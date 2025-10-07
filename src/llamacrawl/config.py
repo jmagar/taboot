@@ -21,6 +21,23 @@ from pydantic import BaseModel, Field, field_validator
 # =============================================================================
 
 
+class FirecrawlLocationConfig(BaseModel):
+    """Location targeting configuration for Firecrawl.
+
+    Enables regional content filtering at the Firecrawl API level
+    to reduce API credits spent on non-target regions.
+    """
+
+    country: str = Field(
+        default="US",
+        description="ISO 3166-1 alpha-2 country code (e.g., 'US', 'GB', 'FR')"
+    )
+    languages: list[str] = Field(
+        default=["en-US"],
+        description="Locale codes for language targeting (e.g., ['en-US', 'en-GB'])"
+    )
+
+
 class FirecrawlSourceConfig(BaseModel):
     """Firecrawl web scraping source configuration."""
 
@@ -29,8 +46,26 @@ class FirecrawlSourceConfig(BaseModel):
     max_pages: int = Field(default=1000, ge=1, le=10000)
     formats: list[str] = Field(default=["markdown"])
     urls: list[str] = Field(default_factory=list)
-    include_paths: list[str] = Field(default_factory=list)
-    exclude_paths: list[str] = Field(default_factory=list)
+    include_paths: list[str] = Field(
+        default_factory=list,
+        description="URL path patterns to include (regex, e.g., ['^/en/', '^/docs/'])"
+    )
+    exclude_paths: list[str] = Field(
+        default_factory=list,
+        description="URL path patterns to exclude (regex, e.g., ['^/fr/', '^/de/']). Auto-populated from language_filter if empty."
+    )
+    location: FirecrawlLocationConfig | None = Field(
+        default=None,
+        description="Regional targeting configuration for Firecrawl API"
+    )
+    filter_non_english_metadata: bool = Field(
+        default=True,
+        description="Filter documents by Firecrawl's detected metadata.language field"
+    )
+    auto_exclude_non_allowed_languages: bool = Field(
+        default=True,
+        description="Automatically exclude language paths not in language_filter.allowed_languages"
+    )
     concurrency: int | None = Field(default=None, ge=1, le=32)
     max_retries: int = Field(default=2, ge=0, le=10)
     retry_delay_ms: int = Field(default=2000, ge=0, le=60000)
@@ -41,10 +76,16 @@ class GitHubSourceConfig(BaseModel):
     """GitHub repositories source configuration."""
 
     enabled: bool = True
-    repositories: list[str] = Field(default_factory=list)
+    repositories: list[str] = Field(
+        default_factory=list,
+        description=(
+            "List of repository identifiers. Accepts either 'owner/repo' or bare 'owner' entries; "
+            "bare owners expand to all accessible repositories for that owner."
+        ),
+    )
     include_issues: bool = True
     include_prs: bool = True
-    include_discussions: bool = True
+    # Note: include_discussions removed - GitHub Discussions API not implemented
     file_extensions: list[str] = Field(
         default=[".md", ".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs"]
     )
@@ -52,11 +93,29 @@ class GitHubSourceConfig(BaseModel):
     @field_validator("repositories")
     @classmethod
     def validate_repositories(cls, v: list[str]) -> list[str]:
-        """Validate repository format (owner/repo)."""
+        """Validate repository entries, allowing owner or owner/repo formats."""
+        cleaned: list[str] = []
         for repo in v:
-            if "/" not in repo:
-                raise ValueError(f"Invalid repository format: {repo}. Expected 'owner/repo'")
-        return v
+            repo_identifier = repo.strip()
+            if not repo_identifier:
+                raise ValueError("Repository entries cannot be empty")
+
+            if repo_identifier.count("/") > 1:
+                raise ValueError(
+                    f"Invalid repository format: {repo_identifier}. "
+                    "Expected 'owner/repo' or 'owner'"
+                )
+
+            if "/" in repo_identifier:
+                owner, repo_name = repo_identifier.split("/", 1)
+                if not owner or not repo_name:
+                    raise ValueError(
+                        f"Invalid repository format: {repo_identifier}. "
+                        "Expected 'owner/repo'"
+                    )
+
+            cleaned.append(repo_identifier)
+        return cleaned
 
 
 class RedditSourceConfig(BaseModel):
@@ -110,11 +169,19 @@ class RetryConfig(BaseModel):
 
 
 class DeduplicationConfig(BaseModel):
-    """Deduplication strategy configuration."""
+    """Deduplication strategy configuration.
 
-    enabled: bool = True
-    strategy: Literal["hash"] = "hash"
-    normalize_content: bool = True
+    Deduplication is always enabled and uses content hash strategy.
+    """
+
+    # Deduplication is always enabled, no config needed
+    # Strategy is always 'hash' (SHA-256 content hashing)
+    # normalize_whitespace: Normalize whitespace before hashing
+    normalize_whitespace: bool = True
+    # remove_punctuation: Remove punctuation before hashing
+    remove_punctuation: bool = False
+    # normalize_case: Normalize case (lowercase) before hashing
+    normalize_case: bool = False
 
 
 class DLQConfig(BaseModel):
@@ -122,6 +189,38 @@ class DLQConfig(BaseModel):
 
     enabled: bool = True
     retention_days: int = Field(default=7, ge=1, le=30)
+
+
+class LanguageFilterConfig(BaseModel):
+    """Language filtering configuration for pipeline.
+
+    Controls content-based language filtering that happens BEFORE embedding
+    to save compute costs and storage space on non-target language content.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable language filtering in ingestion pipeline"
+    )
+    allowed_languages: list[str] = Field(
+        default=["en"],
+        description="List of ISO 639-1 language codes to keep (e.g., ['en', 'es'])"
+    )
+    confidence_threshold: float = Field(
+        default=0.8,
+        ge=0.0,
+        le=1.0,
+        description="Minimum detection confidence (0.0-1.0)"
+    )
+    min_content_length: int = Field(
+        default=50,
+        ge=0,
+        description="Minimum text length for detection (shorter text passes through)"
+    )
+    log_filtered: bool = Field(
+        default=True,
+        description="Log detailed filtering statistics"
+    )
 
 
 class IngestionConfig(BaseModel):
@@ -135,12 +234,15 @@ class IngestionConfig(BaseModel):
     chunk_size: int = Field(default=512, ge=128, le=32768)  # Support full Qwen3 32K context
     chunk_overlap: int = Field(default=50, ge=0, le=8192)   # Allow up to 25% overlap at 32K chunks
     batch_size: int = Field(default=32, ge=1, le=1000)
-    concurrent_sources: int = Field(default=3, ge=1, le=10)
     pipeline_workers: int = Field(default=1, ge=1, le=32)
     embedding_batch_size: int = Field(default=64, ge=1, le=256)
     retry: RetryConfig = Field(default_factory=RetryConfig)
     deduplication: DeduplicationConfig = Field(default_factory=DeduplicationConfig)
     dlq: DLQConfig = Field(default_factory=DLQConfig)
+    language_filter: LanguageFilterConfig = Field(
+        default_factory=LanguageFilterConfig,
+        description="Language filtering configuration (filters BEFORE embedding)"
+    )
 
 
 class QueryConfig(BaseModel):
@@ -152,8 +254,8 @@ class QueryConfig(BaseModel):
     enable_graph_traversal: bool = True
     max_graph_depth: int = Field(default=2, ge=1, le=5)
     synthesis_model: str = "claude-3-5-haiku-20241022"  # Fast and cheap for RAG synthesis
-    max_context_tokens: int = Field(default=4096, ge=512, le=200000)  # Claude supports up to 200K
-    temperature: float = Field(default=0.1, ge=0.0, le=2.0)
+    max_input_tokens: int = Field(default=4096, ge=512, le=200000)  # Claude supports up to 200K
+    # Note: temperature removed - Claude SDK doesn't support it in this context
     include_snippets: bool = True
     snippet_length: int = Field(default=200, ge=50, le=1000)
 
@@ -163,8 +265,8 @@ class GraphConfig(BaseModel):
 
     auto_extract_entities: bool = True
     extraction_model: str = "claude-3-5-haiku-20241022"  # Fast/cheap Claude model for extraction
-    max_keywords_per_document: int = Field(default=10, ge=1, le=50)
-    relationship_extraction: bool = True
+    # Note: max_keywords_per_document removed - not used in implementation
+    # Note: relationship_extraction removed - always enabled, not toggleable
     entity_types: list[str] = Field(
         default=["PERSON", "ORGANIZATION", "LOCATION", "PRODUCT", "TECHNOLOGY", "EVENT", "FILE", "CONCEPT"]
     )
@@ -243,11 +345,13 @@ class LoggingConfig(BaseModel):
 
 
 class MetricsConfig(BaseModel):
-    """Metrics configuration."""
+    """Metrics configuration.
 
-    enabled: bool = True
-    prometheus_port: int = Field(default=9090, ge=0, le=65535)
-    collection_interval: int = Field(default=60, ge=10, le=3600)
+    NOTE: Metrics collection is not yet implemented. This is a placeholder config.
+    """
+
+    # All metrics options are placeholders - not used in current implementation
+    enabled: bool = False  # Changed to False since not implemented
 
 
 class Config(BaseModel):
@@ -428,6 +532,9 @@ def load_config(
     # Additional validation: check enabled sources have credentials
     _validate_source_credentials(config)
 
+    # Auto-populate Firecrawl exclude_paths from language_filter if enabled
+    _apply_language_filter_to_firecrawl(config)
+
     return config
 
 
@@ -489,6 +596,68 @@ def _validate_source_credentials(config: Config) -> None:
         error_list = "\n".join(f"  - {e}" for e in errors)
         raise ValueError(
             f"Missing required credentials for enabled sources:\n{error_list}"
+        )
+
+
+def _apply_language_filter_to_firecrawl(config: Config) -> None:
+    """Auto-populate Firecrawl exclude_paths from language_filter config.
+
+    If language_filter is enabled and auto_exclude_non_allowed_languages is True,
+    this generates URL path exclusion patterns for all common language codes
+    NOT in the allowed_languages list.
+
+    This makes language_filter.allowed_languages the single source of truth
+    for language filtering across all layers.
+
+    Args:
+        config: Config object to modify
+    """
+    if not config.ingestion.language_filter.enabled:
+        return
+
+    if not config.sources.firecrawl.auto_exclude_non_allowed_languages:
+        return
+
+    # Common ISO 639-1 language codes used in URLs
+    # Format: language code -> common URL patterns
+    common_language_paths = {
+        "de", "fr", "es", "ja", "zh", "pt", "ru", "ko", "it", "nl",
+        "pl", "tr", "vi", "th", "sv", "da", "fi", "no", "cs", "ro",
+        "hu", "el", "he", "id", "ms", "uk", "bg", "ar", "hi", "bn",
+    }
+
+    # Get allowed languages
+    allowed = set(lang.lower() for lang in config.ingestion.language_filter.allowed_languages)
+
+    # Calculate which languages to exclude
+    languages_to_exclude = common_language_paths - allowed
+
+    if not languages_to_exclude:
+        # No languages to exclude (all allowed or allowed_languages is empty)
+        return
+
+    # Generate exclude patterns
+    # Firecrawl expects regex patterns that match the request path without the leading slash.
+    # Use a pattern that tolerates optional leading slash and locale suffixes (e.g., es-MX/).
+    auto_exclude_patterns = [
+        rf"^(?:/)?{lang}(?:[-_][a-z0-9]+)?(?:/|$)" for lang in sorted(languages_to_exclude)
+    ]
+
+    # Add to existing exclude_paths (avoid duplicates)
+    existing_patterns = set(config.sources.firecrawl.exclude_paths)
+    new_patterns = [p for p in auto_exclude_patterns if p not in existing_patterns]
+
+    if new_patterns:
+        config.sources.firecrawl.exclude_paths.extend(new_patterns)
+        from llamacrawl.utils.logging import get_logger
+        logger = get_logger(__name__)
+        logger.info(
+            f"Auto-generated {len(new_patterns)} language path exclusions from language_filter",
+            extra={
+                "allowed_languages": sorted(allowed),
+                "excluded_language_paths": sorted(languages_to_exclude),
+                "total_exclude_paths": len(config.sources.firecrawl.exclude_paths),
+            }
         )
 
 

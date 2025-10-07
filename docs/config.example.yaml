@@ -2,6 +2,9 @@
 # Copy this file to config.yaml and adjust settings as needed
 # This file contains non-secret configuration (pipeline settings, feature flags)
 # Secrets belong in .env file
+#
+# NOTE: This file reflects major config cleanup (2025-01)
+# Many unused/broken options have been removed. See CLAUDE.md for details.
 
 # =============================================================================
 # DATA SOURCES CONFIGURATION
@@ -39,8 +42,6 @@ sources:
     include_issues: true
     # Include pull requests in ingestion
     include_prs: true
-    # Include discussions in ingestion
-    include_discussions: true
     # File extensions to include (empty = all files)
     file_extensions: [".md", ".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs"]
 
@@ -104,8 +105,6 @@ ingestion:
   pipeline_workers: 1
   # Embedding batch size (controls TEI request payload size)
   embedding_batch_size: 64
-  # Maximum concurrent sources to ingest in parallel
-  concurrent_sources: 3
 
   # Retry Logic (exponential backoff)
   retry:
@@ -119,13 +118,14 @@ ingestion:
     jitter: 0.2
 
   # Deduplication Strategy
+  # Note: Deduplication is always enabled using SHA-256 content hash
   deduplication:
-    # Enable content hashing for deduplication
-    enabled: true
-    # Strategy: "hash" (SHA-256 content hash)
-    strategy: hash
-    # Normalize content before hashing (lowercase, strip whitespace)
-    normalize_content: true
+    # Normalize whitespace before hashing
+    normalize_whitespace: true
+    # Normalize case (lowercase) before hashing
+    normalize_case: false
+    # Remove punctuation before hashing
+    remove_punctuation: false
 
   # Dead Letter Queue
   dlq:
@@ -156,13 +156,12 @@ query:
   max_graph_depth: 2
 
   # Answer Synthesis
-  # Ollama model to use for answer generation
-  # Options: llama3.1:8b, llama3.1:70b, mistral:7b, etc.
-  synthesis_model: "llama3.1:8b"
-  # Maximum context length to send to LLM (tokens)
-  max_context_tokens: 4096
-  # Temperature for generation (0.0 = deterministic, 1.0 = creative)
-  temperature: 0.1
+  # Claude model to use for answer generation
+  # Options: claude-3-5-haiku-20241022 (fast/cheap), claude-3-5-sonnet-20241022 (better quality)
+  synthesis_model: "claude-3-5-haiku-20241022"
+  # Maximum input tokens for context (Claude supports up to 200K)
+  # Note: Controls input truncation only. Claude SDK doesn't expose temperature or max output tokens.
+  max_input_tokens: 4096
 
   # Source Attribution
   # Include source snippets in response
@@ -177,17 +176,16 @@ query:
 graph:
   # Enable automatic entity extraction during ingestion
   auto_extract_entities: true
-  # Maximum keywords to extract per document
-  max_keywords_per_document: 10
-  # Enable relationship extraction
-  relationship_extraction: true
-  # Entity types to extract (empty = all types)
-  entity_types:
-    - "PERSON"
-    - "ORGANIZATION"
-    - "LOCATION"
-    - "PRODUCT"
-    - "TECHNOLOGY"
+  # Claude model to use for entity extraction
+  extraction_model: "claude-3-5-haiku-20241022"
+  # Extraction strategy: simple, implicit, schema, or combined
+  extraction_strategy: "simple"
+  # Confidence threshold for entity extraction (0.0-1.0)
+  confidence_threshold: 0.7
+  # Maximum triplets to extract per chunk
+  max_triplets_per_chunk: 30
+  # Include implicit relations (inferred from context)
+  include_implicit_relations: true
 
 # =============================================================================
 # VECTOR STORE SETTINGS
@@ -224,10 +222,3 @@ logging:
   # Include sensitive data in logs (DO NOT enable in production)
   log_sensitive_data: false
 
-metrics:
-  # Enable Prometheus metrics collection
-  enabled: true
-  # Metrics port (overridden by PROMETHEUS_PORT env var)
-  prometheus_port: 9090
-  # Metrics collection interval (seconds)
-  collection_interval: 60

@@ -18,10 +18,12 @@ import time
 import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, cast
+from typing import Any, Mapping, cast
 
 import redis
+from redis.asyncio import Redis as AsyncRedis
 from redis.connection import ConnectionPool
+from llama_index.storage.kvstore.redis import RedisKVStore
 
 
 class RedisClient:
@@ -550,3 +552,116 @@ class RedisClient:
             >>> redis_client.flush_all()
         """
         self.client.flushdb()
+
+
+class PickleableRedisKVStore(RedisKVStore):
+    """RedisKVStore variant that survives multiprocessing pickling.
+
+    LlamaIndex's ingestion pipeline pickles transformation stacks when
+    ``num_workers`` > 1. The default RedisKVStore keeps redis-py client
+    instances on the object, which embed ``_thread.lock`` objects and
+    therefore are not pickleable. This subclass strips clients out of the
+    pickle payload and recreates fresh connections on unpickling.
+    """
+
+    def __init__(
+        self,
+        redis_uri: str | None = None,
+        redis_client: redis.Redis | None = None,
+        async_redis_client: AsyncRedis | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            redis_uri=redis_uri,
+            redis_client=redis_client,
+            async_redis_client=async_redis_client,
+            **kwargs,
+        )
+        self._redis_url: str | None = redis_uri
+        self._redis_kwargs: dict[str, Any] = dict(kwargs)
+        self._sync_connection_kwargs: dict[str, Any] | None = self._extract_connection_kwargs(
+            getattr(self, "_redis_client", None)
+        )
+        self._async_connection_kwargs: dict[str, Any] | None = self._extract_connection_kwargs(
+            getattr(self, "_async_redis_client", None)
+        )
+
+        if self._redis_url is None and self._sync_connection_kwargs:
+            self._redis_url = self._build_url_from_kwargs(self._sync_connection_kwargs)
+
+    @staticmethod
+    def _extract_connection_kwargs(client: Any) -> dict[str, Any] | None:
+        if client is None:
+            return None
+
+        pool = getattr(client, "connection_pool", None)
+        if pool is None:
+            return None
+
+        raw_kwargs: Mapping[str, Any] = getattr(pool, "connection_kwargs", {})
+        sanitized: dict[str, Any] = {}
+        for key, value in raw_kwargs.items():
+            if key in {"connection_class", "parser_class"}:
+                continue
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                sanitized[key] = value
+        return sanitized
+
+    @staticmethod
+    def _build_url_from_kwargs(kwargs: Mapping[str, Any]) -> str | None:
+        host = kwargs.get("host")
+        port = kwargs.get("port")
+        if host is None or port is None:
+            return None
+        db = kwargs.get("db")
+        username = kwargs.get("username")
+        password = kwargs.get("password")
+
+        auth = ""
+        if username or password:
+            user = username or ""
+            pwd = password or ""
+            auth = f"{user}:{pwd}@"
+
+        db_suffix = f"/{db}" if isinstance(db, int) and db else ""
+        return f"redis://{auth}{host}:{port}{db_suffix}"
+
+    def __getstate__(self) -> dict[str, Any]:
+        return {
+            "redis_url": self._redis_url,
+            "redis_kwargs": self._redis_kwargs,
+            "sync_connection_kwargs": self._sync_connection_kwargs,
+            "async_connection_kwargs": self._async_connection_kwargs,
+        }
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        redis_url: str | None = state.get("redis_url")
+        redis_kwargs: dict[str, Any] = state.get("redis_kwargs", {}) or {}
+        sync_kwargs: dict[str, Any] | None = state.get("sync_connection_kwargs")
+        async_kwargs: dict[str, Any] | None = state.get("async_connection_kwargs")
+
+        redis_client: redis.Redis | None = None
+        async_client: AsyncRedis | None = None
+
+        if redis_url:
+            redis_client = redis.Redis.from_url(redis_url, **redis_kwargs)
+            async_client = AsyncRedis.from_url(redis_url, **redis_kwargs)
+        elif sync_kwargs:
+            redis_client = redis.Redis(**sync_kwargs)
+            client_kwargs = async_kwargs or sync_kwargs
+            async_client = AsyncRedis(**client_kwargs)
+        else:
+            raise ValueError("Cannot restore Redis clients without connection information")
+
+        RedisKVStore.__init__(
+            self,
+            redis_uri=redis_url,
+            redis_client=redis_client,
+            async_redis_client=async_client,
+            **redis_kwargs,
+        )
+
+        self._redis_url = redis_url
+        self._redis_kwargs = redis_kwargs
+        self._sync_connection_kwargs = sync_kwargs
+        self._async_connection_kwargs = async_kwargs

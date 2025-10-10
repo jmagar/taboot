@@ -95,3 +95,4 @@ exports/
 
 # Cache directories
 .cache/
+.pytest_cache

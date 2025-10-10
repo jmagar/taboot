@@ -11,9 +11,9 @@ The filter uses fast-langdetect for accurate and efficient language detection
 
 from collections import Counter
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
-from fast_langdetect import detect
+from fast_langdetect.infer import LangDetector, LangDetectConfig
 from llama_index.core.schema import BaseNode, TextNode, TransformComponent
 from pydantic import Field
 
@@ -58,6 +58,15 @@ class LanguageFilter(TransformComponent):
     confidence_threshold: float = Field(default=0.8, ge=0.0, le=1.0, description="Minimum detection confidence")
     min_content_length: int = Field(default=50, ge=0, description="Minimum text length for detection")
     log_filtered: bool = Field(default=True, description="Log filtering statistics")
+    detection_model: Literal["lite", "full", "auto"] = Field(
+        default="lite",
+        description="fast-langdetect model size to use for detection",
+    )
+    max_detection_chars: int = Field(
+        default=1000,
+        ge=1,
+        description="Maximum number of characters sampled for language detection",
+    )
 
     def __init__(
         self,
@@ -65,6 +74,8 @@ class LanguageFilter(TransformComponent):
         confidence_threshold: float = 0.8,
         min_content_length: int = 50,
         log_filtered: bool = True,
+        detection_model: Literal["lite", "full", "auto"] = "lite",
+        max_detection_chars: int = 1000,
         **kwargs: Any,
     ):
         """Initialize language filter.
@@ -74,6 +85,8 @@ class LanguageFilter(TransformComponent):
             confidence_threshold: Minimum detection confidence (0.0-1.0). Default: 0.8
             min_content_length: Skip detection for text shorter than this. Default: 50
             log_filtered: Log filtering statistics. Default: True
+            detection_model: fast-langdetect model to use ("lite", "full", or "auto"). Default: "lite"
+            max_detection_chars: Maximum characters sampled for detection. Default: 1000
             **kwargs: Additional arguments for parent class
 
         Raises:
@@ -98,8 +111,16 @@ class LanguageFilter(TransformComponent):
             confidence_threshold=confidence_threshold,
             min_content_length=min_content_length,
             log_filtered=log_filtered,
+            detection_model=detection_model,
+            max_detection_chars=max_detection_chars,
             **kwargs,
         )
+
+        detector_config = LangDetectConfig(
+            model=self.detection_model,
+            max_input_length=self.max_detection_chars,
+        )
+        self._lang_detector: LangDetector = LangDetector(detector_config)
 
         logger.info(
             "LanguageFilter initialized",
@@ -127,7 +148,7 @@ class LanguageFilter(TransformComponent):
         Note:
             - Short text (< min_content_length) passes through without detection
             - Detection errors result in node being included (fail open)
-            - Only first 1000 chars are used for detection (efficiency)
+            - Only the first max_detection_chars characters are used for detection (efficiency)
         """
         if not nodes:
             return []
@@ -153,10 +174,10 @@ class LanguageFilter(TransformComponent):
                 continue
 
             try:
-                # Detect language on first 1000 chars for efficiency
+                # Detect language on a bounded number of characters for efficiency
                 # fast-langdetect is fast, but no need to process very long text
-                detection_text = text[:1000]
-                result = detect(detection_text)
+                detection_text = text[: self.max_detection_chars]
+                result = self._lang_detector.detect(detection_text)
                 if isinstance(result, list):
                     detection_result: dict[str, Any] = result[0] if result else {}
                 elif isinstance(result, dict):

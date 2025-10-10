@@ -12,6 +12,7 @@ The pipeline uses distributed locks to prevent concurrent ingestion of the same 
 and implements per-document error handling to ensure resilience.
 """
 
+import logging
 import time
 import traceback
 import warnings
@@ -19,34 +20,24 @@ from collections import defaultdict
 from collections.abc import Sequence
 from typing import Any
 
-import logging
 import redis.asyncio as aioredis
-from llama_index.core import PropertyGraphIndex, Settings
-from llama_index.core.indices.property_graph import (
-    ImplicitPathExtractor,
-    SchemaLLMPathExtractor,
-    SimpleLLMPathExtractor,
+from llama_index.core import Settings
+from llama_index.core.base.embeddings.base import BaseEmbedding
+from llama_index.core.ingestion import (
+    IngestionCache,
 )
-from llama_index.core.ingestion import IngestionCache
-from llama_index.core.ingestion import IngestionPipeline as LlamaIngestionPipeline
+from llama_index.core.ingestion import (
+    IngestionPipeline as LlamaIngestionPipeline,
+)
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import BaseNode
 from llama_index.core.schema import Document as LlamaDocument
-from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
 from llama_index.storage.docstore.redis import RedisDocumentStore
 from llama_index.vector_stores.qdrant import QdrantVectorStore
-
-from llama_index.core.base.embeddings.base import BaseEmbedding
 
 from llamacrawl.config import Config
 from llamacrawl.embeddings.tei import TEIEmbedding
 from llamacrawl.ingestion.deduplication import DocumentDeduplicator
-from llamacrawl.ingestion.kg_schemas import (
-    EntityType,
-    RelationType,
-    get_all_entity_properties,
-    get_all_relation_properties,
-)
 from llamacrawl.llms import ClaudeAgentLLM
 from llamacrawl.models.document import Document
 from llamacrawl.storage.neo4j import Neo4jClient
@@ -272,22 +263,23 @@ class IngestionPipeline:
         ]
 
         # Add language filter if enabled (BEFORE embedding for cost savings)
-        if self.config.ingestion.language_filter.enabled:
+        language_filter_config = self.config.ingestion.language_filter
+        if language_filter_config.enabled:
             from llamacrawl.ingestion.language_filter import LanguageFilter
 
             language_filter = LanguageFilter(
-                allowed_languages=set(self.config.ingestion.language_filter.allowed_languages),
-                confidence_threshold=self.config.ingestion.language_filter.confidence_threshold,
-                min_content_length=self.config.ingestion.language_filter.min_content_length,
-                log_filtered=self.config.ingestion.language_filter.log_filtered,
+                allowed_languages=set(language_filter_config.allowed_languages),
+                confidence_threshold=language_filter_config.confidence_threshold,
+                min_content_length=language_filter_config.min_content_length,
+                log_filtered=language_filter_config.log_filtered,
             )
             transformations.append(language_filter)
 
             logger.info(
                 "Language filtering enabled in pipeline",
                 extra={
-                    "allowed_languages": self.config.ingestion.language_filter.allowed_languages,
-                    "confidence_threshold": self.config.ingestion.language_filter.confidence_threshold,
+                    "allowed_languages": language_filter_config.allowed_languages,
+                    "confidence_threshold": language_filter_config.confidence_threshold,
                 },
             )
 
@@ -436,9 +428,43 @@ class IngestionPipeline:
 
         new_documents = unique_documents
 
+        # Drop documents with missing or whitespace-only content before embedding
+        filtered_documents: list[Document] = []
+        skipped_empty_docs = 0
+        for doc in new_documents:
+            if doc.content and doc.content.strip():
+                filtered_documents.append(doc)
+            else:
+                skipped_empty_docs += 1
+                logger.warning(
+                    "Skipping document with empty content prior to embedding",
+                    extra={
+                        "source": source,
+                        "doc_id": doc.doc_id,
+                        "source_type": doc.metadata.source_type,
+                        "source_url": doc.metadata.source_url,
+                    },
+                )
+
+        if skipped_empty_docs:
+            logger.info(
+                "Filtered documents with empty content before ingestion",
+                extra={
+                    "source": source,
+                    "skipped_empty_documents": skipped_empty_docs,
+                },
+            )
+
+        if not filtered_documents:
+            summary.failed = skipped_empty_docs
+            summary.duration_seconds = time.time() - start_time
+            return summary
+
+        new_documents = filtered_documents
+
         # Step 2: Process documents with error handling
         processed_documents: list[Document] = []
-        failed_count = 0
+        failed_count = skipped_empty_docs
 
         batch_size = max(1, self.config.ingestion.batch_size)
         current_batch: list[Document] = []
@@ -608,8 +634,8 @@ class IngestionPipeline:
     ) -> None:
         """Extract entities and relationships from document and store in Neo4j.
 
-        Uses LlamaIndex PropertyGraphIndex with SimpleLLMPathExtractor to
-        automatically identify entities and relationships from text.
+        Uses ClaudeEntityExtractor with Claude Agent SDK tool use for reliable
+        structured output without event loop conflicts.
 
         Args:
             source: Source identifier
@@ -619,117 +645,74 @@ class IngestionPipeline:
 
         Note:
             This runs after vector storage to ensure consistency.
-            Uses SimpleLLMPathExtractor for automatic entity extraction.
+            Runs async extraction in a new event loop thread.
         """
+        import asyncio
+        import threading
+        from queue import Queue
+
+        from llamacrawl.ingestion.pipeline_integration import extract_entities_to_neo4j
+
         try:
             logger.debug(
                 "Extracting entities and relationships",
                 extra={"source": source, "doc_id": doc.doc_id},
             )
 
-            # Create Neo4j graph store
-            graph_store = Neo4jPropertyGraphStore(
-                username=self.config.neo4j_user,
-                password=self.config.neo4j_password,
-                url=self.config.neo4j_uri,
-            )
+            # Run async extraction in a new thread with fresh event loop
+            # This avoids "asyncio.run() cannot be called from a running event loop" errors
+            result_queue: Queue[dict[str, int] | Exception] = Queue(maxsize=1)
 
-            # Create entity extractors based on strategy
-            kg_extractors = []
+            def run_async_extraction() -> None:
+                """Run extraction in new event loop on background thread."""
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
 
-            if self.config.graph.extraction_strategy in ["simple", "combined"]:
-                kg_extractors.append(
-                    SimpleLLMPathExtractor(
-                        llm=Settings.llm,
-                        max_paths_per_chunk=self.config.graph.max_triplets_per_chunk,
-                        num_workers=1,
+                try:
+                    result = loop.run_until_complete(
+                        extract_entities_to_neo4j(
+                            config=self.config,
+                            neo4j_client=self.neo4j_client,
+                            source=source,
+                            doc=doc,
+                            llama_doc=llama_doc,
+                            nodes=nodes,
+                        )
                     )
+                    result_queue.put(result)
+                except Exception as exc:
+                    result_queue.put(exc)
+                finally:
+                    try:
+                        loop.run_until_complete(loop.shutdown_asyncgens())
+                    except Exception:
+                        pass
+                    loop.close()
+
+            thread = threading.Thread(target=run_async_extraction, daemon=True)
+            thread.start()
+            thread.join(timeout=300)  # 5 minute timeout
+
+            if thread.is_alive():
+                logger.error(
+                    "Entity extraction timed out after 5 minutes",
+                    extra={"source": source, "doc_id": doc.doc_id}
                 )
+                return
 
-            if self.config.graph.extraction_strategy in ["implicit", "combined"]:
-                kg_extractors.append(ImplicitPathExtractor())
+            # Get result from queue
+            result_or_exc = result_queue.get()
+            if isinstance(result_or_exc, Exception):
+                raise result_or_exc
 
-            if self.config.graph.extraction_strategy in ["schema", "combined"]:
-                schema_extractor = SchemaLLMPathExtractor(
-                    llm=Settings.llm,
-                    possible_entities=EntityType,
-                    possible_entity_props=get_all_entity_properties(),
-                    possible_relations=RelationType,
-                    possible_relation_props=get_all_relation_properties(),
-                    max_triplets_per_chunk=self.config.graph.max_triplets_per_chunk,
-                    num_workers=1,  # Single worker to avoid multiprocessing issues
-                    strict=False,  # Allow new types beyond schema
-                )
-                kg_extractors.append(schema_extractor)
-
-            # Ensure we have at least one extractor
-            if not kg_extractors:
-                kg_extractors.append(
-                    SimpleLLMPathExtractor(
-                        llm=Settings.llm,
-                        max_paths_per_chunk=self.config.graph.max_triplets_per_chunk,
-                        num_workers=1,
-                    )
-                )
-
-            logger.debug(
-                f"Using {len(kg_extractors)} extractors with strategy: {self.config.graph.extraction_strategy}",
-                extra={"strategy": self.config.graph.extraction_strategy, "num_extractors": len(kg_extractors)}
-            )
-
-            # Strip metadata to avoid Neo4j nested map errors
-            # LlamaIndex tries to store all metadata which can contain nested dicts
-            clean_doc = LlamaDocument(
-                text=llama_doc.text,
-                doc_id=llama_doc.doc_id,
-                metadata={
-                    "doc_id": doc.doc_id,
+            logger.info(
+                "Entity extraction completed",
+                extra={
                     "source": source,
-                    "source_type": doc.metadata.source_type,
-                },
+                    "doc_id": doc.doc_id,
+                    **result_or_exc,
+                }
             )
-
-            # Create PropertyGraphIndex for entity extraction
-            # Note: This will extract entities from the document and store in Neo4j
-            # Suppress RuntimeWarning from LlamaIndex SimpleLLMPathExtractor._aextract
-            # Internal LlamaIndex async handling issue - coroutine not properly awaited
-            # Functionality is NOT impacted - entity extraction completes successfully
-            # TODO: Remove when LlamaIndex fixes upstream async handling
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*coroutine.*")
-                PropertyGraphIndex.from_documents(
-                    documents=[clean_doc],
-                    property_graph_store=graph_store,
-                    kg_extractors=kg_extractors,
-                    embed_model=self.embed_model,
-                    show_progress=False,
-                )
-
-            # Also create Document node in Neo4j for graph traversal
-            # Only include scalar properties (Neo4j doesn't support nested maps)
-            doc_properties = {
-                "title": doc.title,
-                "source_type": doc.metadata.source_type,
-                "source_url": doc.metadata.source_url,
-                "content_hash": doc.content_hash,
-                "timestamp": doc.metadata.timestamp.isoformat(),
-            }
-
-            # Add scalar values from metadata.extra (skip nested dicts/lists)
-            if doc.metadata.extra:
-                for key, value in doc.metadata.extra.items():
-                    if isinstance(value, (str, int, float, bool)):
-                        doc_properties[key] = value
-
-            self.neo4j_client.create_document_node(
-                doc_id=doc.doc_id,
-                properties=doc_properties,
-            )
-
-            logger.debug(
-                "Entities and relationships extracted successfully",
-                extra={"source": source, "doc_id": doc.doc_id},
-                )
 
         except Exception as e:
             # Log error but don't fail ingestion
@@ -831,8 +814,13 @@ class IngestionPipeline:
 
             if self.config.graph.auto_extract_entities:
                 logger.info(
-                    f"Starting entity extraction for {doc.doc_id}",
-                    extra={"source": source, "doc_id": doc.doc_id, "strategy": self.config.graph.extraction_strategy}
+                    "Starting entity extraction for %s",
+                    doc.doc_id,
+                    extra={
+                        "source": source,
+                        "doc_id": doc.doc_id,
+                        "strategy": self.config.graph.extraction_strategy,
+                    },
                 )
                 self._extract_entities_to_neo4j(
                     source,
@@ -840,7 +828,11 @@ class IngestionPipeline:
                     llama_docs_by_id[doc.doc_id],
                     nodes_by_doc.get(doc.doc_id, []),
                 )
-                logger.info(f"Entity extraction completed for {doc.doc_id}", extra={"doc_id": doc.doc_id})
+                logger.info(
+                    "Entity extraction completed for %s",
+                    doc.doc_id,
+                    extra={"doc_id": doc.doc_id},
+                )
 
         return batch
 

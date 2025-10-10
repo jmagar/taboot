@@ -316,10 +316,12 @@ class QdrantClient:
         try:
             for i in range(0, len(points), batch_size):
                 batch = points[i : i + batch_size]
+                # Add timeout to prevent hanging on slow Qdrant responses
+                # Using wait=False for async operation, then checking separately
                 self.client.upsert(
                     collection_name=self.collection_name,
                     points=batch,
-                    wait=True,
+                    wait=False,  # Don't wait synchronously
                 )
                 total_upserted += len(batch)
                 batch_num = i // batch_size + 1

@@ -14,6 +14,8 @@ Key features:
 
 import hashlib
 import os
+from collections.abc import Callable
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 
@@ -206,11 +208,9 @@ class GitHubReader(BaseReader):
                 return []
         else:
             if getattr(account, "type", None) == "Organization":
-                try:
+                with suppress(GithubException):
+                    # Organizations expose more metadata through this call.
                     account = client.get_organization(owner)
-                except GithubException:
-                    # Fall back to NamedUser if we cannot get Organization object
-                    pass
 
         try:
             repo_iterator = (
@@ -639,7 +639,11 @@ class GitHubReader(BaseReader):
                     metadata=DocumentMetadata(
                         source_type="github",
                         source_url=pr.html_url,
-                        timestamp=pr.updated_at.replace(tzinfo=UTC) if pr.updated_at else datetime.now(UTC),
+                        timestamp=(
+                            pr.updated_at.replace(tzinfo=UTC)
+                            if pr.updated_at
+                            else datetime.now(UTC)
+                        ),
                         extra={
                             "repo_owner": owner,
                             "repo_name": repo_name,
@@ -700,7 +704,11 @@ class GitHubReader(BaseReader):
 
         return documents
 
-    def load_data(self, **kwargs: Any) -> list[Document]:
+    def load_data(
+        self,
+        progress_callback: Callable[[int, int], None] | None = None,
+        **kwargs: Any,
+    ) -> list[Document]:
         """Load documents from configured GitHub repositories.
 
         Loads repository files, issues, and pull requests based on configuration.
@@ -708,7 +716,11 @@ class GitHubReader(BaseReader):
         timestamp-based filtering.
 
         Args:
-            **kwargs: Optional overrides (not typically used)
+            progress_callback: Optional progress reporter for CLI integration
+            **kwargs: Optional overrides:
+                limit: Maximum number of documents to return
+                ignore_cursor: Skip incremental cursors (full re-ingest)
+                status_callback: Callable that accepts status message for UI
 
         Returns:
             List of Document objects from all configured repositories
@@ -717,6 +729,48 @@ class GitHubReader(BaseReader):
             GithubException: On GitHub API errors
             ValueError: On configuration errors
         """
+        status_callback: Callable[[str], None] | None = kwargs.pop("status_callback", None)
+        limit: int | None = kwargs.get("limit")
+        ignore_cursor = bool(kwargs.get("ignore_cursor", False))
+
+        remaining_limit = limit if limit is not None else None
+
+        stage_total = len(self.repositories) * (
+            1 + int(self.include_issues) + int(self.include_prs)
+        )
+        if stage_total <= 0:
+            stage_total = 1
+
+        completed_stages = 0
+
+        def update_status(message: str) -> None:
+            if status_callback:
+                status_callback(message)
+
+        def mark_stage_complete() -> None:
+            nonlocal completed_stages
+            completed_stages += 1
+            if progress_callback:
+                progress_callback(completed_stages, stage_total)
+
+        def extend_with_limit(documents: list[Document]) -> bool:
+            nonlocal remaining_limit
+            if remaining_limit is None:
+                all_documents.extend(documents)
+                return False
+
+            if remaining_limit <= 0:
+                return True
+
+            if len(documents) >= remaining_limit:
+                all_documents.extend(documents[:remaining_limit])
+                remaining_limit = 0
+                return True
+
+            all_documents.extend(documents)
+            remaining_limit -= len(documents)
+            return False
+
         all_documents: list[Document] = []
 
         for repo_identifier in self.repositories:
@@ -741,10 +795,18 @@ class GitHubReader(BaseReader):
                 },
             )
 
+            update_status(f"Fetching files for {owner}/{repo_name}")
+
             # Load repository files
             try:
                 files = self._load_repository_files(owner, repo_name)
-                all_documents.extend(files)
+                limit_reached = extend_with_limit(files)
+                mark_stage_complete()
+                update_status(
+                    f"Loaded {len(files)} files from {owner}/{repo_name}",
+                )
+                if limit_reached:
+                    break
             except Exception as e:
                 self.logger.error(
                     f"Failed to load files from {owner}/{repo_name}",
@@ -757,13 +819,26 @@ class GitHubReader(BaseReader):
 
             # Load issues if enabled
             if self.include_issues:
+                if remaining_limit is not None and remaining_limit <= 0:
+                    break
+
+                update_status(f"Fetching issues for {owner}/{repo_name}")
                 try:
                     # Get last cursor for issues
-                    cursor = self.redis_client.get_cursor(f"{owner}/{repo_name}/issues")
-                    since = datetime.fromisoformat(cursor.split(":")[-1]) if cursor else None
+                    since: datetime | None = None
+                    if not ignore_cursor:
+                        cursor = self.redis_client.get_cursor(f"{owner}/{repo_name}/issues")
+                        if cursor:
+                            since = datetime.fromisoformat(cursor.split(":")[-1])
 
                     issues = self._load_issues(owner, repo_name, since=since)
-                    all_documents.extend(issues)
+                    limit_reached = extend_with_limit(issues)
+                    mark_stage_complete()
+                    update_status(
+                        f"Loaded {len(issues)} issues from {owner}/{repo_name}",
+                    )
+                    if limit_reached:
+                        break
                 except Exception as e:
                     self.logger.error(
                         f"Failed to load issues from {owner}/{repo_name}",
@@ -776,13 +851,26 @@ class GitHubReader(BaseReader):
 
             # Load pull requests if enabled
             if self.include_prs:
+                if remaining_limit is not None and remaining_limit <= 0:
+                    break
+
+                update_status(f"Fetching pull requests for {owner}/{repo_name}")
                 try:
                     # Get last cursor for PRs
-                    cursor = self.redis_client.get_cursor(f"{owner}/{repo_name}/prs")
-                    since = datetime.fromisoformat(cursor.split(":")[-1]) if cursor else None
+                    since: datetime | None = None
+                    if not ignore_cursor:
+                        cursor = self.redis_client.get_cursor(f"{owner}/{repo_name}/prs")
+                        if cursor:
+                            since = datetime.fromisoformat(cursor.split(":")[-1])
 
                     prs = self._load_pull_requests(owner, repo_name, since=since)
-                    all_documents.extend(prs)
+                    limit_reached = extend_with_limit(prs)
+                    mark_stage_complete()
+                    update_status(
+                        f"Loaded {len(prs)} pull requests from {owner}/{repo_name}",
+                    )
+                    if limit_reached:
+                        break
                 except Exception as e:
                     self.logger.error(
                         f"Failed to load pull requests from {owner}/{repo_name}",
@@ -798,5 +886,11 @@ class GitHubReader(BaseReader):
             total_fetched=len(all_documents),
             repositories=len(self.repositories),
         )
+
+        if progress_callback:
+            final_total = max(completed_stages, 1)
+            progress_callback(completed_stages, final_total)
+        if status_callback:
+            status_callback("GitHub sync complete")
 
         return all_documents

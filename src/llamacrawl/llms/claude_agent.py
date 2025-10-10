@@ -8,16 +8,21 @@ claude-agent-sdk to communicate with Claude Code's backend.
 """
 
 import asyncio
-from typing import Any
+import threading
+from queue import Queue
+from typing import Any, AsyncGenerator, Callable, Coroutine, TypeVar, cast
 
 from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, TextBlock
-from llama_index.core.base.llms.types import ChatMessage, MessageRole
+from llama_index.core.base.llms.types import ChatMessage, MessageRole, LLMMetadata
 from llama_index.core.llms import CompletionResponse, CompletionResponseGen, CustomLLM
 from llama_index.core.llms.callbacks import llm_completion_callback
 
 from llamacrawl.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+T = TypeVar("T")
 
 
 class ClaudeAgentLLM(CustomLLM):
@@ -56,17 +61,19 @@ class ClaudeAgentLLM(CustomLLM):
         return True
 
     @property
-    def metadata(self) -> dict[str, Any]:
+    def metadata(self) -> LLMMetadata:
         """Get LLM metadata.
 
         Returns:
-            Dictionary with model metadata including context window and output size
+            LLMMetadata object with model configuration and capabilities
         """
-        return {
-            "context_window": self.context_window,
-            "num_output": self.max_tokens,
-            "model_name": self.model,
-        }
+        return LLMMetadata(
+            context_window=self.context_window,
+            num_output=self.max_tokens,
+            model_name=self.model,
+            is_chat_model=True,
+            is_function_calling_model=False,  # Claude Agent SDK doesn't support function calling
+        )
 
     @llm_completion_callback()
     def complete(self, prompt: str, **kwargs: Any) -> CompletionResponse:
@@ -97,6 +104,46 @@ class ClaudeAgentLLM(CustomLLM):
         try:
             # Run async query in sync context
             response_text = asyncio.run(self._async_complete(prompt))
+
+            logger.info(
+                "Claude Agent SDK completion successful",
+                extra={"response_length": len(response_text)},
+            )
+
+            return CompletionResponse(text=response_text)
+
+        except Exception as e:
+            logger.error(
+                f"Claude Agent SDK completion failed: {e}",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
+            raise RuntimeError(f"Claude Agent SDK completion failed: {e}") from e
+
+    @llm_completion_callback()
+    async def acomplete(self, prompt: str, **kwargs: Any) -> CompletionResponse:
+        """Generate async completion without asyncio.run().
+
+        This method is called by LlamaIndex's async extractors (e.g., PropertyGraphIndex).
+        Unlike the inherited default that calls complete() → asyncio.run(), this directly
+        awaits the async implementation to avoid "cannot be called from a running event loop" errors.
+
+        Args:
+            prompt: Input text prompt
+            **kwargs: Additional arguments (ignored for compatibility)
+
+        Returns:
+            CompletionResponse with generated text
+
+        Raises:
+            RuntimeError: If Claude Agent SDK query fails
+        """
+        logger.debug(
+            "Starting Claude Agent SDK async completion",
+            extra={"prompt_length": len(prompt), "model": self.model},
+        )
+
+        try:
+            response_text = await self._async_complete(prompt)
 
             logger.info(
                 "Claude Agent SDK completion successful",
@@ -171,26 +218,44 @@ class ClaudeAgentLLM(CustomLLM):
             },
         )
 
+        sentinel: object = object()
+        queue: Queue[CompletionResponse | Exception | object] = Queue()
+
+        def run_streaming() -> None:
+            async def _runner() -> None:
+                try:
+                    async for response in self._async_stream_complete(prompt):
+                        queue.put(response)
+                except Exception as exc:  # pragma: no cover - defensive
+                    queue.put(exc)
+                finally:
+                    queue.put(sentinel)
+
+            asyncio.run(_runner())
+
+        thread = threading.Thread(target=run_streaming, daemon=True)
+        thread.start()
+
         try:
-            # Run async streaming in sync context
-            for response in asyncio.run(self._async_stream_complete(prompt)):
-                yield response
+            while True:
+                item = queue.get()
+                if item is sentinel:
+                    break
+                if isinstance(item, Exception):
+                    raise RuntimeError(f"Claude Agent SDK streaming failed: {item}") from item
 
-        except Exception as e:
-            logger.error(
-                f"Claude Agent SDK streaming failed: {e}",
-                extra={"error": str(e), "error_type": type(e).__name__},
-            )
-            raise RuntimeError(f"Claude Agent SDK streaming failed: {e}") from e
+                yield item
+        finally:
+            thread.join()
 
-    async def _async_stream_complete(self, prompt: str) -> list[CompletionResponse]:
+    async def _async_stream_complete(self, prompt: str) -> AsyncGenerator[CompletionResponse, None]:
         """Internal async streaming completion implementation.
 
         Args:
             prompt: Input text prompt
 
-        Returns:
-            List of CompletionResponse objects with incremental updates
+        Yields:
+            CompletionResponse objects with incremental updates
 
         Note:
             Claude Agent SDK doesn't expose temperature or max_tokens parameters.
@@ -200,7 +265,6 @@ class ClaudeAgentLLM(CustomLLM):
             model=self.model,
         )
 
-        responses: list[CompletionResponse] = []
         accumulated_text = ""
 
         async with ClaudeSDKClient(options=options) as client:
@@ -213,11 +277,7 @@ class ClaudeAgentLLM(CustomLLM):
                         if isinstance(block, TextBlock):
                             delta = block.text
                             accumulated_text += delta
-                            responses.append(
-                                CompletionResponse(text=accumulated_text, delta=delta)
-                            )
-
-        return responses
+                            yield CompletionResponse(text=accumulated_text, delta=delta)
 
     @llm_completion_callback()
     def chat(self, messages: list[ChatMessage], **kwargs: Any) -> CompletionResponse:
@@ -259,6 +319,39 @@ class ClaudeAgentLLM(CustomLLM):
                 formatted_parts.append(f"Assistant: {content}")
 
         return "\n\n".join(formatted_parts)
+
+    def _run_coroutine_in_thread(self, coroutine_factory: Callable[[], Coroutine[Any, Any, T]]) -> T:
+        """Execute coroutine in a fresh event loop running on a background thread."""
+
+        result_queue: Queue[tuple[bool, T | BaseException]] = Queue(maxsize=1)
+
+        def _runner() -> None:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            try:
+                result = loop.run_until_complete(coroutine_factory())
+            except BaseException as exc:  # pragma: no cover - defensive
+                result_queue.put((False, exc))
+            else:
+                result_queue.put((True, result))
+            finally:
+                try:
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                except Exception:  # pragma: no cover - best effort cleanup
+                    pass
+                loop.close()
+
+        thread = threading.Thread(target=_runner, daemon=True)
+        thread.start()
+
+        success, payload = result_queue.get()
+        thread.join()
+
+        if success:
+            return cast(T, payload)
+
+        raise cast(BaseException, payload)
 
 
 # Export public API

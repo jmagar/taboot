@@ -203,9 +203,11 @@ def test_firecrawl_reader_applies_filters_and_trims_metadata(monkeypatch: pytest
             "formats": ["markdown"],
             "include_paths": ["/docs/**"],
             "exclude_paths": ["/blog/**"],
-            "concurrency": 5,
+            "cache_max_age_ms": 86400000,
+            "max_concurrency": 5,
             "max_retries": 1,
             "retry_delay_ms": 500,
+            "crawl_delay_ms": 250,
             "timeout_ms": 10000,
         },
         redis_client=StubRedisClient(),
@@ -217,11 +219,12 @@ def test_firecrawl_reader_applies_filters_and_trims_metadata(monkeypatch: pytest
     trimmed_value = docs[0].metadata.extra["firecrawl_metadata"].get("redundant")
     assert isinstance(trimmed_value, str) and len(trimmed_value) <= reader.max_metadata_chars + 3
 
-    params = captured["instances"][0]["params"]
-    assert params["includePaths"] == ["/docs/**"]
-    assert params["excludePaths"] == ["/blog/**"]
-    assert params["concurrency"] == 5
-    assert params["maxRetries"] == 1
-    assert params["retryDelay"] == 500
-    assert params["timeout"] == 10000
+    params = captured["instances"][-1]["params"]
+    assert params["include_paths"] == ["/docs/**"]
+    assert params["exclude_paths"] == ["/blog/**"]
+    assert params["scrape_options"]["max_age"] == 86400000
+    assert params["scrape_options"]["store_in_cache"] is True
     assert params["scrape_options"]["formats"] == ["markdown"]
+    assert params["max_concurrency"] == 5
+    assert params["delay"] == 1
+    assert params["timeout"] == 10000

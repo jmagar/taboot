@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 # =============================================================================
 # Pydantic Configuration Models (Pydantic v2 syntax)
@@ -54,6 +54,11 @@ class FirecrawlSourceConfig(BaseModel):
         default_factory=list,
         description="URL path patterns to exclude (regex, e.g., ['^/fr/', '^/de/']). Auto-populated from language_filter if empty."
     )
+    cache_max_age_ms: int | None = Field(
+        default=172800000,
+        ge=0,
+        description="Firecrawl cache maxAge in milliseconds. Set to 0 or null to disable caching.",
+    )
     location: FirecrawlLocationConfig | None = Field(
         default=None,
         description="Regional targeting configuration for Firecrawl API"
@@ -66,9 +71,21 @@ class FirecrawlSourceConfig(BaseModel):
         default=True,
         description="Automatically exclude language paths not in language_filter.allowed_languages"
     )
-    concurrency: int | None = Field(default=None, ge=1, le=32)
+    max_concurrency: int | None = Field(
+        default=None,
+        ge=1,
+        le=32,
+        validation_alias=AliasChoices("max_concurrency", "concurrency"),
+        description="Maximum concurrent workers for Firecrawl. Accepts legacy 'concurrency' key.",
+    )
     max_retries: int = Field(default=2, ge=0, le=10)
     retry_delay_ms: int = Field(default=2000, ge=0, le=60000)
+    crawl_delay_ms: int | None = Field(
+        default=None,
+        ge=0,
+        le=60000,
+        description="Delay in milliseconds between page fetches (Firecrawl 'delay' parameter).",
+    )
     timeout_ms: int | None = Field(default=None, ge=0, le=120000)
 
 
@@ -456,6 +473,19 @@ def load_config(
     # Convert to Path objects
     env_path = Path(env_file)
     config_path = Path(config_file)
+
+    # Resolve project root for fallback lookups when running from nested directories
+    project_root = Path(__file__).resolve().parents[2]
+
+    if not env_path.exists() and not env_path.is_absolute():
+        fallback_env = project_root / env_file
+        if fallback_env.exists():
+            env_path = fallback_env
+
+    if not config_path.exists() and not config_path.is_absolute():
+        fallback_config = project_root / config_file
+        if fallback_config.exists():
+            config_path = fallback_config
 
     # Load environment variables
     if env_path.exists():

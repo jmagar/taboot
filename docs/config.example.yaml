@@ -25,10 +25,14 @@ sources:
     # Optionally restrict crawl scope
     include_paths: []
     exclude_paths: []
+    # Cache TTL in milliseconds for Firecrawl's CDN cache (default 2 days)
+    cache_max_age_ms: 172800000
     # Worker concurrency and retry behaviour
-    concurrency: 4
+    max_concurrency: 4
     max_retries: 2
     retry_delay_ms: 1500
+    # Optional throttle between requests in milliseconds (converted to seconds)
+    crawl_delay_ms: null
     timeout_ms: 12000
 
   # GitHub Repositories
@@ -134,6 +138,23 @@ ingestion:
     # TTL for DLQ entries (days)
     retention_days: 7
 
+  # Language Filtering (Layer 3: Content-based filtering BEFORE embedding)
+  # This provides maximum cost savings by filtering chunks before expensive operations
+  language_filter:
+    # Enable language filtering in ingestion pipeline
+    enabled: true
+    # ISO 639-1 language codes to keep (e.g., ["en"], ["en", "es"])
+    allowed_languages: ["en"]
+    # Minimum detection confidence (0.0-1.0, default: 0.8)
+    # Lower = more permissive (may include false positives)
+    # Higher = more strict (may filter false negatives)
+    confidence_threshold: 0.8
+    # Minimum text length for detection (shorter text passes through)
+    # Short text lacks enough signal for accurate detection
+    min_content_length: 50
+    # Log detailed filtering statistics
+    log_filtered: true
+
 # =============================================================================
 # QUERY PIPELINE SETTINGS
 # =============================================================================
@@ -221,4 +242,3 @@ logging:
   level: INFO
   # Include sensitive data in logs (DO NOT enable in production)
   log_sensitive_data: false
-

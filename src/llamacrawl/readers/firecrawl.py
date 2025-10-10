@@ -12,6 +12,7 @@ Firecrawl v2 SDK as of PR #19773) and converts results to our Document model.
 """
 
 import hashlib
+import math
 import os
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -98,11 +99,13 @@ class FirecrawlReader(BaseReader):
 
         self.include_paths: list[str] = config.get("include_paths", []) or []
         self.exclude_paths: list[str] = config.get("exclude_paths", []) or []
+        self.cache_max_age_ms: int | None = config.get("cache_max_age_ms", 172800000)
         self.location: dict[str, Any] | None = config.get("location")
         self.filter_non_english_metadata: bool = config.get("filter_non_english_metadata", True)
-        self.concurrency: int | None = config.get("concurrency")
+        self.max_concurrency: int | None = config.get("max_concurrency", config.get("concurrency"))
         self.max_retries: int | None = config.get("max_retries")
         self.retry_delay_ms: int | None = config.get("retry_delay_ms")
+        self.crawl_delay_ms: int | None = config.get("crawl_delay_ms")
         self.timeout_ms: int | None = config.get("timeout_ms")
         self.max_metadata_chars: int = config.get("metadata_max_chars", 256)
         self.max_metadata_list_items: int = config.get("metadata_max_list_items", 5)
@@ -126,24 +129,8 @@ class FirecrawlReader(BaseReader):
     def _build_base_params(self) -> dict[str, Any]:
         """Build base parameters applied to every Firecrawl request."""
         params: dict[str, Any] = {}
-
-        # Firecrawl SDK expects camelCase parameter names
-        if self.include_paths:
-            params["includePaths"] = self.include_paths
-        if self.exclude_paths:
-            params["excludePaths"] = self.exclude_paths
-        if self.concurrency is not None:
-            params["concurrency"] = self.concurrency
-        if self.max_retries is not None:
-            params["maxRetries"] = self.max_retries
-        if self.retry_delay_ms is not None:
-            params["retryDelay"] = self.retry_delay_ms
         if self.timeout_ms is not None:
             params["timeout"] = self.timeout_ms
-        default_formats = self.config.get("formats")
-        if default_formats:
-            params["scrape_options"] = {"formats": default_formats}
-
         return params
 
     def supports_incremental_sync(self) -> bool:
@@ -313,7 +300,36 @@ class FirecrawlReader(BaseReader):
 
         Returns:
             List of Document objects
+
+        Raises:
+            ValueError: If URL matches exclude_paths pattern
         """
+        # Validate URL against exclude_paths for all modes except crawl
+        # (crawl mode applies filters server-side via Firecrawl API)
+        if mode != "crawl" and self.exclude_paths:
+            import re
+            parsed = urlparse(url)
+            path = parsed.path
+            for pattern in self.exclude_paths:
+                # Try regex pattern first
+                if pattern.startswith("^"):
+                    try:
+                        if re.search(pattern, path):
+                            raise ValueError(
+                                f"URL path '{path}' matches exclude pattern '{pattern}'. "
+                                f"This URL is excluded by your configuration."
+                            )
+                    except re.error:
+                        pass  # Invalid regex, skip
+                else:
+                    # Handle glob patterns like **/fr/** or */fr/*
+                    pattern_normalized = pattern.strip("*").strip("/")
+                    if pattern_normalized in path.split("/"):
+                        raise ValueError(
+                            f"URL path '{path}' matches exclude pattern '{pattern}'. "
+                            f"This URL is excluded by your configuration."
+                        )
+
         # Build Firecrawl parameters based on mode
         params = self._build_firecrawl_params(
             mode=mode,
@@ -321,6 +337,11 @@ class FirecrawlReader(BaseReader):
             max_depth=max_depth,
             formats=formats,
             **kwargs,
+        )
+
+        self.logger.info(
+            f"Creating FireCrawlWebReader for {mode} mode",
+            extra={"url": url, "mode": mode, "params": params},
         )
 
         # Create a FireCrawlWebReader instance with the specific mode and params
@@ -332,13 +353,50 @@ class FirecrawlReader(BaseReader):
             params=params,
         )
 
+        self.logger.debug(f"Calling load_data() for {url}")
+        
         # Call load_data() with just the URL (load_data only accepts url/query/urls)
         llamaindex_docs = reader_instance.load_data(url=url)
+        
+        self.logger.debug(f"Loaded {len(llamaindex_docs)} documents from {url}")
 
         # Convert LlamaIndex documents to our Document model
         documents = self._convert_to_documents(llamaindex_docs, source_url=url)
 
         return documents
+
+    def _glob_to_regex(self, pattern: str) -> str:
+        """Convert glob pattern to regex pattern for Firecrawl API.
+
+        Args:
+            pattern: Glob pattern (e.g., '**/fr/**', '*/docs/*') or raw regex (starts with ^)
+
+        Returns:
+            Regex pattern compatible with Firecrawl API (ReDoS-safe)
+        """
+        # If already a regex (starts with ^), return as-is without modification
+        if pattern.startswith("^"):
+            return pattern
+
+        # Simplify glob patterns to avoid ReDoS
+        # **/foo/** -> /foo/ (just match the segment anywhere in path)
+        # */foo/* -> /foo/ (same - Firecrawl will handle the rest)
+        import re
+
+        # Extract the core path component (strip leading/trailing wildcards)
+        pattern_stripped = pattern.strip("*").strip("/")
+
+        # If pattern is just wildcards, return a safe catch-all
+        if not pattern_stripped:
+            return ".*"
+
+        # Build a simple, safe regex that matches the path component
+        # Example: **/es/** -> es/.* (matches any path containing es/)
+        # Format matches Firecrawl docs: "blog/.*" pattern style
+        regex = re.escape(pattern_stripped)
+        regex = f"{regex}/.*"
+
+        return regex
 
     def _build_firecrawl_params(
         self,
@@ -362,31 +420,68 @@ class FirecrawlReader(BaseReader):
         """
         params: dict[str, Any] = self._base_params.copy()
 
-        # Add location targeting if configured
-        if self.location:
-            params["location"] = {
-                "country": self.location.get("country", "US"),
-                "languages": self.location.get("languages", ["en-US"]),
-            }
-
         # Mode-specific parameters
         if mode == "crawl":
-            # Crawl mode: nest scrape options in scrape_options parameter
-            if formats:
-                scrape_options = params.get("scrape_options", {})
-                scrape_options["formats"] = formats
-                params["scrape_options"] = scrape_options
             params["limit"] = limit
-            params["max_discovery_depth"] = max_depth  # v2 API uses max_discovery_depth, not maxDepth
+            params["max_discovery_depth"] = max_depth  # Firecrawl Python SDK uses snake_case
+
+            # Add include_paths/exclude_paths for URL-based filtering (Layer 1)
+            # Firecrawl Python SDK expects regex patterns in snake_case
+            # NOTE: Only convert glob patterns - skip raw regex (^...) as they may trigger ReDoS detector
+            if self.include_paths and len(self.include_paths) > 0:
+                converted_includes = [
+                    self._glob_to_regex(p) for p in self.include_paths
+                    if not p.startswith("^")  # Skip raw regex patterns
+                ]
+                if converted_includes:
+                    params["include_paths"] = converted_includes
+                    self.logger.info(
+                        f"Crawl including {len(converted_includes)} URL patterns",
+                        extra={
+                            "sample_patterns": converted_includes[:5],
+                            "total_count": len(converted_includes)
+                        }
+                    )
+            if self.exclude_paths and len(self.exclude_paths) > 0:
+                converted_excludes = [
+                    self._glob_to_regex(p) for p in self.exclude_paths
+                    if not p.startswith("^")  # Skip raw regex patterns
+                ]
+                if converted_excludes:
+                    params["exclude_paths"] = converted_excludes
+                    self.logger.info(
+                        f"Crawl excluding {len(converted_excludes)} URL patterns",
+                        extra={
+                            "sample_patterns": converted_excludes[:5],
+                            "total_count": len(converted_excludes)
+                        }
+                    )
+            if self.max_concurrency is not None:
+                params["max_concurrency"] = self.max_concurrency  # snake_case for SDK
+            if self.crawl_delay_ms is not None:
+                params["delay"] = max(math.ceil(self.crawl_delay_ms / 1000), 0)
+
+            scrape_options: dict[str, Any] = {}
+            if formats:
+                scrape_options["formats"] = formats
+            self._apply_cache_options(scrape_options)
+            self._apply_location(scrape_options, mode="crawl")
+            if scrape_options:
+                params["scrape_options"] = scrape_options
 
         elif mode == "scrape":
-            # Scrape mode: formats at top level
             if formats:
                 params["formats"] = formats
+            if self.cache_max_age_ms:
+                params["max_age"] = self.cache_max_age_ms
+                params["store_in_cache"] = True
+            self._apply_location(params, mode="scrape")
 
         elif mode == "map":
             # Map mode uses limit for URL discovery (no content fetching, so no formats)
             params["limit"] = limit
+            if self.location:
+                params["location"] = self._build_location()
 
         elif mode == "extract":
             # Extract mode might have schema or prompt
@@ -394,8 +489,13 @@ class FirecrawlReader(BaseReader):
                 params["schema"] = kwargs["schema"]
             if "prompt" in kwargs:
                 params["prompt"] = kwargs["prompt"]
+            scrape_options: dict[str, Any] = {}
             if formats:
-                params["formats"] = formats
+                scrape_options["formats"] = formats
+            self._apply_cache_options(scrape_options)
+            self._apply_location(scrape_options, mode="extract")
+            if scrape_options:
+                params["scrape_options"] = scrape_options
 
         # Merge any additional kwargs
         for key, value in kwargs.items():
@@ -403,6 +503,29 @@ class FirecrawlReader(BaseReader):
                 params[key] = value
 
         return params
+
+    def _apply_cache_options(self, target: dict[str, Any]) -> None:
+        """Attach cache controls to scrape options if enabled."""
+        if self.cache_max_age_ms and self.cache_max_age_ms > 0:
+            target["max_age"] = self.cache_max_age_ms
+            target["store_in_cache"] = True
+
+    def _apply_location(self, target: dict[str, Any], *, mode: str) -> None:
+        """Attach location configuration to the appropriate parameter structure."""
+        if not self.location:
+            return
+        location_payload = self._build_location()
+        if mode == "scrape":
+            target["location"] = location_payload
+        else:
+            # For crawl/extract the location must be embedded in scrape_options
+            target["location"] = location_payload
+
+    def _build_location(self) -> dict[str, Any]:
+        """Construct Firecrawl location payload."""
+        country = self.location.get("country", "US") if self.location else "US"
+        languages = self.location.get("languages", ["en-US"]) if self.location else ["en-US"]
+        return {"country": country, "languages": languages}
 
     def _convert_to_documents(
         self, llamaindex_docs: list[Any], source_url: str

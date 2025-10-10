@@ -177,7 +177,7 @@ class Neo4jClient:
             logger.info("Neo4j schema initialization complete")
 
     def create_document_node(self, doc_id: str, properties: dict[str, Any]) -> dict[str, Any]:
-        """Create a Document node in the graph.
+        """Create or update a Document node in the graph.
 
         Args:
             doc_id: Unique document identifier
@@ -190,7 +190,7 @@ class Neo4jClient:
             Neo4jError: If node creation fails
         """
         query = """
-        CREATE (d:Document {doc_id: $doc_id})
+        MERGE (d:Document {doc_id: $doc_id})
         SET d += $properties
         RETURN d
         """
@@ -199,7 +199,7 @@ class Neo4jClient:
             result = session.execute_write(
                 self._create_node_tx, query, doc_id=doc_id, properties=properties
             )
-            logger.debug(f"Created Document node: {doc_id}")
+            logger.debug(f"Upserted Document node: {doc_id}")
             return result
 
     def create_entity_node(

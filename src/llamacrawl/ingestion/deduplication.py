@@ -353,7 +353,7 @@ class DocumentDeduplicator:
             return 0
 
         # Delete all matching keys
-        deleted = self.redis.client.delete(*keys)
+        deleted = int(self.redis.client.delete(*keys))
 
         logger.info(
             "Cleared all hashes for source",

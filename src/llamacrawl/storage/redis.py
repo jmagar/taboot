@@ -73,7 +73,7 @@ class RedisClient:
             True if Redis is accessible, False otherwise
         """
         try:
-            return self.client.ping()
+            return bool(self.client.ping())
         except redis.ConnectionError:
             return False
 
@@ -301,7 +301,7 @@ class RedisClient:
             >>> print(f"Cleared {cleared} DLQ entries")
         """
         key = f"dlq:{source}"
-        length = self.client.llen(key)
+        length = int(self.client.llen(key))
         self.client.delete(key)
         return length
 
@@ -320,7 +320,7 @@ class RedisClient:
             ...     print("Warning: Large DLQ backlog")
         """
         key = f"dlq:{source}"
-        return self.client.llen(key)
+        return int(self.client.llen(key))
 
     # =========================================================================
     # Distributed Lock Methods
@@ -391,7 +391,7 @@ class RedisClient:
         """
 
         # Redis eval() is untyped in redis-py stubs but returns int in this case
-        result = self.client.eval(lua_script, 1, lock_key, lock_value)  # type: ignore[no-untyped-call]
+        result = self.client.eval(lua_script, 1, lock_key, lock_value)
         return bool(result)
 
     def extend_lock(self, key: str, lock_value: str, additional_ttl: int = 300) -> bool:
@@ -424,7 +424,7 @@ class RedisClient:
         """
 
         # Redis eval() is untyped in redis-py stubs but returns int in this case
-        result = self.client.eval(lua_script, 1, lock_key, lock_value, additional_ttl)  # type: ignore[no-untyped-call]
+        result = self.client.eval(lua_script, 1, lock_key, lock_value, additional_ttl)
         return bool(result)
 
     @contextmanager

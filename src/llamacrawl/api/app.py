@@ -12,8 +12,12 @@ from llamacrawl.api.models import (
     FirecrawlJobCreateResponse,
     FirecrawlJobDetailResponse,
 )
+from llamacrawl.api.sessions_manager import SessionsWatcherManager
 from llamacrawl.cli.dependencies import build_redis
 from llamacrawl.config import load_config
+from llamacrawl.embeddings.tei import TEIEmbedding
+from llamacrawl.storage.neo4j import Neo4jClient
+from llamacrawl.storage.qdrant import QdrantClient
 from llamacrawl.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -28,20 +32,56 @@ try:
     _config = load_config()
     _redis_client = build_redis(_config)
     _job_store = FirecrawlJobStore(_redis_client)
+
+    # Initialize heavy clients once for sharing between managers
+    _neo4j_client = Neo4jClient(config=_config)
+    _qdrant_client = QdrantClient(
+        url=_config.qdrant_url,
+        collection_name=_config.vector_store.collection_name,
+        vector_dimension=_config.vector_store.vector_dimension,
+        distance_metric=_config.vector_store.distance_metric,
+    )
+    _embed_model = TEIEmbedding(base_url=_config.tei_embedding_url)
+
+    # Initialize Firecrawl job manager
     _job_manager = FirecrawlJobManager(
         config=_config,
         redis_client=_redis_client,
         job_store=_job_store,
+        qdrant_client=_qdrant_client,
+        neo4j_client=_neo4j_client,
+        embed_model=_embed_model,
     )
+
+    # Initialize sessions watcher manager if enabled
+    _sessions_manager = SessionsWatcherManager(
+        config=_config,
+        redis_client=_redis_client,
+        qdrant_client=_qdrant_client,
+        neo4j_client=_neo4j_client,
+        embed_model=_embed_model,
+    ) if _config.sources.sessions.enabled else None
+
 except Exception:  # pragma: no cover - startup failure is fatal
     logger.exception("Failed to initialize LlamaCrawl API dependencies")
     raise
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    """Initialize background tasks and watchers."""
+    if _sessions_manager:
+        await _sessions_manager.start()
 
 
 @app.on_event("shutdown")
 async def _shutdown() -> None:
     """Clean up background tasks and shared resources."""
     await _job_manager.shutdown()
+    if _sessions_manager:
+        await _sessions_manager.shutdown()
+    if _neo4j_client:
+        _neo4j_client.close()
     _redis_client.close()
 
 

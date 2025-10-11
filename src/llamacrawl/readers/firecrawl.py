@@ -572,8 +572,10 @@ class FirecrawlReader(BaseReader):
                 },
             )
 
+            # Accumulate documents (Firecrawl returns all docs in 'data' field)
             if docs:
                 collected_docs = docs
+                print(f"[POLLING DEBUG] Got {len(docs)} docs, status={status}")
 
             if progress_callback:
                 progress_callback(completed_count, total_count, status)
@@ -595,9 +597,16 @@ class FirecrawlReader(BaseReader):
                 f"Firecrawl crawl job {job_id} failed to complete successfully"
             )
 
+        print(f"[POLLING DEBUG] Completed with {len(collected_docs)} docs")
+        print(f"[POLLING DEBUG] Doc types: {[type(d).__name__ for d in collected_docs[:3]] if collected_docs else 'NONE'}")
+
         self.logger.info(
-            "Async Firecrawl crawl completed",
-            extra={"job_id": job_id, "document_count": len(collected_docs)},
+            "Async Firecrawl crawl completed via polling",
+            extra={
+                "job_id": job_id,
+                "document_count": len(collected_docs),
+                "doc_types": [type(d).__name__ for d in collected_docs[:3]] if collected_docs else [],
+            },
         )
 
         return self._convert_to_documents(collected_docs, source_url=url)
@@ -647,49 +656,79 @@ class FirecrawlReader(BaseReader):
         final_status: str = "unknown"
 
         # Use AsyncWatcher for real-time progress
-        async for snapshot in AsyncWatcher(
-            self.async_firecrawl_client,
-            job_id,
-            kind="crawl",
-            poll_interval=int(poll_interval),
-            timeout=timeout_seconds,
-        ):
-            final_status = snapshot.status
-            completed_count = getattr(snapshot, "completed", 0)
-            total_count = getattr(snapshot, "total", None)
+        # NOTE: AsyncWatcher may fail due to Firecrawl SDK bug where CrawlJob pydantic model
+        # doesn't accept "discovering" status. We catch this and fall back to HTTP polling.
+        try:
+            async for snapshot in AsyncWatcher(
+                self.async_firecrawl_client,
+                job_id,
+                kind="crawl",
+                poll_interval=int(poll_interval),
+                timeout=timeout_seconds,
+            ):
+                final_status = snapshot.status
+                completed_count = getattr(snapshot, "completed", 0)
+                total_count = getattr(snapshot, "total", None)
 
-            # Extract documents from snapshot
-            if hasattr(snapshot, "data") and snapshot.data:
-                collected_docs = snapshot.data
+                # Extract documents from snapshot (Firecrawl returns all docs in data field)
+                if hasattr(snapshot, "data") and snapshot.data:
+                    collected_docs = snapshot.data
+                    print(f"[WATCHER DEBUG] Got {len(snapshot.data)} docs from snapshot, status={final_status}")
 
-            self.logger.debug(
-                "Firecrawl crawl progress",
+                self.logger.debug(
+                    "Firecrawl crawl progress via watcher",
+                    extra={
+                        "job_id": job_id,
+                        "status": final_status,
+                        "completed": completed_count,
+                        "total": total_count,
+                        "docs": len(collected_docs) if collected_docs else 0,
+                    },
+                )
+
+                # Call progress callback if provided
+                if progress_callback:
+                    progress_callback(completed_count, total_count, final_status)
+
+                # Terminal status check
+                if final_status in ("completed", "failed", "cancelled"):
+                    break
+
+            if final_status == "failed":
+                raise RuntimeError(f"Firecrawl crawl job {job_id} failed")
+
+            if final_status == "cancelled":
+                raise RuntimeError(f"Firecrawl crawl job {job_id} was cancelled")
+
+        except Exception as watcher_error:
+            # Firecrawl SDK has a bug where CrawlJob doesn't accept "discovering" status
+            # Fall back to HTTP polling if watcher fails
+            print(f"[WATCHER DEBUG] Watcher failed: {watcher_error}, falling back to polling")
+            self.logger.warning(
+                "AsyncWatcher failed, falling back to HTTP polling",
                 extra={
                     "job_id": job_id,
-                    "status": final_status,
-                    "completed": completed_count,
-                    "total": total_count,
-                    "docs": len(collected_docs) if collected_docs else 0,
+                    "error": str(watcher_error),
+                    "error_type": type(watcher_error).__name__,
                 },
             )
+            return await self._async_crawl_with_polling(
+                url=url,
+                params=params,
+                progress_callback=progress_callback,
+            )
 
-            # Call progress callback if provided
-            if progress_callback:
-                progress_callback(completed_count, total_count, final_status)
-
-            # Terminal status check
-            if final_status in ("completed", "failed", "cancelled"):
-                break
-
-        if final_status == "failed":
-            raise RuntimeError(f"Firecrawl crawl job {job_id} failed")
-
-        if final_status == "cancelled":
-            raise RuntimeError(f"Firecrawl crawl job {job_id} was cancelled")
+        print(f"[WATCHER DEBUG] Watcher completed with {len(collected_docs)} docs")
+        print(f"[WATCHER DEBUG] Doc types: {[type(d).__name__ for d in collected_docs[:3]] if collected_docs else 'NONE'}")
 
         self.logger.info(
             "Async Firecrawl crawl completed via watcher",
-            extra={"job_id": job_id, "document_count": len(collected_docs)},
+            extra={
+                "job_id": job_id,
+                "document_count": len(collected_docs),
+                "doc_types": [type(d).__name__ for d in collected_docs[:3]] if collected_docs else [],
+                "first_doc_sample": str(collected_docs[0])[:200] if collected_docs else "NO DOCS",
+            },
         )
 
         # Convert Firecrawl Document objects to our Document model

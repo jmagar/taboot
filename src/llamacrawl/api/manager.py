@@ -37,6 +37,9 @@ class FirecrawlJobManager:
         config: Config,
         redis_client: RedisClient,
         job_store: FirecrawlJobStore,
+        qdrant_client: QdrantClient,
+        neo4j_client: Neo4jClient,
+        embed_model: TEIEmbedding,
     ) -> None:
         self._config = config
         self._redis_client = redis_client
@@ -44,15 +47,10 @@ class FirecrawlJobManager:
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._task_lock = asyncio.Lock()
 
-        # Heavy clients are initialized lazily and reused across jobs
-        self._neo4j_client = Neo4jClient(config=config)
-        self._qdrant_client = QdrantClient(
-            url=config.qdrant_url,
-            collection_name=config.vector_store.collection_name,
-            vector_dimension=config.vector_store.vector_dimension,
-            distance_metric=config.vector_store.distance_metric,
-        )
-        self._embed_model = TEIEmbedding(base_url=config.tei_embedding_url)
+        # Heavy clients are passed in from app.py for sharing between managers
+        self._neo4j_client = neo4j_client
+        self._qdrant_client = qdrant_client
+        self._embed_model = embed_model
 
     async def submit_job(self, request: FirecrawlJobCreateRequest) -> FirecrawlJobRecord:
         """Create a new Firecrawl job and start background processing."""
@@ -241,5 +239,3 @@ class FirecrawlJobManager:
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
-
-        self._neo4j_client.close()

@@ -394,7 +394,7 @@ class QdrantClient:
                 exact=True,
             )
 
-            count = result.count
+            count = int(result.count)
             logger.debug(
                 f"Document count: {count}",
                 extra={"source_type": source_type, "count": count},
@@ -507,7 +507,7 @@ class QdrantClient:
                 for st in filters["source_types"]
             ]
             # Qdrant Filter expects broader union, list is invariant
-            return Filter(should=should_conditions, must=must_conditions)  # type: ignore[arg-type]
+            return Filter(should=should_conditions, must=must_conditions)
 
         # Date range filters
         range_params: dict[str, str] = {}
@@ -518,7 +518,7 @@ class QdrantClient:
 
         if range_params:
             # Range accepts datetime strings for timestamp fields despite float type hint
-            must_conditions.append(FieldCondition(key="timestamp", range=Range(**range_params)))  # type: ignore[arg-type]
+            must_conditions.append(FieldCondition(key="timestamp", range=Range(**range_params)))
 
         # Custom metadata filters (nested fields via dot notation)
         for key, value in filters.items():
@@ -532,7 +532,7 @@ class QdrantClient:
                     must_conditions.append(FieldCondition(key=key, range=Range(**value)))
 
         # Qdrant Filter expects broader union, list is invariant
-        return Filter(must=must_conditions) if must_conditions else Filter()  # type: ignore[arg-type]
+        return Filter(must=must_conditions) if must_conditions else Filter()
 
 
 __all__ = ["QdrantClient"]

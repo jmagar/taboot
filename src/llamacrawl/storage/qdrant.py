@@ -45,6 +45,7 @@ class QdrantClient:
         url: str,
         collection_name: str = "llamacrawl_documents",
         vector_dimension: int = 1024,
+        distance_metric: str = "cosine",
     ):
         """Initialize Qdrant client.
 
@@ -52,10 +53,12 @@ class QdrantClient:
             url: Qdrant server URL (e.g., "http://localhost:6333")
             collection_name: Name of the collection to use
             vector_dimension: Dimension of embedding vectors (default: 1024)
+            distance_metric: Distance metric ("cosine", "euclidean", "dot", default: "cosine")
         """
         self.url = url
         self.collection_name = collection_name
         self.vector_dimension = vector_dimension
+        self.distance_metric = self._map_distance_metric(distance_metric)
 
         logger.info(
             "Initializing Qdrant client",
@@ -63,6 +66,7 @@ class QdrantClient:
                 "qdrant_url": url,
                 "collection_name": collection_name,
                 "vector_dimension": vector_dimension,
+                "distance_metric": distance_metric,
             },
         )
 
@@ -72,6 +76,33 @@ class QdrantClient:
         except Exception as e:
             logger.error(f"Failed to initialize Qdrant client: {e}", extra={"error": str(e)})
             raise
+
+    def _map_distance_metric(self, metric: str) -> Distance:
+        """Map string distance metric to Qdrant Distance enum.
+
+        Args:
+            metric: Distance metric string ("cosine", "euclidean", "dot")
+
+        Returns:
+            Qdrant Distance enum value
+
+        Raises:
+            ValueError: If metric is not supported
+        """
+        metric_map = {
+            "cosine": Distance.COSINE,
+            "euclidean": Distance.EUCLID,
+            "dot": Distance.DOT,
+        }
+
+        metric_lower = metric.lower()
+        if metric_lower not in metric_map:
+            raise ValueError(
+                f"Unsupported distance metric: {metric}. "
+                f"Supported metrics: {', '.join(metric_map.keys())}"
+            )
+
+        return metric_map[metric_lower]
 
     def health_check(self) -> bool:
         """Check if Qdrant server is healthy and accessible.
@@ -154,7 +185,7 @@ class QdrantClient:
             # Vector configuration
             vectors_config = VectorParams(
                 size=self.vector_dimension,
-                distance=Distance.COSINE,
+                distance=self.distance_metric,
             )
 
             # HNSW configuration for optimized search
@@ -285,10 +316,12 @@ class QdrantClient:
         try:
             for i in range(0, len(points), batch_size):
                 batch = points[i : i + batch_size]
+                # Add timeout to prevent hanging on slow Qdrant responses
+                # Using wait=False for async operation, then checking separately
                 self.client.upsert(
                     collection_name=self.collection_name,
                     points=batch,
-                    wait=True,
+                    wait=False,  # Don't wait synchronously
                 )
                 total_upserted += len(batch)
                 batch_num = i // batch_size + 1
@@ -361,7 +394,7 @@ class QdrantClient:
                 exact=True,
             )
 
-            count = result.count
+            count = int(result.count)
             logger.debug(
                 f"Document count: {count}",
                 extra={"source_type": source_type, "count": count},
@@ -474,7 +507,7 @@ class QdrantClient:
                 for st in filters["source_types"]
             ]
             # Qdrant Filter expects broader union, list is invariant
-            return Filter(should=should_conditions, must=must_conditions)  # type: ignore[arg-type]
+            return Filter(should=should_conditions, must=must_conditions)
 
         # Date range filters
         range_params: dict[str, str] = {}
@@ -485,21 +518,21 @@ class QdrantClient:
 
         if range_params:
             # Range accepts datetime strings for timestamp fields despite float type hint
-            must_conditions.append(FieldCondition(key="timestamp", range=Range(**range_params)))  # type: ignore[arg-type]
+            must_conditions.append(FieldCondition(key="timestamp", range=Range(**range_params)))
 
         # Custom metadata filters (nested fields via dot notation)
         for key, value in filters.items():
             if key not in ["source_type", "source_types", "date_from", "date_to"]:
                 # Support nested metadata filters using dot notation
                 # e.g., filters={"metadata.repo_owner": "llamaindex"}
-                if isinstance(value, (str, int, bool)):
+                if isinstance(value, str | int | bool):
                     must_conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
                 elif isinstance(value, dict) and "gte" in value or "lte" in value:
                     # Range filter for numeric fields
                     must_conditions.append(FieldCondition(key=key, range=Range(**value)))
 
         # Qdrant Filter expects broader union, list is invariant
-        return Filter(must=must_conditions) if must_conditions else Filter()  # type: ignore[arg-type]
+        return Filter(must=must_conditions) if must_conditions else Filter()
 
 
 __all__ = ["QdrantClient"]

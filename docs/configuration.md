@@ -140,14 +140,15 @@ sources:
     enabled: true
     repositories:
       - "owner/repo1"
-      - "owner/repo2"
+      - "owner"  # ingest all repositories for this owner
     include_issues: true
     include_prs: true
     include_discussions: true
     file_extensions: [".md", ".py", ".ts", ".js", ".yaml", ".json"]
 ```
 
-- **repositories**: List of repositories to index (format: `owner/repo`)
+- **repositories**: Repository identifiers. Accepts `owner/repo` or bare `owner` to sync all
+  repositories for that owner.
 - **include_issues**: Whether to ingest issues and comments
 - **include_prs**: Whether to ingest pull requests and reviews
 - **include_discussions**: Whether to ingest GitHub discussions
@@ -375,7 +376,7 @@ sources:
     enabled: true
     repositories:
       - "facebook/react"
-      - "microsoft/typescript"
+      - "microsoft"  # all repositories for Microsoft
     include_issues: true
     include_prs: false  # Skip PRs if not needed
     include_discussions: false

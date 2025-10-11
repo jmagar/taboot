@@ -17,9 +17,8 @@ import time
 from datetime import datetime
 from typing import Any
 
-from llama_index.llms.ollama import Ollama
-
 from llamacrawl.config import Config
+from llamacrawl.llms import ClaudeAgentLLM
 from llamacrawl.models.document import QueryResult, SourceAttribution
 from llamacrawl.utils.logging import get_logger
 
@@ -27,11 +26,11 @@ logger = get_logger(__name__)
 
 
 class AnswerSynthesizer:
-    """Synthesize answers from retrieved documents using Ollama LLM.
+    """Synthesize answers from retrieved documents using Claude Agent SDK.
 
     This class takes retrieved documents with scores and generates a coherent
-    answer with inline citations and source attribution. It uses LlamaIndex's
-    Ollama LLM integration to call the configured Ollama model.
+    answer with inline citations and source attribution. It uses Claude Agent SDK
+    via a custom LlamaIndex LLM wrapper, allowing use of Claude.ai subscription.
 
     The synthesizer handles:
     - Context formatting with source numbering
@@ -42,53 +41,48 @@ class AnswerSynthesizer:
     - Response formatting into QueryResult model
 
     Attributes:
-        config: Configuration object with Ollama settings
-        llm: LlamaIndex Ollama LLM instance
-        model_name: Name of Ollama model to use (e.g., "llama3.1:8b")
-        max_context_tokens: Maximum number of tokens for context
+        config: Configuration object with Claude settings
+        llm: ClaudeAgentLLM instance
+        model_name: Name of Claude model to use (e.g., "claude-sonnet-4-0")
+        max_input_tokens: Maximum number of tokens for context
     """
 
     def __init__(self, config: Config):
-        """Initialize AnswerSynthesizer with Ollama LLM.
+        """Initialize AnswerSynthesizer with Claude Agent SDK.
 
         Args:
-            config: Configuration object with Ollama URL and model settings
+            config: Configuration object with Claude model settings
 
         Raises:
-            ValueError: If Ollama configuration is invalid
-            ConnectionError: If Ollama server is unreachable
+            ValueError: If Claude configuration is invalid
         """
         self.config = config
         self.model_name = config.query.synthesis_model
-        self.max_context_tokens = config.query.max_context_tokens
+        self.max_input_tokens = config.query.max_input_tokens
 
         logger.info(
             "Initializing AnswerSynthesizer",
             extra={
-                "ollama_url": config.ollama_url,
                 "model": self.model_name,
-                "max_context_tokens": self.max_context_tokens,
-                "temperature": config.query.temperature,
+                "max_input_tokens": self.max_input_tokens,
             },
         )
 
-        # Initialize Ollama LLM with LlamaIndex integration
+        # Initialize Claude Agent SDK LLM
         try:
-            self.llm = Ollama(
+            self.llm = ClaudeAgentLLM(
                 model=self.model_name,
-                base_url=config.ollama_url,
-                temperature=config.query.temperature,
-                request_timeout=60.0,  # 60 second timeout for LLM requests
+                max_tokens=self.max_input_tokens,
             )
 
             logger.info("AnswerSynthesizer initialized successfully")
 
         except Exception as e:
             logger.error(
-                f"Failed to initialize Ollama LLM: {e}",
+                f"Failed to initialize Claude Agent LLM: {e}",
                 extra={"error": str(e), "error_type": type(e).__name__},
             )
-            raise ValueError(f"Failed to initialize Ollama LLM: {e}") from e
+            raise ValueError(f"Failed to initialize Claude Agent LLM: {e}") from e
 
     def synthesize(
         self,
@@ -156,7 +150,7 @@ class AnswerSynthesizer:
         logger.debug("Stage 1: Formatting context from documents")
 
         context = self._format_context(retrieved_docs)
-        truncated_context = self._truncate_context(context, self.max_context_tokens)
+        truncated_context = self._truncate_context(context, self.max_input_tokens)
 
         context_time = (time.time() - stage_start) * 1000
         logger.debug(
@@ -183,9 +177,9 @@ class AnswerSynthesizer:
             },
         )
 
-        # Stage 3: Call Ollama for synthesis
+        # Stage 3: Call Claude Agent SDK for synthesis
         stage_start = time.time()
-        logger.debug("Stage 3: Calling Ollama LLM for synthesis")
+        logger.debug("Stage 3: Calling Claude Agent LLM for synthesis")
 
         try:
             response = self.llm.complete(prompt)
@@ -202,7 +196,7 @@ class AnswerSynthesizer:
 
         except Exception as e:
             logger.error(
-                f"Ollama synthesis failed: {e}",
+                f"Claude Agent synthesis failed: {e}",
                 extra={"error": str(e), "error_type": type(e).__name__},
             )
             # Return error message to user
@@ -252,6 +246,65 @@ class AnswerSynthesizer:
         )
 
         return result
+
+    def stream_synthesize(
+        self,
+        query_text: str,
+        retrieved_docs: list[dict[str, Any]],
+    ) -> tuple[Any, list[dict[str, Any]]]:
+        """Stream answer synthesis token by token.
+
+        Same as synthesize() but yields tokens as they arrive from Claude.
+        Returns a generator that yields text deltas.
+
+        Args:
+            query_text: Original user query
+            retrieved_docs: List of retrieved documents from query engine
+
+        Yields:
+            Text deltas from Claude (strings to print immediately)
+
+        Returns:
+            Tuple of (delta_generator, retrieved_docs) for CLI to use
+        """
+        logger.info(
+            "Starting streaming answer synthesis",
+            extra={
+                "query": query_text,
+                "num_docs": len(retrieved_docs),
+            },
+        )
+
+        # Handle empty results
+        if not retrieved_docs:
+            logger.warning("No documents provided for synthesis")
+            yield "I couldn't find any relevant information to answer your question."
+            return
+
+        # Stage 1: Format context from documents
+        context = self._format_context(retrieved_docs)
+        truncated_context = self._truncate_context(context, self.max_input_tokens)
+
+        # Stage 2: Build prompt
+        prompt = self._build_prompt(query_text, truncated_context)
+
+        # Stage 3: Stream from Claude Agent SDK
+        logger.debug("Stage 3: Streaming from Claude Agent LLM")
+
+        try:
+            # Use stream_complete to get deltas
+            for chunk in self.llm.stream_complete(prompt):
+                if chunk.delta:  # Only yield if there's new text
+                    yield chunk.delta
+
+            logger.info("Streaming synthesis completed")
+
+        except Exception as e:
+            logger.error(
+                f"Claude Agent streaming synthesis failed: {e}",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
+            yield f"\n\nI encountered an error while generating the answer: {str(e)}"
 
     def _format_context(self, retrieved_docs: list[dict[str, Any]]) -> str:
         """Format retrieved documents into context string with source numbers.
@@ -318,7 +371,7 @@ class AnswerSynthesizer:
         return context[:max_chars] + "\n\n[Context truncated due to length...]"
 
     def _build_prompt(self, query_text: str, context: str) -> str:
-        """Build prompt for Ollama with system instructions, context, and query.
+        """Build prompt for Claude with system instructions, context, and query.
 
         The prompt instructs the model to:
         - Answer based on provided context only

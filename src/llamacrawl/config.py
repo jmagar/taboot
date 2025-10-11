@@ -14,11 +14,28 @@ from typing import Any, Literal
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 # =============================================================================
 # Pydantic Configuration Models (Pydantic v2 syntax)
 # =============================================================================
+
+
+class FirecrawlLocationConfig(BaseModel):
+    """Location targeting configuration for Firecrawl.
+
+    Enables regional content filtering at the Firecrawl API level
+    to reduce API credits spent on non-target regions.
+    """
+
+    country: str = Field(
+        default="US",
+        description="ISO 3166-1 alpha-2 country code (e.g., 'US', 'GB', 'FR')"
+    )
+    languages: list[str] = Field(
+        default=["en-US"],
+        description="Locale codes for language targeting (e.g., ['en-US', 'en-GB'])"
+    )
 
 
 class FirecrawlSourceConfig(BaseModel):
@@ -27,18 +44,68 @@ class FirecrawlSourceConfig(BaseModel):
     enabled: bool = True
     default_crawl_depth: int = Field(default=3, ge=1, le=10)
     max_pages: int = Field(default=1000, ge=1, le=10000)
-    formats: list[str] = Field(default=["markdown", "html"])
+    formats: list[str] = Field(default=["markdown"])
     urls: list[str] = Field(default_factory=list)
+    include_paths: list[str] = Field(
+        default_factory=list,
+        description="URL path patterns to include (regex, e.g., ['^/en/', '^/docs/'])"
+    )
+    exclude_paths: list[str] = Field(
+        default_factory=list,
+        description=(
+            "URL path patterns to exclude (regex, e.g., ['^/fr/', '^/de/']). "
+            "Auto-populated from language_filter if empty."
+        )
+    )
+    cache_max_age_ms: int | None = Field(
+        default=172800000,
+        ge=0,
+        description="Firecrawl cache maxAge in milliseconds. Set to 0 or null to disable caching.",
+    )
+    location: FirecrawlLocationConfig | None = Field(
+        default=None,
+        description="Regional targeting configuration for Firecrawl API"
+    )
+    filter_non_english_metadata: bool = Field(
+        default=True,
+        description="Filter documents by Firecrawl's detected metadata.language field"
+    )
+    auto_exclude_non_allowed_languages: bool = Field(
+        default=True,
+        description="Automatically exclude language paths not in language_filter.allowed_languages"
+    )
+    max_concurrency: int | None = Field(
+        default=None,
+        ge=1,
+        le=32,
+        validation_alias=AliasChoices("max_concurrency", "concurrency"),
+        description="Maximum concurrent workers for Firecrawl. Accepts legacy 'concurrency' key.",
+    )
+    max_retries: int = Field(default=2, ge=0, le=10)
+    retry_delay_ms: int = Field(default=2000, ge=0, le=60000)
+    crawl_delay_ms: int | None = Field(
+        default=None,
+        ge=0,
+        le=60000,
+        description="Delay in milliseconds between page fetches (Firecrawl 'delay' parameter).",
+    )
+    timeout_ms: int | None = Field(default=None, ge=0, le=120000)
 
 
 class GitHubSourceConfig(BaseModel):
     """GitHub repositories source configuration."""
 
     enabled: bool = True
-    repositories: list[str] = Field(default_factory=list)
+    repositories: list[str] = Field(
+        default_factory=list,
+        description=(
+            "List of repository identifiers. Accepts either 'owner/repo' or bare 'owner' entries; "
+            "bare owners expand to all accessible repositories for that owner."
+        ),
+    )
     include_issues: bool = True
     include_prs: bool = True
-    include_discussions: bool = True
+    # Note: include_discussions removed - GitHub Discussions API not implemented
     file_extensions: list[str] = Field(
         default=[".md", ".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs"]
     )
@@ -46,11 +113,29 @@ class GitHubSourceConfig(BaseModel):
     @field_validator("repositories")
     @classmethod
     def validate_repositories(cls, v: list[str]) -> list[str]:
-        """Validate repository format (owner/repo)."""
+        """Validate repository entries, allowing owner or owner/repo formats."""
+        cleaned: list[str] = []
         for repo in v:
-            if "/" not in repo:
-                raise ValueError(f"Invalid repository format: {repo}. Expected 'owner/repo'")
-        return v
+            repo_identifier = repo.strip()
+            if not repo_identifier:
+                raise ValueError("Repository entries cannot be empty")
+
+            if repo_identifier.count("/") > 1:
+                raise ValueError(
+                    f"Invalid repository format: {repo_identifier}. "
+                    "Expected 'owner/repo' or 'owner'"
+                )
+
+            if "/" in repo_identifier:
+                owner, repo_name = repo_identifier.split("/", 1)
+                if not owner or not repo_name:
+                    raise ValueError(
+                        f"Invalid repository format: {repo_identifier}. "
+                        "Expected 'owner/repo'"
+                    )
+
+            cleaned.append(repo_identifier)
+        return cleaned
 
 
 class RedditSourceConfig(BaseModel):
@@ -84,6 +169,56 @@ class GmailSourceConfig(BaseModel):
     query_filters: list[str] = Field(default_factory=list)
 
 
+class SessionsSourceConfig(BaseModel):
+    """AI coding assistant session ingestion configuration.
+
+    Monitors JSONL session files from Claude Code, Codex CLI, and potentially
+    other AI assistants for real-time ingestion into the RAG pipeline.
+    """
+
+    enabled: bool = False
+    claude_code_path: Path | None = Field(
+        default_factory=lambda: Path.home() / ".claude" / "projects",
+        description="Path to Claude Code project logs"
+    )
+    codex_path: Path | None = Field(
+        default_factory=lambda: Path.home() / ".codex" / "sessions",
+        description="Path to Codex CLI session logs"
+    )
+    gemini_path: Path | None = Field(
+        default=None,
+        description="Path to Gemini CLI session logs (future)"
+    )
+    conversation_stable_time: int = Field(
+        default=600,
+        ge=60,
+        le=3600,
+        description="Seconds to wait before creating conversation-level doc"
+    )
+    enable_message_level: bool = Field(
+        default=True,
+        description="Enable message-level document indexing"
+    )
+    enable_conversation_level: bool = Field(
+        default=True,
+        description="Enable conversation-level document indexing"
+    )
+
+    @field_validator("claude_code_path", "codex_path", "gemini_path", mode="before")
+    @classmethod
+    def expand_path(cls, v: str | Path | None) -> Path | None:
+        """Expand tilde and convert strings to absolute Path objects."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            # Expand tilde and convert to absolute path
+            return Path(v).expanduser().resolve()
+        if isinstance(v, Path):
+            # Expand tilde if present
+            return v.expanduser().resolve()
+        return v
+
+
 class SourceConfig(BaseModel):
     """Configuration for all data sources."""
 
@@ -92,6 +227,7 @@ class SourceConfig(BaseModel):
     reddit: RedditSourceConfig = Field(default_factory=RedditSourceConfig)
     elasticsearch: ElasticsearchSourceConfig = Field(default_factory=ElasticsearchSourceConfig)
     gmail: GmailSourceConfig = Field(default_factory=GmailSourceConfig)
+    sessions: SessionsSourceConfig = Field(default_factory=SessionsSourceConfig)
 
 
 class RetryConfig(BaseModel):
@@ -104,11 +240,19 @@ class RetryConfig(BaseModel):
 
 
 class DeduplicationConfig(BaseModel):
-    """Deduplication strategy configuration."""
+    """Deduplication strategy configuration.
 
-    enabled: bool = True
-    strategy: Literal["hash"] = "hash"
-    normalize_content: bool = True
+    Deduplication is always enabled and uses content hash strategy.
+    """
+
+    # Deduplication is always enabled, no config needed
+    # Strategy is always 'hash' (SHA-256 content hashing)
+    # normalize_whitespace: Normalize whitespace before hashing
+    normalize_whitespace: bool = True
+    # remove_punctuation: Remove punctuation before hashing
+    remove_punctuation: bool = False
+    # normalize_case: Normalize case (lowercase) before hashing
+    normalize_case: bool = False
 
 
 class DLQConfig(BaseModel):
@@ -116,6 +260,38 @@ class DLQConfig(BaseModel):
 
     enabled: bool = True
     retention_days: int = Field(default=7, ge=1, le=30)
+
+
+class LanguageFilterConfig(BaseModel):
+    """Language filtering configuration for pipeline.
+
+    Controls content-based language filtering that happens BEFORE embedding
+    to save compute costs and storage space on non-target language content.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable language filtering in ingestion pipeline"
+    )
+    allowed_languages: list[str] = Field(
+        default=["en"],
+        description="List of ISO 639-1 language codes to keep (e.g., ['en', 'es'])"
+    )
+    confidence_threshold: float = Field(
+        default=0.8,
+        ge=0.0,
+        le=1.0,
+        description="Minimum detection confidence (0.0-1.0)"
+    )
+    min_content_length: int = Field(
+        default=50,
+        ge=0,
+        description="Minimum text length for detection (shorter text passes through)"
+    )
+    log_filtered: bool = Field(
+        default=True,
+        description="Log detailed filtering statistics"
+    )
 
 
 class IngestionConfig(BaseModel):
@@ -128,11 +304,16 @@ class IngestionConfig(BaseModel):
 
     chunk_size: int = Field(default=512, ge=128, le=32768)  # Support full Qwen3 32K context
     chunk_overlap: int = Field(default=50, ge=0, le=8192)   # Allow up to 25% overlap at 32K chunks
-    batch_size: int = Field(default=100, ge=1, le=1000)
-    concurrent_sources: int = Field(default=3, ge=1, le=10)
+    batch_size: int = Field(default=32, ge=1, le=1000)
+    pipeline_workers: int = Field(default=1, ge=1, le=32)
+    embedding_batch_size: int = Field(default=64, ge=1, le=256)
     retry: RetryConfig = Field(default_factory=RetryConfig)
     deduplication: DeduplicationConfig = Field(default_factory=DeduplicationConfig)
     dlq: DLQConfig = Field(default_factory=DLQConfig)
+    language_filter: LanguageFilterConfig = Field(
+        default_factory=LanguageFilterConfig,
+        description="Language filtering configuration (filters BEFORE embedding)"
+    )
 
 
 class QueryConfig(BaseModel):
@@ -143,9 +324,9 @@ class QueryConfig(BaseModel):
     enable_reranking: bool = True
     enable_graph_traversal: bool = True
     max_graph_depth: int = Field(default=2, ge=1, le=5)
-    synthesis_model: str = "gemma3:12b-it-qat"
-    max_context_tokens: int = Field(default=4096, ge=512, le=16384)
-    temperature: float = Field(default=0.1, ge=0.0, le=2.0)
+    synthesis_model: str = "claude-3-5-haiku-20241022"  # Fast and cheap for RAG synthesis
+    max_input_tokens: int = Field(default=4096, ge=512, le=200000)  # Claude supports up to 200K
+    # Note: temperature removed - Claude SDK doesn't support it in this context
     include_snippets: bool = True
     snippet_length: int = Field(default=200, ge=50, le=1000)
 
@@ -154,12 +335,59 @@ class GraphConfig(BaseModel):
     """Knowledge graph extraction configuration."""
 
     auto_extract_entities: bool = True
-    extraction_model: str = "sciphi/triplex"
-    max_keywords_per_document: int = Field(default=10, ge=1, le=50)
-    relationship_extraction: bool = True
+    extraction_model: str = "claude-3-5-haiku-20241022"  # Fast/cheap Claude model for extraction
+    # Note: max_keywords_per_document removed - not used in implementation
+    # Note: relationship_extraction removed - always enabled, not toggleable
     entity_types: list[str] = Field(
-        default=["PERSON", "ORGANIZATION", "LOCATION", "PRODUCT", "TECHNOLOGY"]
+        default=[
+            "PERSON", "ORGANIZATION", "LOCATION", "PRODUCT",
+            "TECHNOLOGY", "EVENT", "FILE", "CONCEPT"
+        ]
     )
+    extraction_strategy: Literal["simple", "implicit", "schema", "combined"] = "simple"
+    confidence_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+    max_triplets_per_chunk: int = Field(default=30, ge=1, le=100)
+    include_implicit_relations: bool = True
+
+    # Entity type schemas with properties
+    entity_properties: dict[str, list[str]] = Field(
+        default={
+            "PERSON": ["email", "role", "title", "company"],
+            "ORGANIZATION": ["industry", "size", "website", "location"],
+            "LOCATION": ["address", "coordinates", "type"],
+            "PRODUCT": ["version", "vendor", "category"],
+            "TECHNOLOGY": ["language", "framework", "version"],
+            "EVENT": ["startTime", "endTime", "location", "type"],
+            "FILE": ["fileId", "source", "format", "lastModified"],
+            "CONCEPT": ["category", "domain", "relatedTo"],
+        }
+    )
+
+    # Relation type schemas with properties
+    relation_types: list[str] = Field(
+        default=[
+            "WORKS_FOR", "CREATED_BY", "LOCATED_IN", "USES", "PART_OF",
+            "RELATED_TO", "IMPLEMENTS", "DEPENDS_ON", "MENTIONS", "REFERENCES"
+        ]
+    )
+
+    relation_properties: dict[str, list[str]] = Field(
+        default={
+            "WORKS_FOR": ["role", "startDate", "endDate"],
+            "CREATED_BY": ["date", "version"],
+            "LOCATED_IN": ["since", "type"],
+            "USES": ["purpose", "frequency"],
+            "PART_OF": ["role", "percentage"],
+            "RELATED_TO": ["strength", "type"],
+            "IMPLEMENTS": ["version", "standard"],
+            "DEPENDS_ON": ["version", "type"],
+            "MENTIONS": ["context", "sentiment"],
+            "REFERENCES": ["page", "section"],
+        }
+    )
+
+    allowed_entity_types: list[str] | None = None
+    allowed_relation_types: list[str] | None = None
 
 
 class HNSWConfig(BaseModel):
@@ -177,6 +405,9 @@ class VectorStoreConfig(BaseModel):
     distance_metric: Literal["cosine", "euclidean", "dot"] = "cosine"
     enable_quantization: bool = True
     hnsw: HNSWConfig = Field(default_factory=HNSWConfig)
+    upsert_batch_size: int = Field(default=256, ge=1, le=1024)
+    upsert_parallel: int = Field(default=4, ge=1, le=16)
+    upsert_max_retries: int = Field(default=3, ge=0, le=10)
 
 
 class LoggingConfig(BaseModel):
@@ -188,11 +419,13 @@ class LoggingConfig(BaseModel):
 
 
 class MetricsConfig(BaseModel):
-    """Metrics configuration."""
+    """Metrics configuration.
 
-    enabled: bool = True
-    prometheus_port: int = Field(default=9090, ge=0, le=65535)
-    collection_interval: int = Field(default=60, ge=10, le=3600)
+    NOTE: Metrics collection is not yet implemented. This is a placeholder config.
+    """
+
+    # All metrics options are placeholders - not used in current implementation
+    enabled: bool = False  # Changed to False since not implemented
 
 
 class Config(BaseModel):
@@ -235,9 +468,8 @@ class Config(BaseModel):
     neo4j_user: str = "neo4j"
     neo4j_password: str = "changeme"
     redis_url: str = "redis://localhost:6379"
-    tei_embedding_url: str = "http://localhost:8080"
-    tei_reranker_url: str = "http://localhost:8081"
-    ollama_url: str = "http://localhost:11434"
+    tei_embedding_url: str
+    tei_reranker_url: str
 
     # Observability (env var overrides)
     log_level: str = "INFO"
@@ -299,6 +531,19 @@ def load_config(
     env_path = Path(env_file)
     config_path = Path(config_file)
 
+    # Resolve project root for fallback lookups when running from nested directories
+    project_root = Path(__file__).resolve().parents[2]
+
+    if not env_path.exists() and not env_path.is_absolute():
+        fallback_env = project_root / env_file
+        if fallback_env.exists():
+            env_path = fallback_env
+
+    if not config_path.exists() and not config_path.is_absolute():
+        fallback_config = project_root / config_file
+        if fallback_config.exists():
+            config_path = fallback_config
+
     # Load environment variables
     if env_path.exists():
         load_dotenv(env_path, override=True)
@@ -347,9 +592,8 @@ def load_config(
         "neo4j_user": os.getenv("NEO4J_USER", "neo4j"),
         "neo4j_password": os.getenv("NEO4J_PASSWORD", "changeme"),
         "redis_url": os.getenv("REDIS_URL", "redis://localhost:6379"),
-        "tei_embedding_url": os.getenv("TEI_EMBEDDING_URL", "http://localhost:8080"),
-        "tei_reranker_url": os.getenv("TEI_RERANKER_URL", "http://localhost:8081"),
-        "ollama_url": os.getenv("OLLAMA_URL", "http://localhost:11434"),
+        "tei_embedding_url": os.getenv("TEI_EMBEDDING_URL"),
+        "tei_reranker_url": os.getenv("TEI_RERANKER_URL"),
         # Observability (override YAML if env var set)
         "log_level": os.getenv("LOG_LEVEL", yaml_config.get("logging", {}).get("level", "INFO")),
         "prometheus_port": int(
@@ -366,8 +610,17 @@ def load_config(
     except Exception as e:
         raise ValueError(f"Configuration validation failed: {e}") from e
 
+    # Validate required infrastructure URLs
+    if not config.tei_embedding_url:
+        raise ValueError("TEI_EMBEDDING_URL environment variable is required")
+    if not config.tei_reranker_url:
+        raise ValueError("TEI_RERANKER_URL environment variable is required")
+
     # Additional validation: check enabled sources have credentials
     _validate_source_credentials(config)
+
+    # Auto-populate Firecrawl exclude_paths from language_filter if enabled
+    _apply_language_filter_to_firecrawl(config)
 
     return config
 
@@ -426,10 +679,153 @@ def _validate_source_credentials(config: Config) -> None:
                 "Set API key in .env or disable Elasticsearch in config.yaml"
             )
 
+    # Sessions requires valid paths that exist and are readable
+    if config.sources.sessions.enabled:
+        sessions_config = config.sources.sessions
+
+        # Check Claude Code path
+        if sessions_config.claude_code_path is not None:
+            claude_path = sessions_config.claude_code_path
+            if not claude_path.is_absolute():
+                errors.append(
+                    f"Sessions Claude Code path must be absolute: {claude_path}. "
+                    "Use Path.home() / '.claude' / 'projects' format in config."
+                )
+            elif not claude_path.exists():
+                errors.append(
+                    f"Sessions Claude Code path does not exist: {claude_path}. "
+                    "Create the directory or disable Sessions in config.yaml"
+                )
+            elif not claude_path.is_dir():
+                errors.append(
+                    f"Sessions Claude Code path is not a directory: {claude_path}"
+                )
+            elif not os.access(claude_path, os.R_OK):
+                errors.append(
+                    f"Sessions Claude Code path is not readable: {claude_path}. "
+                    "Check file permissions."
+                )
+
+        # Check Codex path
+        if sessions_config.codex_path is not None:
+            codex_path = sessions_config.codex_path
+            if not codex_path.is_absolute():
+                errors.append(
+                    f"Sessions Codex path must be absolute: {codex_path}. "
+                    "Use Path.home() / '.codex' / 'sessions' format in config."
+                )
+            elif not codex_path.exists():
+                errors.append(
+                    f"Sessions Codex path does not exist: {codex_path}. "
+                    "Create the directory or disable Sessions in config.yaml"
+                )
+            elif not codex_path.is_dir():
+                errors.append(
+                    f"Sessions Codex path is not a directory: {codex_path}"
+                )
+            elif not os.access(codex_path, os.R_OK):
+                errors.append(
+                    f"Sessions Codex path is not readable: {codex_path}. "
+                    "Check file permissions."
+                )
+
+        # Check Gemini path (optional, future use)
+        if sessions_config.gemini_path is not None:
+            gemini_path = sessions_config.gemini_path
+            if not gemini_path.is_absolute():
+                errors.append(
+                    f"Sessions Gemini path must be absolute: {gemini_path}"
+                )
+            elif not gemini_path.exists():
+                errors.append(
+                    f"Sessions Gemini path does not exist: {gemini_path}. "
+                    "Create the directory or remove gemini_path from config.yaml"
+                )
+            elif not gemini_path.is_dir():
+                errors.append(
+                    f"Sessions Gemini path is not a directory: {gemini_path}"
+                )
+            elif not os.access(gemini_path, os.R_OK):
+                errors.append(
+                    f"Sessions Gemini path is not readable: {gemini_path}. "
+                    "Check file permissions."
+                )
+
+        # Validate at least one path is configured
+        if (sessions_config.claude_code_path is None and
+            sessions_config.codex_path is None and
+            sessions_config.gemini_path is None):
+            errors.append(
+                "Sessions is enabled but no paths are configured. "
+                "Set at least one of claude_code_path, codex_path, or gemini_path in config.yaml"
+            )
+
     if errors:
         error_list = "\n".join(f"  - {e}" for e in errors)
         raise ValueError(
             f"Missing required credentials for enabled sources:\n{error_list}"
+        )
+
+
+def _apply_language_filter_to_firecrawl(config: Config) -> None:
+    """Auto-populate Firecrawl exclude_paths from language_filter config.
+
+    If language_filter is enabled and auto_exclude_non_allowed_languages is True,
+    this generates URL path exclusion patterns for all common language codes
+    NOT in the allowed_languages list.
+
+    This makes language_filter.allowed_languages the single source of truth
+    for language filtering across all layers.
+
+    Args:
+        config: Config object to modify
+    """
+    if not config.ingestion.language_filter.enabled:
+        return
+
+    if not config.sources.firecrawl.auto_exclude_non_allowed_languages:
+        return
+
+    # Common ISO 639-1 language codes used in URLs
+    # Format: language code -> common URL patterns
+    common_language_paths = {
+        "de", "fr", "es", "ja", "zh", "pt", "ru", "ko", "it", "nl",
+        "pl", "tr", "vi", "th", "sv", "da", "fi", "no", "cs", "ro",
+        "hu", "el", "he", "id", "ms", "uk", "bg", "ar", "hi", "bn",
+    }
+
+    # Get allowed languages
+    allowed = {lang.lower() for lang in config.ingestion.language_filter.allowed_languages}
+
+    # Calculate which languages to exclude
+    languages_to_exclude = common_language_paths - allowed
+
+    if not languages_to_exclude:
+        # No languages to exclude (all allowed or allowed_languages is empty)
+        return
+
+    # Generate exclude patterns
+    # Firecrawl expects regex patterns that match the request path without the leading slash.
+    # Use a pattern that tolerates optional leading slash and locale suffixes (e.g., es-MX/).
+    auto_exclude_patterns = [
+        rf"^(?:/)?{lang}(?:[-_][a-z0-9]+)?(?:/|$)" for lang in sorted(languages_to_exclude)
+    ]
+
+    # Add to existing exclude_paths (avoid duplicates)
+    existing_patterns = set(config.sources.firecrawl.exclude_paths)
+    new_patterns = [p for p in auto_exclude_patterns if p not in existing_patterns]
+
+    if new_patterns:
+        config.sources.firecrawl.exclude_paths.extend(new_patterns)
+        from llamacrawl.utils.logging import get_logger
+        logger = get_logger(__name__)
+        logger.info(
+            f"Auto-generated {len(new_patterns)} language path exclusions from language_filter",
+            extra={
+                "allowed_languages": sorted(allowed),
+                "excluded_language_paths": sorted(languages_to_exclude),
+                "total_exclude_paths": len(config.sources.firecrawl.exclude_paths),
+            }
         )
 
 

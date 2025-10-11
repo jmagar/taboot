@@ -19,7 +19,8 @@ Critical Limitations:
 import hashlib
 import os
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from datetime import UTC, datetime
 from typing import Any
 
@@ -363,7 +364,10 @@ class RedditReader(BaseReader):
                     progress_callback(current_total, total_expected_posts)
 
                 self.logger.info(
-                    f"Processing r/{subreddit_name}: {post_count} posts processed, {len(documents)} total documents",
+                    (
+                        f"Processing r/{subreddit_name}: {post_count} posts processed, "
+                        f"{len(documents)} total documents"
+                    ),
                     extra={
                         "source": self.source_name,
                         "subreddit": subreddit_name,
@@ -379,7 +383,10 @@ class RedditReader(BaseReader):
 
         # Log final summary for this subreddit
         self.logger.info(
-            f"Completed r/{subreddit_name}: {post_count} posts processed, {len(documents)} total documents",
+            (
+                f"Completed r/{subreddit_name}: {post_count} posts processed, "
+                f"{len(documents)} total documents"
+            ),
             extra={
                 "source": self.source_name,
                 "subreddit": subreddit_name,

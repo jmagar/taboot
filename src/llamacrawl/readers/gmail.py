@@ -35,7 +35,6 @@ from typing import Any
 
 # Note: Not using LlamaIndex GmailReader due to credential handling incompatibility
 # We use Gmail API directly instead
-
 from llamacrawl.models.document import Document, DocumentMetadata
 from llamacrawl.readers.base import BaseReader
 from llamacrawl.storage.redis import RedisClient
@@ -186,6 +185,7 @@ class GmailReader(BaseReader):
                 labels: List of labels to filter (default from config)
                 query: Custom Gmail query (overrides auto-generated query)
                 max_results: Maximum emails to fetch (default 500)
+                ignore_cursor: Skip cursor for full re-ingestion (default False)
 
         Returns:
             List of Document objects representing emails
@@ -204,11 +204,12 @@ class GmailReader(BaseReader):
         labels = kwargs.get("labels", self.config.get("labels", ["INBOX"]))
         max_results = kwargs.get("max_results", self.config.get("max_results", 500))
         include_attachments = self.config.get("include_attachments_metadata", True)
+        ignore_cursor = kwargs.get("ignore_cursor", False)
 
         # Build query with incremental sync support
         query = kwargs.get("query")
         if not query:
-            query = self._build_query(labels)
+            query = self._build_query(labels, ignore_cursor=ignore_cursor)
 
         self.logger.info(
             f"Loading Gmail messages with query: {query}",
@@ -239,6 +240,7 @@ class GmailReader(BaseReader):
             # Fetch full message details
             documents = []
             error_count = 0
+            max_email_timestamp = None  # Track latest email timestamp for cursor
 
             for msg_id_obj in message_ids:
                 try:
@@ -252,6 +254,11 @@ class GmailReader(BaseReader):
                     # Convert to Document
                     doc = self._convert_to_document(full_message, include_attachments)
                     documents.append(doc)
+
+                    # Track max timestamp from email metadata
+                    email_timestamp = doc.metadata.timestamp
+                    if max_email_timestamp is None or email_timestamp > max_email_timestamp:
+                        max_email_timestamp = email_timestamp
 
                 except Exception as e:
                     error_count += 1
@@ -274,9 +281,14 @@ class GmailReader(BaseReader):
                 },
             )
 
-            # Update cursor to current date for next incremental sync
-            current_date = datetime.now().strftime("%Y/%m/%d")
-            self.set_last_cursor(current_date)
+            # Update cursor to max email timestamp (only if emails were fetched)
+            if documents and max_email_timestamp:
+                cursor_date = max_email_timestamp.strftime("%Y/%m/%d")
+                self.set_last_cursor(cursor_date)
+                self.logger.info(
+                    f"Updated cursor to max email date: {cursor_date}",
+                    extra={"source": self.source_name, "cursor": cursor_date},
+                )
 
             self.log_load_summary(
                 total_fetched=len(message_ids),
@@ -300,15 +312,17 @@ class GmailReader(BaseReader):
             )
             raise
 
-    def _build_query(self, labels: list[str]) -> str:
+    def _build_query(self, labels: list[str], ignore_cursor: bool = False) -> str:
         """Build Gmail search query with incremental sync support.
 
         Constructs query using Gmail search operators:
-        - If cursor exists: "after:YYYY/MM/DD label:INBOX label:SENT"
-        - If no cursor (first sync): "label:INBOX label:SENT"
+        - If cursor exists and not ignored: "after:YYYY/MM/DD label:INBOX label:SENT"
+        - If no cursor or cursor ignored (full sync): "label:INBOX label:SENT"
+        - Appends any configured query_filters (e.g., "from:user@example.com", "has:attachment")
 
         Args:
             labels: List of Gmail labels to filter (e.g., ["INBOX", "SENT"])
+            ignore_cursor: Skip cursor for full re-ingestion (default False)
 
         Returns:
             Gmail search query string
@@ -321,16 +335,30 @@ class GmailReader(BaseReader):
             >>> # Subsequent sync (has cursor: 2024/09/30)
             >>> query = reader._build_query(["INBOX"])
             >>> print(query)  # "after:2024/09/30 label:INBOX"
+            >>>
+            >>> # Full re-ingestion (ignore cursor)
+            >>> query = reader._build_query(["INBOX"], ignore_cursor=True)
+            >>> print(query)  # "label:INBOX"
+            >>>
+            >>> # With query filters
+            >>> # config.yaml: query_filters: ["from:alice@example.com", "has:attachment"]
+            >>> query = reader._build_query(["INBOX"])
+            >>> print(query)  # "label:INBOX from:alice@example.com has:attachment"
         """
         query_parts = []
 
-        # Add date filter if cursor exists (incremental sync)
+        # Add date filter if cursor exists and not ignored (incremental sync)
         cursor = self.get_last_cursor()
-        if cursor:
+        if cursor and not ignore_cursor:
             # Cursor is stored in YYYY/MM/DD format (Gmail search operator format)
             query_parts.append(f"after:{cursor}")
             self.logger.debug(
                 f"Using incremental sync with cursor: {cursor}",
+                extra={"source": self.source_name, "cursor": cursor},
+            )
+        elif ignore_cursor and cursor:
+            self.logger.info(
+                f"Ignoring cursor for full re-ingestion (cursor was: {cursor})",
                 extra={"source": self.source_name, "cursor": cursor},
             )
 
@@ -344,6 +372,15 @@ class GmailReader(BaseReader):
                 # Use OR operator for multiple labels (must be uppercase)
                 label_query = " OR ".join(label_queries)
                 query_parts.append(f"({label_query})")
+
+        # Add configured query filters (e.g., "from:user@example.com", "has:attachment")
+        query_filters = self.config.get("query_filters", [])
+        if query_filters:
+            query_parts.extend(query_filters)
+            self.logger.debug(
+                f"Applied query filters: {query_filters}",
+                extra={"source": self.source_name, "filters": query_filters},
+            )
 
         query = " ".join(query_parts)
 
@@ -380,9 +417,8 @@ class GmailReader(BaseReader):
         """
         for part in parts:
             # Check if this part matches the desired MIME type
-            if part.get("mimeType") == mime_type:
-                if "data" in part.get("body", {}):
-                    return self._decode_base64url(part["body"]["data"])
+            if part.get("mimeType") == mime_type and "data" in part.get("body", {}):
+                return self._decode_base64url(part["body"]["data"])
 
             # Recursively search nested parts
             if "parts" in part:

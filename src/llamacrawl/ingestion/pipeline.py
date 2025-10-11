@@ -12,34 +12,58 @@ The pipeline uses distributed locks to prevent concurrent ingestion of the same 
 and implements per-document error handling to ensure resilience.
 """
 
+import contextlib
+import logging
 import time
 import traceback
+import warnings
+from collections import defaultdict
 from collections.abc import Sequence
 from typing import Any
 
-from llama_index.core import PropertyGraphIndex, Settings
-from llama_index.core.indices.property_graph import SimpleLLMPathExtractor
-from llama_index.core.ingestion import IngestionCache
-from llama_index.core.ingestion import IngestionPipeline as LlamaIngestionPipeline
+import redis.asyncio as aioredis
+from llama_index.core import Settings
+from llama_index.core.base.embeddings.base import BaseEmbedding
+from llama_index.core.ingestion import (
+    IngestionCache,
+)
+from llama_index.core.ingestion import (
+    IngestionPipeline as LlamaIngestionPipeline,
+)
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import BaseNode
 from llama_index.core.schema import Document as LlamaDocument
-from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
-from llama_index.llms.ollama import Ollama
-from llama_index.storage.docstore.redis import RedisDocumentStore  # type: ignore[import-not-found]
-from llama_index.storage.kvstore.redis import RedisKVStore  # type: ignore[import-not-found]
+from llama_index.storage.docstore.redis import RedisDocumentStore
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
 from llamacrawl.config import Config
 from llamacrawl.embeddings.tei import TEIEmbedding
 from llamacrawl.ingestion.deduplication import DocumentDeduplicator
+from llamacrawl.llms import ClaudeAgentLLM
 from llamacrawl.models.document import Document
 from llamacrawl.storage.neo4j import Neo4jClient
 from llamacrawl.storage.qdrant import QdrantClient
-from llamacrawl.storage.redis import RedisClient
+from llamacrawl.storage.redis import PickleableRedisKVStore, RedisClient
 from llamacrawl.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+# LlamaIndex emits noisy pickling warnings when multiprocessing serializes
+# the sentence splitter. Suppress them since the attributes are restored lazily.
+warnings.filterwarnings(
+    "ignore",
+    message=r"Removing unpickleable private attribute .*",
+)
+
+_PICKLE_WARNING_SUBSTRING = "Removing unpickleable private attribute"
+
+
+class _SuppressPickleWarnings(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return _PICKLE_WARNING_SUBSTRING not in record.getMessage()
+
+
+logging.getLogger().addFilter(_SuppressPickleWarnings())
 
 
 class IngestionSummary:
@@ -141,6 +165,7 @@ class IngestionPipeline:
         self.neo4j_client = neo4j_client
         self.embed_model = embed_model
         self.log_progress_interval = log_progress_interval
+        self._seen_content_hashes: set[str] = set()
 
         # Initialize deduplicator
         self.deduplicator = DocumentDeduplicator(
@@ -149,10 +174,18 @@ class IngestionPipeline:
         )
 
         # Initialize Settings.llm for entity extraction
-        Settings.llm = Ollama(
+        Settings.llm = ClaudeAgentLLM(
             model=config.graph.extraction_model,
-            base_url=config.ollama_url,
         )
+
+        # Initialize Settings.embed_model for PropertyGraphIndex when compatible
+        if isinstance(self.embed_model, BaseEmbedding):
+            Settings.embed_model = self.embed_model
+        else:
+            logger.debug(
+                "Skipping Settings.embed_model assignment; embed_model is not a BaseEmbedding",
+                extra={"embed_model_type": type(self.embed_model).__name__},
+            )
 
         logger.info(
             "Initializing ingestion pipeline",
@@ -181,27 +214,43 @@ class IngestionPipeline:
         redis_kwargs = self.redis_client.client.connection_pool.connection_kwargs
         redis_host = redis_kwargs.get("host", "localhost")
         redis_port = redis_kwargs.get("port", 6379)
+        redis_url = self.config.redis_url or f"redis://{redis_host}:{redis_port}"
+
+        # Create async Redis client for LlamaIndex components
+        async_redis_client = aioredis.Redis.from_url(
+            redis_url,
+            decode_responses=True,
+        )
 
         # Create Redis document store for caching
-        docstore = RedisDocumentStore.from_host_and_port(
-            host=redis_host,
-            port=redis_port,
+        docstore = RedisDocumentStore(
+            redis_kvstore=PickleableRedisKVStore(
+                redis_uri=redis_url,
+                redis_client=self.redis_client.client,
+                async_redis_client=async_redis_client,
+            ),
             namespace="llamacrawl_docstore",
         )
 
         # Create ingestion cache using RedisKVStore (BaseKVStore implementation)
         # Reuse existing Redis client connection with namespace support via **kwargs
         cache = IngestionCache(
-            cache=RedisKVStore(
+            collection="llamacrawl_cache",
+            cache=PickleableRedisKVStore(
+                redis_uri=redis_url,
                 redis_client=self.redis_client.client,
-                namespace="llamacrawl_cache",
+                async_redis_client=async_redis_client,
             ),
         )
 
         # Create Qdrant vector store for LlamaIndex
+        # Content is stored in _node_content field by LlamaIndex
         vector_store = QdrantVectorStore(
             client=self.qdrant_client.client,
             collection_name=self.qdrant_client.collection_name,
+            batch_size=self.config.vector_store.upsert_batch_size,
+            parallel=self.config.vector_store.upsert_parallel,
+            max_retries=self.config.vector_store.upsert_max_retries,
         )
 
         # Create transformation pipeline
@@ -212,9 +261,37 @@ class IngestionPipeline:
                 chunk_overlap=self.config.ingestion.chunk_overlap,
                 separator=" ",
             ),
-            # Embedding transformation
-            self.embed_model,
         ]
+
+        # Add language filter if enabled (BEFORE embedding for cost savings)
+        language_filter_config = self.config.ingestion.language_filter
+        if language_filter_config.enabled:
+            from llamacrawl.ingestion.language_filter import LanguageFilter
+
+            language_filter = LanguageFilter(
+                allowed_languages=set(language_filter_config.allowed_languages),
+                confidence_threshold=language_filter_config.confidence_threshold,
+                min_content_length=language_filter_config.min_content_length,
+                log_filtered=language_filter_config.log_filtered,
+            )
+            transformations.append(language_filter)
+
+            logger.info(
+                "Language filtering enabled in pipeline",
+                extra={
+                    "allowed_languages": language_filter_config.allowed_languages,
+                    "confidence_threshold": language_filter_config.confidence_threshold,
+                },
+            )
+
+        # Add embedding transformation (always last) when compatible
+        if isinstance(self.embed_model, BaseEmbedding):
+            transformations.append(self.embed_model)
+        else:
+            logger.debug(
+                "Embed model is not a BaseEmbedding; skipping transformation append",
+                extra={"embed_model_type": type(self.embed_model).__name__},
+            )
 
         # Initialize LlamaIndex IngestionPipeline
         self.llama_pipeline = LlamaIngestionPipeline(
@@ -311,74 +388,111 @@ class IngestionPipeline:
             },
         )
 
-        # Step 2: Process documents with error handling
-        processed_documents: list[Document] = []
-        failed_count = 0
-
-        for idx, doc in enumerate(new_documents):
-            try:
-                # Log progress periodically
-                if (idx + 1) % self.log_progress_interval == 0:
-                    logger.info(
-                        f"Processing document {idx + 1}/{len(new_documents)}",
-                        extra={
-                            "source": source,
-                            "doc_id": doc.doc_id,
-                            "progress": f"{idx + 1}/{len(new_documents)}",
-                        },
-                    )
-
-                # Step 3: Convert to LlamaIndex Document
-                llama_doc = self._convert_to_llama_document(doc)
-
-                # Step 4: Run LlamaIndex pipeline (chunking + embedding + vector store)
-                nodes = self.llama_pipeline.run(documents=[llama_doc], show_progress=False)
-
+        # Additional intra-run deduplication based on content hash to avoid
+        # re-embedding identical documents discovered under different URLs
+        unique_documents: list[Document] = []
+        session_duplicates = 0
+        for doc in new_documents:
+            content_hash = doc.content_hash
+            if content_hash and content_hash in self._seen_content_hashes:
+                session_duplicates += 1
                 logger.debug(
-                    "Document processed through LlamaIndex pipeline",
+                    "Skipping duplicate document encountered within current run",
                     extra={
                         "source": source,
                         "doc_id": doc.doc_id,
-                        "chunks_created": len(nodes),
+                        "content_hash": content_hash,
                     },
                 )
+            else:
+                if content_hash:
+                    self._seen_content_hashes.add(content_hash)
+                unique_documents.append(doc)
 
-                # Step 5: Extract entities and relationships into Neo4j
-                if self.config.graph.auto_extract_entities:
-                    self._extract_entities_to_neo4j(source, doc, llama_doc, nodes)
+        if session_duplicates:
+            summary.deduplicated += session_duplicates
+            logger.info(
+                "Skipped additional duplicate documents based on content hash",
+                extra={
+                    "source": source,
+                    "session_duplicates": session_duplicates,
+                },
+            )
 
-                # Mark document as successfully processed
-                processed_documents.append(doc)
+        if not unique_documents:
+            logger.info(
+                "All documents within this batch were duplicates based on content hash",
+                extra={"source": source},
+            )
+            summary.duration_seconds = time.time() - start_time
+            return summary
 
-            except Exception as e:
-                # Log error and push to DLQ
-                error_msg = f"{type(e).__name__}: {str(e)}"
-                logger.error(
-                    f"Failed to process document: {error_msg}",
+        new_documents = unique_documents
+
+        # Drop documents with missing or whitespace-only content before embedding
+        filtered_documents: list[Document] = []
+        skipped_empty_docs = 0
+        for doc in new_documents:
+            if doc.content and doc.content.strip():
+                filtered_documents.append(doc)
+            else:
+                skipped_empty_docs += 1
+                logger.warning(
+                    "Skipping document with empty content prior to embedding",
                     extra={
                         "source": source,
                         "doc_id": doc.doc_id,
-                        "error": error_msg,
-                        "traceback": traceback.format_exc(),
-                    },
-                )
-
-                # Push to Dead Letter Queue
-                self.redis_client.push_to_dlq(
-                    source=source,
-                    doc_data={
-                        "doc_id": doc.doc_id,
-                        "title": doc.title,
-                        "content_hash": doc.content_hash,
+                        "source_type": doc.metadata.source_type,
                         "source_url": doc.metadata.source_url,
                     },
-                    error=error_msg,
                 )
 
-                failed_count += 1
+        if skipped_empty_docs:
+            logger.info(
+                "Filtered documents with empty content before ingestion",
+                extra={
+                    "source": source,
+                    "skipped_empty_documents": skipped_empty_docs,
+                },
+            )
 
-                # Continue processing remaining documents
-                continue
+        if not filtered_documents:
+            summary.failed = skipped_empty_docs
+            summary.duration_seconds = time.time() - start_time
+            return summary
+
+        new_documents = filtered_documents
+
+        # Step 2: Process documents with error handling
+        processed_documents: list[Document] = []
+        failed_count = skipped_empty_docs
+
+        batch_size = max(1, self.config.ingestion.batch_size)
+        current_batch: list[Document] = []
+
+        for idx, doc in enumerate(new_documents):
+            if (idx + 1) % self.log_progress_interval == 0:
+                logger.info(
+                    f"Processing document {idx + 1}/{len(new_documents)}",
+                    extra={
+                        "source": source,
+                        "doc_id": doc.doc_id,
+                        "progress": f"{idx + 1}/{len(new_documents)}",
+                    },
+                )
+
+            current_batch.append(doc)
+
+            if len(current_batch) >= batch_size:
+                processed, failed = self._process_batch(source, current_batch)
+                processed_documents.extend(processed)
+                failed_count += failed
+                current_batch = []
+
+        if current_batch:
+            processed, failed = self._process_batch(source, current_batch)
+            processed_documents.extend(processed)
+            failed_count += failed
 
         # Step 6: Update content hashes in Redis for successfully processed documents
         if processed_documents:
@@ -521,8 +635,8 @@ class IngestionPipeline:
     ) -> None:
         """Extract entities and relationships from document and store in Neo4j.
 
-        Uses LlamaIndex PropertyGraphIndex with SimpleLLMPathExtractor to
-        automatically identify entities and relationships from text.
+        Uses ClaudeEntityExtractor with Claude Agent SDK tool use for reliable
+        structured output without event loop conflicts.
 
         Args:
             source: Source identifier
@@ -532,67 +646,245 @@ class IngestionPipeline:
 
         Note:
             This runs after vector storage to ensure consistency.
-            Uses SimpleLLMPathExtractor for automatic entity extraction.
+            Runs async extraction in a new event loop thread.
         """
+        import asyncio
+        import threading
+        from queue import Queue
+
+        from llamacrawl.ingestion.pipeline_integration import extract_entities_to_neo4j
+
         try:
             logger.debug(
                 "Extracting entities and relationships",
                 extra={"source": source, "doc_id": doc.doc_id},
             )
 
-            # Create Neo4j graph store
-            graph_store = Neo4jPropertyGraphStore(
-                username=self.config.neo4j_user,
-                password=self.config.neo4j_password,
-                url=self.config.neo4j_uri,
-            )
+            # Run async extraction in a new thread with fresh event loop
+            # This avoids "asyncio.run() cannot be called from a running event loop" errors
+            result_queue: Queue[dict[str, int] | Exception] = Queue(maxsize=1)
 
-            # Create entity extractors
-            kg_extractors = [
-                SimpleLLMPathExtractor(
-                    llm=Settings.llm,
-                    num_workers=1,  # Single worker for per-document extraction
-                    max_paths_per_chunk=self.config.graph.max_keywords_per_document,
+            def run_async_extraction() -> None:
+                """Run extraction in new event loop on background thread."""
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+                try:
+                    result = loop.run_until_complete(
+                        extract_entities_to_neo4j(
+                            config=self.config,
+                            neo4j_client=self.neo4j_client,
+                            source=source,
+                            doc=doc,
+                            llama_doc=llama_doc,
+                            nodes=nodes,
+                        )
+                    )
+                    result_queue.put(result)
+                except Exception as exc:
+                    result_queue.put(exc)
+                finally:
+                    with contextlib.suppress(Exception):
+                        loop.run_until_complete(loop.shutdown_asyncgens())
+                    loop.close()
+
+            thread = threading.Thread(target=run_async_extraction, daemon=True)
+            thread.start()
+            thread.join(timeout=300)  # 5 minute timeout
+
+            if thread.is_alive():
+                logger.error(
+                    "Entity extraction timed out after 5 minutes",
+                    extra={"source": source, "doc_id": doc.doc_id}
                 )
-            ]
+                return
 
-            # Create PropertyGraphIndex for entity extraction
-            # Note: This will extract entities from the document and store in Neo4j
-            PropertyGraphIndex.from_documents(
-                documents=[llama_doc],
-                property_graph_store=graph_store,
-                kg_extractors=kg_extractors,
-                show_progress=False,
-            )
+            # Get result from queue
+            result_or_exc = result_queue.get()
+            if isinstance(result_or_exc, Exception):
+                raise result_or_exc
 
-            # Also create Document node in Neo4j for graph traversal
-            self.neo4j_client.create_document_node(
-                doc_id=doc.doc_id,
-                properties={
-                    "title": doc.title,
-                    "source_type": doc.metadata.source_type,
-                    "source_url": doc.metadata.source_url,
-                    "content_hash": doc.content_hash,
-                    "timestamp": doc.metadata.timestamp.isoformat(),
-                },
-            )
-
-            logger.debug(
-                "Entities and relationships extracted successfully",
-                extra={"source": source, "doc_id": doc.doc_id},
+            logger.info(
+                "Entity extraction completed",
+                extra={
+                    "source": source,
+                    "doc_id": doc.doc_id,
+                    **result_or_exc,
+                }
             )
 
         except Exception as e:
             # Log error but don't fail ingestion
+            error_msg = f"{type(e).__name__}: {str(e) or 'Unknown error'}"
             logger.warning(
-                f"Failed to extract entities: {str(e)}",
+                f"Failed to extract entities: {error_msg}",
                 extra={
                     "source": source,
                     "doc_id": doc.doc_id,
-                    "error": str(e),
+                    "error": error_msg,
+                    "traceback": traceback.format_exc(),
                 },
             )
 
+
+    def _process_batch(self, source: str, batch: list[Document]) -> tuple[list[Document], int]:
+        """Process a batch of documents through the ingestion pipeline.
+
+        Falls back to per-document processing if the batch fails to ensure failures
+        don't block the entire batch.
+        """
+        try:
+            processed_docs = self._run_pipeline_batch(source, batch)
+            return processed_docs, 0
+        except Exception as batch_error:  # pragma: no cover - defensive fallback
+            logger.warning(
+                "Batch processing failed; falling back to per-document processing",
+                extra={
+                    "source": source,
+                    "batch_size": len(batch),
+                    "error": f"{type(batch_error).__name__}: {batch_error}",
+                    "traceback": traceback.format_exc(),
+                },
+            )
+
+            processed_docs: list[Document] = []
+            failed_count = 0
+            for doc in batch:
+                try:
+                    processed_docs.extend(self._run_pipeline_batch(source, [doc]))
+                except Exception as doc_error:
+                    self._handle_document_failure(source, doc, doc_error)
+                    failed_count += 1
+            return processed_docs, failed_count
+
+    def _run_pipeline_batch(self, source: str, batch: list[Document]) -> list[Document]:
+        """Execute the LlamaIndex pipeline for a batch of documents."""
+        llama_docs_by_id: dict[str, LlamaDocument] = {}
+        llama_docs: list[LlamaDocument] = []
+
+        for doc in batch:
+            llama_doc = self._convert_to_llama_document(doc)
+            llama_docs.append(llama_doc)
+            llama_docs_by_id[doc.doc_id] = llama_doc
+
+        pipeline_workers = (
+            self.config.ingestion.pipeline_workers
+            if getattr(self.config.ingestion, "pipeline_workers", 1) > 1
+            else None
+        )
+
+        raw_nodes = self.llama_pipeline.run(
+            documents=llama_docs,
+            show_progress=False,
+            num_workers=pipeline_workers,
+        )
+
+        # Drop empty or whitespace-only chunks to avoid downstream embedding errors
+        nodes: list[BaseNode] = []
+        skipped_empty_chunks = 0
+        for node in raw_nodes:
+            text_content = node.get_content(metadata_mode="none")
+            if not text_content or not text_content.strip():
+                skipped_empty_chunks += 1
+                continue
+            nodes.append(node)
+
+        if skipped_empty_chunks:
+            logger.debug(
+                "Skipped empty chunks after LlamaIndex pipeline",
+                extra={"skipped_chunks": skipped_empty_chunks},
+            )
+
+        nodes_by_doc: dict[str, list[BaseNode]] = defaultdict(list)
+        for node in nodes:
+            ref_doc_id = getattr(node, "ref_doc_id", None) or node.metadata.get("doc_id")
+            if ref_doc_id:
+                nodes_by_doc[ref_doc_id].append(node)
+
+        for doc in batch:
+            logger.debug(
+                "Document processed through LlamaIndex pipeline",
+                extra={
+                    "source": source,
+                    "doc_id": doc.doc_id,
+                    "chunks_created": len(nodes_by_doc.get(doc.doc_id, [])),
+                },
+            )
+
+            if self.config.graph.auto_extract_entities:
+                logger.info(
+                    "Starting entity extraction for %s",
+                    doc.doc_id,
+                    extra={
+                        "source": source,
+                        "doc_id": doc.doc_id,
+                        "strategy": self.config.graph.extraction_strategy,
+                    },
+                )
+                self._extract_entities_to_neo4j(
+                    source,
+                    doc,
+                    llama_docs_by_id[doc.doc_id],
+                    nodes_by_doc.get(doc.doc_id, []),
+                )
+                logger.info(
+                    "Entity extraction completed for %s",
+                    doc.doc_id,
+                    extra={"doc_id": doc.doc_id},
+                )
+
+        return batch
+
+    def _handle_document_failure(self, source: str, doc: Document, error: Exception) -> None:
+        """Log a document processing failure and push it to the DLQ if enabled."""
+        error_msg = f"{type(error).__name__}: {str(error)}"
+        logger.error(
+            f"Failed to process document: {error_msg}",
+            extra={
+                "source": source,
+                "doc_id": doc.doc_id,
+                "error": error_msg,
+                "traceback": traceback.format_exc(),
+            },
+        )
+
+        # Only push to DLQ if enabled in config
+        if self.config.ingestion.dlq.enabled:
+            self.redis_client.push_to_dlq(
+                source=source,
+                doc_data={
+                    "doc_id": doc.doc_id,
+                    "title": doc.title,
+                    "content_hash": doc.content_hash,
+                    "source_url": doc.metadata.source_url,
+                },
+                error=error_msg,
+            )
+
+            # Periodically cleanup old DLQ entries based on retention policy
+            # Run cleanup with 10% probability to avoid overhead on every push
+            import random
+            if random.random() < 0.1:
+                try:
+                    removed = self.redis_client.cleanup_dlq(
+                        source=source,
+                        retention_days=self.config.ingestion.dlq.retention_days,
+                    )
+                    if removed > 0:
+                        logger.info(
+                            f"DLQ cleanup: removed {removed} old entries",
+                            extra={"source": source, "removed_count": removed},
+                        )
+                except Exception as cleanup_error:
+                    logger.warning(
+                        f"DLQ cleanup failed: {cleanup_error}",
+                        extra={"source": source, "error": str(cleanup_error)},
+                    )
+        else:
+            logger.debug(
+                "DLQ is disabled, skipping DLQ push",
+                extra={"source": source, "doc_id": doc.doc_id},
+            )
 
 # Export public API
 __all__ = ["IngestionPipeline", "IngestionSummary"]

@@ -13,6 +13,7 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any, TypeVar, cast
 
+from llamacrawl.config import RetryConfig
 from llamacrawl.utils.logging import get_logger
 
 # Type variables for decorators
@@ -130,10 +131,11 @@ def _calculate_delay(
 
 
 def retry_with_backoff(
-    max_attempts: int = 3,
-    initial_delay: float = 1.0,
-    max_delay: float = 60.0,
+    max_attempts: int | None = None,
+    initial_delay: float | None = None,
+    max_delay: float | None = None,
     exceptions: tuple[type[Exception], ...] = DEFAULT_EXCEPTIONS,
+    config: RetryConfig | None = None,
 ) -> Callable[[F], F]:
     """Decorator for retrying functions with exponential backoff.
 
@@ -141,11 +143,15 @@ def retry_with_backoff(
     backoff. Respects HTTP Retry-After headers and fails fast on
     authentication errors (401, 403).
 
+    If config is provided, uses values from RetryConfig. Otherwise uses
+    provided parameters or defaults.
+
     Args:
-        max_attempts: Maximum number of attempts (including initial call)
-        initial_delay: Initial delay in seconds before first retry
-        max_delay: Maximum delay in seconds between retries
+        max_attempts: Maximum number of attempts (including initial call), or None to use config
+        initial_delay: Initial delay in seconds before first retry, or None to use config
+        max_delay: Maximum delay in seconds between retries, or None to use config
         exceptions: Tuple of exception types to catch and retry
+        config: Optional RetryConfig to use for all parameters
 
     Returns:
         Decorator function
@@ -156,14 +162,30 @@ def retry_with_backoff(
             response = requests.get(url)
             response.raise_for_status()
             return response.json()
+
+        # Or use config from get_config()
+        from llamacrawl.config import get_config
+        cfg = get_config()
+        @retry_with_backoff(config=cfg.ingestion.retry)
+        def fetch_data_with_config(url: str) -> dict:
+            ...
     """
+    # Use config values if provided, otherwise use parameters or defaults
+    if config is not None:
+        _max_attempts = config.max_attempts
+        _initial_delay = config.initial_delay_seconds
+        _max_delay = config.max_delay_seconds
+    else:
+        _max_attempts = max_attempts if max_attempts is not None else 3
+        _initial_delay = initial_delay if initial_delay is not None else 1.0
+        _max_delay = max_delay if max_delay is not None else 60.0
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             """Synchronous wrapper with retry logic."""
             last_exception: Exception | None = None
 
-            for attempt in range(max_attempts):
+            for attempt in range(_max_attempts):
                 try:
                     # Attempt the function call
                     result = func(*args, **kwargs)
@@ -175,7 +197,7 @@ def retry_with_backoff(
                             extra={
                                 "function": func.__name__,
                                 "attempt": attempt + 1,
-                                "max_attempts": max_attempts,
+                                "max_attempts": _max_attempts,
                             },
                         )
 
@@ -197,12 +219,12 @@ def retry_with_backoff(
                         raise
 
                     # If this was the last attempt, raise the exception
-                    if attempt >= max_attempts - 1:
+                    if attempt >= _max_attempts - 1:
                         logger.error(
-                            f"Function {func.__name__} failed after {max_attempts} attempts",
+                            f"Function {func.__name__} failed after {_max_attempts} attempts",
                             extra={
                                 "function": func.__name__,
-                                "max_attempts": max_attempts,
+                                "max_attempts": _max_attempts,
                                 "final_error": str(e),
                                 "error_type": type(e).__name__,
                             },
@@ -219,20 +241,20 @@ def retry_with_backoff(
                             extra={
                                 "function": func.__name__,
                                 "attempt": attempt + 1,
-                                "max_attempts": max_attempts,
+                                "max_attempts": _max_attempts,
                                 "delay_seconds": delay,
                                 "error": str(e),
                             },
                         )
                     else:
                         # Calculate exponential backoff with jitter
-                        delay = _calculate_delay(attempt, initial_delay, max_delay)
+                        delay = _calculate_delay(attempt, _initial_delay, _max_delay)
                         logger.warning(
                             f"Function {func.__name__} failed, retrying",
                             extra={
                                 "function": func.__name__,
                                 "attempt": attempt + 1,
-                                "max_attempts": max_attempts,
+                                "max_attempts": _max_attempts,
                                 "delay_seconds": round(delay, 2),
                                 "error": str(e),
                                 "error_type": type(e).__name__,
@@ -254,10 +276,11 @@ def retry_with_backoff(
 
 
 def async_retry_with_backoff(
-    max_attempts: int = 3,
-    initial_delay: float = 1.0,
-    max_delay: float = 60.0,
+    max_attempts: int | None = None,
+    initial_delay: float | None = None,
+    max_delay: float | None = None,
     exceptions: tuple[type[Exception], ...] = DEFAULT_EXCEPTIONS,
+    config: RetryConfig | None = None,
 ) -> Callable[[F], F]:
     """Decorator for retrying async functions with exponential backoff.
 
@@ -265,11 +288,15 @@ def async_retry_with_backoff(
     on transient failures with exponential backoff. Respects HTTP Retry-After
     headers and fails fast on authentication errors (401, 403).
 
+    If config is provided, uses values from RetryConfig. Otherwise uses
+    provided parameters or defaults.
+
     Args:
-        max_attempts: Maximum number of attempts (including initial call)
-        initial_delay: Initial delay in seconds before first retry
-        max_delay: Maximum delay in seconds between retries
+        max_attempts: Maximum number of attempts (including initial call), or None to use config
+        initial_delay: Initial delay in seconds before first retry, or None to use config
+        max_delay: Maximum delay in seconds between retries, or None to use config
         exceptions: Tuple of exception types to catch and retry
+        config: Optional RetryConfig to use for all parameters
 
     Returns:
         Decorator function
@@ -281,14 +308,30 @@ def async_retry_with_backoff(
                 response = await client.get(url)
                 response.raise_for_status()
                 return response.json()
+
+        # Or use config from get_config()
+        from llamacrawl.config import get_config
+        cfg = get_config()
+        @async_retry_with_backoff(config=cfg.ingestion.retry)
+        async def fetch_data_with_config(url: str) -> dict:
+            ...
     """
+    # Use config values if provided, otherwise use parameters or defaults
+    if config is not None:
+        _max_attempts = config.max_attempts
+        _initial_delay = config.initial_delay_seconds
+        _max_delay = config.max_delay_seconds
+    else:
+        _max_attempts = max_attempts if max_attempts is not None else 3
+        _initial_delay = initial_delay if initial_delay is not None else 1.0
+        _max_delay = max_delay if max_delay is not None else 60.0
     def decorator(func: F) -> F:
         @wraps(func)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             """Asynchronous wrapper with retry logic."""
             last_exception: Exception | None = None
 
-            for attempt in range(max_attempts):
+            for attempt in range(_max_attempts):
                 try:
                     # Attempt the async function call
                     result = await func(*args, **kwargs)
@@ -300,7 +343,7 @@ def async_retry_with_backoff(
                             extra={
                                 "function": func.__name__,
                                 "attempt": attempt + 1,
-                                "max_attempts": max_attempts,
+                                "max_attempts": _max_attempts,
                             },
                         )
 
@@ -322,12 +365,12 @@ def async_retry_with_backoff(
                         raise
 
                     # If this was the last attempt, raise the exception
-                    if attempt >= max_attempts - 1:
+                    if attempt >= _max_attempts - 1:
                         logger.error(
                             f"Async function {func.__name__} failed after {max_attempts} attempts",
                             extra={
                                 "function": func.__name__,
-                                "max_attempts": max_attempts,
+                                "max_attempts": _max_attempts,
                                 "final_error": str(e),
                                 "error_type": type(e).__name__,
                             },
@@ -344,20 +387,20 @@ def async_retry_with_backoff(
                             extra={
                                 "function": func.__name__,
                                 "attempt": attempt + 1,
-                                "max_attempts": max_attempts,
+                                "max_attempts": _max_attempts,
                                 "delay_seconds": delay,
                                 "error": str(e),
                             },
                         )
                     else:
                         # Calculate exponential backoff with jitter
-                        delay = _calculate_delay(attempt, initial_delay, max_delay)
+                        delay = _calculate_delay(attempt, _initial_delay, _max_delay)
                         logger.warning(
                             f"Async function {func.__name__} failed, retrying",
                             extra={
                                 "function": func.__name__,
                                 "attempt": attempt + 1,
-                                "max_attempts": max_attempts,
+                                "max_attempts": _max_attempts,
                                 "delay_seconds": round(delay, 2),
                                 "error": str(e),
                                 "error_type": type(e).__name__,

@@ -177,7 +177,7 @@ class Neo4jClient:
             logger.info("Neo4j schema initialization complete")
 
     def create_document_node(self, doc_id: str, properties: dict[str, Any]) -> dict[str, Any]:
-        """Create a Document node in the graph.
+        """Create or update a Document node in the graph.
 
         Args:
             doc_id: Unique document identifier
@@ -190,7 +190,7 @@ class Neo4jClient:
             Neo4jError: If node creation fails
         """
         query = """
-        CREATE (d:Document {doc_id: $doc_id})
+        MERGE (d:Document {doc_id: $doc_id})
         SET d += $properties
         RETURN d
         """
@@ -199,7 +199,7 @@ class Neo4jClient:
             result = session.execute_write(
                 self._create_node_tx, query, doc_id=doc_id, properties=properties
             )
-            logger.debug(f"Created Document node: {doc_id}")
+            logger.debug(f"Upserted Document node: {doc_id}")
             return result
 
     def create_entity_node(
@@ -445,35 +445,74 @@ class Neo4jClient:
         query = """
         MATCH (start:Document {doc_id: $doc_id})
 
-        // Find documents through various relationship paths
-        OPTIONAL MATCH (start)-[:REFERENCES|REPLIED_TO*1..2]-(related1:Document)
-        OPTIONAL MATCH (start)-[:MENTIONS]->(entity:Entity)<-[:MENTIONS]-(related2:Document)
-        OPTIONAL MATCH (start)<-[:AUTHORED]-(author)-[:AUTHORED]->(related3:Document)
+        CALL {
+            WITH start
+            OPTIONAL MATCH p=(start)-[*1..2]-(related1:Document)
+            RETURN [row IN collect({related: related1, path: p})
+                    WHERE row.related IS NOT NULL
+                      AND row.path IS NOT NULL
+                      AND all(rel IN relationships(row.path) WHERE type(rel) IN $reference_types)
+                    | row.related] AS related_refs
+        }
 
-        WITH start,
-             collect(DISTINCT related1) + collect(DISTINCT related2) +
-             collect(DISTINCT related3) as all_related
+        CALL {
+            WITH start
+            OPTIONAL MATCH (start)-[rel1]->(entity:Entity)<-[rel2]-(related2:Document)
+            RETURN [row IN collect({related: related2, rel1: rel1, rel2: rel2})
+                    WHERE row.related IS NOT NULL
+                      AND row.rel1 IS NOT NULL AND row.rel2 IS NOT NULL
+                      AND type(row.rel1) IN $mention_types
+                      AND type(row.rel2) IN $mention_types
+                    | row.related] AS related_mentions
+        }
 
-        UNWIND all_related as related
+        CALL {
+            WITH start
+            OPTIONAL MATCH (start)<-[rel1]-(author)-[rel2]->(related3:Document)
+            RETURN [row IN collect({related: related3, rel1: rel1, rel2: rel2})
+                    WHERE row.related IS NOT NULL
+                      AND row.rel1 IS NOT NULL AND row.rel2 IS NOT NULL
+                      AND type(row.rel1) IN $author_types
+                      AND type(row.rel2) IN $author_types
+                    | row.related] AS related_authors
+        }
+
+        WITH start, (
+            coalesce(related_refs, []) +
+            coalesce(related_mentions, []) +
+            coalesce(related_authors, [])
+        ) AS all_related
+
+        UNWIND all_related AS related
+        WITH start, related
         WHERE related IS NOT NULL AND related.doc_id <> start.doc_id
 
-        // Calculate relevance score based on multiple factors
         WITH related,
-             count(*) as connection_count,
-             related.source_type as source_type
+             count(*) AS connection_count,
+             related.source_type AS source_type
 
-        RETURN related.doc_id as doc_id,
-               related.title as title,
-               related.source_type as source_type,
-               related.timestamp as timestamp,
-               connection_count as relevance_score
+        RETURN related.doc_id AS doc_id,
+               related.title AS title,
+               related.source_type AS source_type,
+               related.timestamp AS timestamp,
+               connection_count AS relevance_score
         ORDER BY relevance_score DESC, timestamp DESC
         LIMIT $limit
         """
 
+        reference_types = ["REFERENCES", "REPLIED_TO"]
+        mention_types = ["MENTIONS"]
+        author_types = ["AUTHORED"]
+
         with self.driver.session() as session:
             result = session.execute_read(
-                self._find_related_documents_tx, query, doc_id=doc_id, limit=limit
+                self._find_related_documents_tx,
+                query,
+                doc_id=doc_id,
+                limit=limit,
+                reference_types=reference_types,
+                mention_types=mention_types,
+                author_types=author_types,
             )
             logger.debug(f"Found {len(result)} related documents for {doc_id}")
             return result

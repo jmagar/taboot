@@ -105,8 +105,12 @@ class BaseReader(ABC):
         Example:
             >>> def on_progress(current: int, total: int) -> None:
             ...     print(f"Progress: {current}/{total}")
-            >>> reader = FirecrawlReader(source_name='firecrawl', config=cfg, redis_client=redis)
-            >>> documents = reader.load_data(url='https://example.com', progress_callback=on_progress)
+            >>> reader = FirecrawlReader(
+            ...     source_name='firecrawl', config=cfg, redis_client=redis
+            ... )
+            >>> documents = reader.load_data(
+            ...     url='https://example.com', progress_callback=on_progress
+            ... )
             >>> print(f"Loaded {len(documents)} documents")
         """
         pass

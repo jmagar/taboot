@@ -16,11 +16,13 @@ Key naming conventions (from shared.md):
 import json
 import time
 import uuid
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from typing import Any, cast
 
 import redis
+from llama_index.storage.kvstore.redis import RedisKVStore
+from redis.asyncio import Redis as AsyncRedis
 from redis.connection import ConnectionPool
 
 
@@ -71,7 +73,7 @@ class RedisClient:
             True if Redis is accessible, False otherwise
         """
         try:
-            return self.client.ping()
+            return bool(self.client.ping())
         except redis.ConnectionError:
             return False
 
@@ -199,6 +201,62 @@ class RedisClient:
         # Push to left (head) of list
         self.client.lpush(key, json.dumps(dlq_entry))
 
+    def cleanup_dlq(self, source: str, retention_days: int) -> int:
+        """Remove DLQ entries older than retention period.
+
+        Args:
+            source: Source identifier
+            retention_days: Number of days to retain entries
+
+        Returns:
+            Number of entries removed
+
+        Example:
+            >>> # Remove entries older than 7 days
+            >>> removed = redis_client.cleanup_dlq('gmail', retention_days=7)
+            >>> print(f"Removed {removed} old DLQ entries")
+        """
+        key = f"dlq:{source}"
+
+        # Calculate cutoff timestamp
+        cutoff_time = time.time() - (retention_days * 86400)
+
+        # Get all entries
+        all_entries_json = self.client.lrange(key, 0, -1)
+
+        # Filter entries to keep (newer than cutoff)
+        entries_to_keep = []
+        removed_count = 0
+
+        for entry_json in all_entries_json:
+            try:
+                entry = json.loads(entry_json)
+                entry_time = entry.get("timestamp", 0)
+
+                if entry_time >= cutoff_time:
+                    # Keep entry (within retention period)
+                    entries_to_keep.append(entry_json)
+                else:
+                    # Entry is too old, will be removed
+                    removed_count += 1
+
+            except json.JSONDecodeError:
+                # Skip malformed entries (they will be removed)
+                removed_count += 1
+
+        # Replace list with filtered entries
+        if removed_count > 0:
+            # Delete old list
+            self.client.delete(key)
+
+            # Re-create list with kept entries (if any)
+            if entries_to_keep:
+                # Push in reverse order to maintain FIFO semantics
+                for entry_json in reversed(entries_to_keep):
+                    self.client.rpush(key, entry_json)
+
+        return removed_count
+
     def get_dlq(self, source: str, limit: int = 100) -> list[dict[str, Any]]:
         """Retrieve DLQ entries for inspection or reprocessing.
 
@@ -243,7 +301,7 @@ class RedisClient:
             >>> print(f"Cleared {cleared} DLQ entries")
         """
         key = f"dlq:{source}"
-        length = self.client.llen(key)
+        length = int(self.client.llen(key))
         self.client.delete(key)
         return length
 
@@ -262,7 +320,7 @@ class RedisClient:
             ...     print("Warning: Large DLQ backlog")
         """
         key = f"dlq:{source}"
-        return self.client.llen(key)
+        return int(self.client.llen(key))
 
     # =========================================================================
     # Distributed Lock Methods
@@ -333,7 +391,7 @@ class RedisClient:
         """
 
         # Redis eval() is untyped in redis-py stubs but returns int in this case
-        result = self.client.eval(lua_script, 1, lock_key, lock_value)  # type: ignore[no-untyped-call]
+        result = self.client.eval(lua_script, 1, lock_key, lock_value)
         return bool(result)
 
     def extend_lock(self, key: str, lock_value: str, additional_ttl: int = 300) -> bool:
@@ -366,7 +424,7 @@ class RedisClient:
         """
 
         # Redis eval() is untyped in redis-py stubs but returns int in this case
-        result = self.client.eval(lua_script, 1, lock_key, lock_value, additional_ttl)  # type: ignore[no-untyped-call]
+        result = self.client.eval(lua_script, 1, lock_key, lock_value, additional_ttl)
         return bool(result)
 
     @contextmanager
@@ -494,3 +552,116 @@ class RedisClient:
             >>> redis_client.flush_all()
         """
         self.client.flushdb()
+
+
+class PickleableRedisKVStore(RedisKVStore):
+    """RedisKVStore variant that survives multiprocessing pickling.
+
+    LlamaIndex's ingestion pipeline pickles transformation stacks when
+    ``num_workers`` > 1. The default RedisKVStore keeps redis-py client
+    instances on the object, which embed ``_thread.lock`` objects and
+    therefore are not pickleable. This subclass strips clients out of the
+    pickle payload and recreates fresh connections on unpickling.
+    """
+
+    def __init__(
+        self,
+        redis_uri: str | None = None,
+        redis_client: redis.Redis | None = None,
+        async_redis_client: AsyncRedis | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            redis_uri=redis_uri,
+            redis_client=redis_client,
+            async_redis_client=async_redis_client,
+            **kwargs,
+        )
+        self._redis_url: str | None = redis_uri
+        self._redis_kwargs: dict[str, Any] = dict(kwargs)
+        self._sync_connection_kwargs: dict[str, Any] | None = self._extract_connection_kwargs(
+            getattr(self, "_redis_client", None)
+        )
+        self._async_connection_kwargs: dict[str, Any] | None = self._extract_connection_kwargs(
+            getattr(self, "_async_redis_client", None)
+        )
+
+        if self._redis_url is None and self._sync_connection_kwargs:
+            self._redis_url = self._build_url_from_kwargs(self._sync_connection_kwargs)
+
+    @staticmethod
+    def _extract_connection_kwargs(client: Any) -> dict[str, Any] | None:
+        if client is None:
+            return None
+
+        pool = getattr(client, "connection_pool", None)
+        if pool is None:
+            return None
+
+        raw_kwargs: Mapping[str, Any] = getattr(pool, "connection_kwargs", {})
+        sanitized: dict[str, Any] = {}
+        for key, value in raw_kwargs.items():
+            if key in {"connection_class", "parser_class"}:
+                continue
+            if isinstance(value, str | int | float | bool) or value is None:
+                sanitized[key] = value
+        return sanitized
+
+    @staticmethod
+    def _build_url_from_kwargs(kwargs: Mapping[str, Any]) -> str | None:
+        host = kwargs.get("host")
+        port = kwargs.get("port")
+        if host is None or port is None:
+            return None
+        db = kwargs.get("db")
+        username = kwargs.get("username")
+        password = kwargs.get("password")
+
+        auth = ""
+        if username or password:
+            user = username or ""
+            pwd = password or ""
+            auth = f"{user}:{pwd}@"
+
+        db_suffix = f"/{db}" if isinstance(db, int) and db else ""
+        return f"redis://{auth}{host}:{port}{db_suffix}"
+
+    def __getstate__(self) -> dict[str, Any]:
+        return {
+            "redis_url": self._redis_url,
+            "redis_kwargs": self._redis_kwargs,
+            "sync_connection_kwargs": self._sync_connection_kwargs,
+            "async_connection_kwargs": self._async_connection_kwargs,
+        }
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        redis_url: str | None = state.get("redis_url")
+        redis_kwargs: dict[str, Any] = state.get("redis_kwargs", {}) or {}
+        sync_kwargs: dict[str, Any] | None = state.get("sync_connection_kwargs")
+        async_kwargs: dict[str, Any] | None = state.get("async_connection_kwargs")
+
+        redis_client: redis.Redis | None = None
+        async_client: AsyncRedis | None = None
+
+        if redis_url:
+            redis_client = redis.Redis.from_url(redis_url, **redis_kwargs)
+            async_client = AsyncRedis.from_url(redis_url, **redis_kwargs)
+        elif sync_kwargs:
+            redis_client = redis.Redis(**sync_kwargs)
+            client_kwargs = async_kwargs or sync_kwargs
+            async_client = AsyncRedis(**client_kwargs)
+        else:
+            raise ValueError("Cannot restore Redis clients without connection information")
+
+        RedisKVStore.__init__(
+            self,
+            redis_uri=redis_url,
+            redis_client=redis_client,
+            async_redis_client=async_client,
+            **redis_kwargs,
+        )
+
+        self._redis_url = redis_url
+        self._redis_kwargs = redis_kwargs
+        self._sync_connection_kwargs = sync_kwargs
+        self._async_connection_kwargs = async_kwargs

@@ -17,54 +17,57 @@ A multi-source RAG (Retrieval Augmented Generation) pipeline built on LlamaIndex
 
 - Python 3.11+
 - Docker with Docker Compose
-- NVIDIA GPU (for embeddings and LLM synthesis)
+- NVIDIA GPU (for embeddings and reranking)
 - UV package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd llamacrawl
+git clone https://github.com/jmagar/taboot
+cd taboot
 
 # Install dependencies
 uv sync
 
 # Copy configuration templates
-cp .env.example .env
-cp config.example.yaml config.yaml
+cp docs/.env.example .env
+cp docs/config.example.yaml config.yaml
 
 # Edit configurations with your credentials
 $EDITOR .env
 $EDITOR config.yaml
 
-# Deploy infrastructure (to remote GPU server)
-docker --context docker-mcp-steamy-wsl compose up -d
+# Deploy infrastructure
+docker compose up -d
 
 # Wait for services to be healthy
-docker --context docker-mcp-steamy-wsl compose ps
+docker compose ps
 
 # Initialize storage backends
-uv run llamacrawl init
+llamacrawl init
 
 # Verify installation
-uv run llamacrawl status
+llamacrawl status
 ```
 
 ### Basic Usage
 
 ```bash
 # Ingest data from a source
-uv run llamacrawl ingest firecrawl
+llamacrawl ingest github
+
+# Scrape web content with Firecrawl
+llamacrawl scrape https://example.com
 
 # Query the RAG system
-uv run llamacrawl query "What are the latest authentication changes?"
+llamacrawl query "What are the latest authentication changes?"
 
 # Query with filters
-uv run llamacrawl query "bug reports" --sources github,reddit --after 2024-01-01
+llamacrawl query "bug reports" --sources github,reddit --after 2024-01-01
 
 # Check system status
-uv run llamacrawl status
+llamacrawl status
 ```
 
 ## Architecture
@@ -84,7 +87,7 @@ LlamaCrawl consists of three main layers:
 │                 LlamaIndex Core Engine                       │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
 │  │   Readers    │  │  Embeddings  │  │  Synthesis   │      │
-│  │   (5 types)  │  │     (TEI)    │  │   (Ollama)   │      │
+│  │   (5 types)  │  │     (TEI)    │  │   (Claude)   │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
 └─────────────────────────────────────────────────────────────┘
                    │
@@ -100,7 +103,7 @@ LlamaCrawl consists of three main layers:
 ## Data Sources
 
 - **Firecrawl**: Web scraping with configurable crawl depth and page limits
-- **GitHub**: Repositories, issues, pull requests, discussions with incremental sync
+- **GitHub**: Repositories, issues, pull requests with incremental sync
 - **Reddit**: Posts and comments from configured subreddits
 - **Gmail**: Email messages and threads via OAuth 2.0
 - **Elasticsearch**: Bulk import from existing indices
@@ -120,7 +123,7 @@ LlamaCrawl consists of three main layers:
 - **Cache/State**: Redis for deduplication and cursor management
 - **Embeddings**: TEI (Text Embeddings Inference) with GPU acceleration
 - **Reranking**: TEI with Qwen3-Reranker-0.6B
-- **LLM**: Ollama with llama3.1:8b for answer synthesis
+- **LLM**: Claude (via Agent SDK) for answer synthesis
 - **CLI**: Typer for command-line interface
 
 ## Contributing

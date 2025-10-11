@@ -12,6 +12,7 @@ The query engine integrates LlamaIndex components with custom TEI embedding
 and reranking services, applying hybrid search patterns for optimal retrieval.
 """
 
+import json
 import time
 from datetime import datetime
 from typing import Any
@@ -29,6 +30,33 @@ from llamacrawl.storage.qdrant import QdrantClient
 from llamacrawl.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def _extract_content_from_payload(payload: dict[str, Any]) -> str:
+    """Extract text content from Qdrant payload containing LlamaIndex node data.
+
+    LlamaIndex stores nodes as JSON in _node_content field. This function
+    parses that JSON and extracts the actual text content.
+
+    Args:
+        payload: Qdrant point payload
+
+    Returns:
+        Extracted text content or empty string if not found
+    """
+    # Try to get content from _node_content (LlamaIndex format)
+    if "_node_content" in payload and payload["_node_content"]:
+        try:
+            node_data = json.loads(payload["_node_content"])
+            return node_data.get("text", "")
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            logger.warning(
+                f"Failed to parse _node_content: {e}",
+                extra={"error": str(e)},
+            )
+
+    # Fallback to direct content field (if using enable_hybrid=True)
+    return payload.get("content", "")
 
 
 class QueryEngine:
@@ -115,6 +143,7 @@ class QueryEngine:
         self.vector_index = VectorStoreIndex.from_vector_store(
             vector_store=qdrant_vector_store,
             storage_context=storage_context,
+            embed_model=self.embed_model,
         )
 
         logger.debug("VectorStoreIndex initialized from Qdrant")
@@ -132,6 +161,7 @@ class QueryEngine:
                 # Create PropertyGraphIndex from existing Neo4j graph
                 self.graph_index: PropertyGraphIndex | None = PropertyGraphIndex.from_existing(
                     property_graph_store=neo4j_graph_store,
+                    embed_model=self.embed_model,
                 )
 
                 logger.debug("PropertyGraphIndex initialized from Neo4j")
@@ -294,7 +324,7 @@ class QueryEngine:
                     "doc_id": str(r["id"]),
                     "score": r["score"],
                     "title": r["payload"].get("title", ""),
-                    "content": r["payload"].get("content", ""),
+                    "content": _extract_content_from_payload(r["payload"]),
                     "source_type": r["payload"].get("source_type", ""),
                     "source_url": r["payload"].get("source_url", ""),
                     "timestamp": r["payload"].get("timestamp", ""),
@@ -411,9 +441,9 @@ class QueryEngine:
 
         nodes: list[NodeWithScore] = []
         for result in search_results:
-            # Create TextNode from payload
+            # Create TextNode from payload - extract content from LlamaIndex node format
             node = TextNode(
-                text=result["payload"].get("content", ""),
+                text=_extract_content_from_payload(result["payload"]),
                 id_=str(result["id"]),
                 metadata={
                     "doc_id": str(result["id"]),

@@ -59,11 +59,13 @@ class TEIRerank(BaseNodePostprocessor):
             raw_scores: Return raw logits vs normalized scores (default: False)
             **kwargs: Additional arguments passed to BaseNodePostprocessor
         """
-        super().__init__(**kwargs)
-        self.base_url = base_url
-        self.top_n = top_n
-        self.timeout = timeout
-        self.raw_scores = raw_scores
+        super().__init__(
+            base_url=base_url,
+            top_n=top_n,
+            timeout=timeout,
+            raw_scores=raw_scores,
+            **kwargs
+        )
 
     @classmethod
     def class_name(cls) -> str:
@@ -163,6 +165,7 @@ class TEIRerank(BaseNodePostprocessor):
         self,
         nodes: list[NodeWithScore],
         query_bundle: QueryBundle | None = None,
+        top_n: int | None = None,
     ) -> list[NodeWithScore]:
         """Rerank nodes based on query relevance.
 
@@ -176,10 +179,13 @@ class TEIRerank(BaseNodePostprocessor):
         Args:
             nodes: List of nodes with scores from initial retrieval
             query_bundle: Query bundle containing the query text
+            top_n: Optional override for top_n (defaults to self.top_n)
 
         Returns:
             List of reranked nodes (top-n by score)
         """
+        # Use provided top_n or fall back to instance attribute
+        effective_top_n = top_n if top_n is not None else self.top_n
         # Handle empty node list gracefully
         if not nodes:
             logger.warning("Reranking called with empty node list, returning empty list")
@@ -189,9 +195,9 @@ class TEIRerank(BaseNodePostprocessor):
         if not query_bundle:
             logger.warning(
                 "Reranking called without query bundle, returning original nodes (top-n)",
-                extra={"num_nodes": len(nodes), "top_n": self.top_n},
+                extra={"num_nodes": len(nodes), "top_n": effective_top_n},
             )
-            return nodes[: self.top_n]
+            return nodes[: effective_top_n]
 
         # Extract query text
         query = query_bundle.query_str
@@ -203,7 +209,7 @@ class TEIRerank(BaseNodePostprocessor):
             "Reranking nodes",
             extra={
                 "num_candidates": len(nodes),
-                "top_n": self.top_n,
+                "top_n": effective_top_n,
                 "query_length": len(query),
             },
         )
@@ -217,7 +223,7 @@ class TEIRerank(BaseNodePostprocessor):
 
             # Log reranking scores for debugging
             if logger.isEnabledFor(10):  # DEBUG level
-                for i, result in enumerate(results[: self.top_n]):
+                for i, result in enumerate(results[: effective_top_n]):
                     logger.debug(
                         f"Reranked result {i+1}",
                         extra={
@@ -229,7 +235,7 @@ class TEIRerank(BaseNodePostprocessor):
 
             # Create reranked nodes with updated scores
             reranked_nodes: list[NodeWithScore] = []
-            for result in results[: self.top_n]:
+            for result in results[: effective_top_n]:
                 idx: int = int(result["index"])
                 node = nodes[idx]
                 # Update score with reranker score
@@ -257,7 +263,7 @@ class TEIRerank(BaseNodePostprocessor):
                 },
             )
             # Return top-n from original nodes
-            return nodes[: self.top_n]
+            return nodes[: effective_top_n]
 
 
 # Export public API

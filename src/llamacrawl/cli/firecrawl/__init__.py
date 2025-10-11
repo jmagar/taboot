@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import typer
 
-from . import async_crawl as async_crawl_cmd
 from . import crawl as crawl_cmd
 from . import extract as extract_cmd
 from . import map as map_cmd
@@ -22,6 +21,5 @@ def register_firecrawl_commands(app: typer.Typer) -> None:
     """Register Firecrawl commands with the root CLI."""
     app.command()(scrape_cmd.scrape)
     app.command()(crawl_cmd.crawl)
-    app.command("async-crawl")(async_crawl_cmd.async_crawl)
-    app.command()(map_cmd.map)
+    app.command(name="map")(map_cmd.map_urls)
     app.command()(extract_cmd.extract)

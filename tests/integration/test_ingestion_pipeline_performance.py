@@ -129,7 +129,10 @@ def stub_config() -> Any:
     )
 
 
-def test_ingestion_batches_and_deduplicates(monkeypatch: pytest.MonkeyPatch, stub_config: Any) -> None:
+def test_ingestion_batches_and_deduplicates(
+    monkeypatch: pytest.MonkeyPatch,
+    stub_config: Any,
+) -> None:
     monkeypatch.setattr(
         "llamacrawl.ingestion.pipeline.IngestionPipeline._initialize_llama_pipeline",
         lambda self: None,
@@ -171,10 +174,15 @@ def test_ingestion_batches_and_deduplicates(monkeypatch: pytest.MonkeyPatch, stu
     assert summary.deduplicated == 1
     # batch size is 2 so we expect two pipeline calls
     assert [call["count"] for call in stub_llama.calls] == [2, 1]
-    assert all(call["num_workers"] == stub_config.ingestion.pipeline_workers for call in stub_llama.calls)
+    assert all(
+        call["num_workers"] == stub_config.ingestion.pipeline_workers
+        for call in stub_llama.calls
+    )
 
 
-def test_firecrawl_reader_applies_filters_and_trims_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_firecrawl_reader_applies_filters_and_trims_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured: dict[str, Any] = {}
 
     class StubFirecrawlSDK:

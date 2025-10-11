@@ -525,7 +525,7 @@ class QdrantClient:
             if key not in ["source_type", "source_types", "date_from", "date_to"]:
                 # Support nested metadata filters using dot notation
                 # e.g., filters={"metadata.repo_owner": "llamaindex"}
-                if isinstance(value, (str, int, bool)):
+                if isinstance(value, str | int | bool):
                     must_conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
                 elif isinstance(value, dict) and "gte" in value or "lte" in value:
                     # Range filter for numeric fields

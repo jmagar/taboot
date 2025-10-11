@@ -417,9 +417,8 @@ class GmailReader(BaseReader):
         """
         for part in parts:
             # Check if this part matches the desired MIME type
-            if part.get("mimeType") == mime_type:
-                if "data" in part.get("body", {}):
-                    return self._decode_base64url(part["body"]["data"])
+            if part.get("mimeType") == mime_type and "data" in part.get("body", {}):
+                return self._decode_base64url(part["body"]["data"])
 
             # Recursively search nested parts
             if "parts" in part:

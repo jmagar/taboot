@@ -477,8 +477,11 @@ class Neo4jClient:
                     | row.related] AS related_authors
         }
 
-        WITH start,
-             coalesce(related_refs, []) + coalesce(related_mentions, []) + coalesce(related_authors, []) AS all_related
+        WITH start, (
+            coalesce(related_refs, []) +
+            coalesce(related_mentions, []) +
+            coalesce(related_authors, [])
+        ) AS all_related
 
         UNWIND all_related AS related
         WITH start, related

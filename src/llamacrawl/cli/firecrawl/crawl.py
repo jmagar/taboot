@@ -49,10 +49,6 @@ def crawl(
         bool,
         typer.Option("--only-english/--all-languages", help="Filter non-English content"),
     ] = True,
-    async_mode: Annotated[
-        bool,
-        typer.Option("--async/--sync", help="Use async mode for better performance"),
-    ] = False,
 ) -> None:
     """Crawl an entire website using Firecrawl."""
     state = ctx.ensure_object(CLIState)
@@ -63,41 +59,19 @@ def crawl(
             "limit": limit,
             "max_depth": max_depth,
             "only_english": only_english,
-            "async_mode": async_mode,
         },
     )
-    
-    if async_mode:
-        # Run with async implementation
-        import asyncio
-        from .async_common import run_async_firecrawl_ingestion
-        asyncio.run(
-            run_async_firecrawl_ingestion(
-                state,
-                url=url,
-                mode="crawl",
-                limit=limit,
-                max_depth=max_depth,
-                formats=formats,
-                include_paths=include_paths,
-                exclude_paths=exclude_paths,
-                location_country=location_country,
-                location_languages=location_languages,
-                filter_non_english_metadata=only_english,
-            )
-        )
-    else:
-        # Use synchronous implementation
-        run_firecrawl_ingestion(
-            state,
-            url=url,
-            mode="crawl",
-            limit=limit,
-            max_depth=max_depth,
-            formats=formats,
-            include_paths=include_paths,
-            exclude_paths=exclude_paths,
-            location_country=location_country,
-            location_languages=location_languages,
-            filter_non_english_metadata=only_english,
-        )
+
+    run_firecrawl_ingestion(
+        state,
+        url=url,
+        mode="crawl",
+        limit=limit,
+        max_depth=max_depth,
+        formats=formats,
+        include_paths=include_paths,
+        exclude_paths=exclude_paths,
+        location_country=location_country,
+        location_languages=location_languages,
+        filter_non_english_metadata=only_english,
+    )

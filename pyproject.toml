@@ -31,6 +31,9 @@ dependencies = [
     "httpx>=0.25.0",
     "llama-index-storage-docstore-redis>=0.4.1",
     "fast-langdetect>=0.5.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "watchdog>=3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -50,6 +53,7 @@ dev = [
 
 [project.scripts]
 llamacrawl = "llamacrawl.cli:app"
+llamacrawl-api = "llamacrawl.api.server:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -87,14 +91,3 @@ markers = [
 ]
 addopts = "-v --tb=short --strict-markers"
 cache_dir = ".cache/pytest"
-
-[dependency-groups]
-dev = [
-    "faker>=37.8.0",
-    "pytest>=8.4.2",
-    "pytest-asyncio>=1.2.0",
-    "pytest-cov>=7.0.0",
-    "pytest-docker>=3.2.3",
-    "pytest-mock>=3.15.1",
-    "responses>=0.25.8",
-]

@@ -143,7 +143,7 @@ class TestDocumentDeduplicator:
 
         # Simulate all stored hashes missing, but content hash already known in set
         results = []
-        for doc in sample_documents[:2]:
+        for _doc in sample_documents[:2]:
             results.extend([None, True])  # stored hash missing, hash seen before
 
         mock_pipeline.execute.return_value = results

@@ -12,6 +12,7 @@ The pipeline uses distributed locks to prevent concurrent ingestion of the same 
 and implements per-document error handling to ensure resilience.
 """
 
+import contextlib
 import logging
 import time
 import traceback
@@ -683,10 +684,8 @@ class IngestionPipeline:
                 except Exception as exc:
                     result_queue.put(exc)
                 finally:
-                    try:
+                    with contextlib.suppress(Exception):
                         loop.run_until_complete(loop.shutdown_asyncgens())
-                    except Exception:
-                        pass
                     loop.close()
 
             thread = threading.Thread(target=run_async_extraction, daemon=True)

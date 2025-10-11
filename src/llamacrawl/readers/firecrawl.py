@@ -11,19 +11,23 @@ The reader uses LlamaIndex's FireCrawlWebReader internally (which now supports
 Firecrawl v2 SDK as of PR #19773) and converts results to our Document model.
 """
 
+import asyncio
 import hashlib
 import math
 import os
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Literal
 from urllib.parse import urlparse
 
+from firecrawl import AsyncFirecrawl
+from firecrawl.v2.watcher_async import AsyncWatcher
 from llama_index.readers.web import FireCrawlWebReader
 
 from llamacrawl.models.document import Document, DocumentMetadata
 from llamacrawl.readers.base import BaseReader
 from llamacrawl.storage.redis import RedisClient
-from llamacrawl.utils.retry import retry_with_backoff
+from llamacrawl.utils.retry import async_retry_with_backoff, retry_with_backoff
 
 
 class FirecrawlReader(BaseReader):
@@ -121,6 +125,12 @@ class FirecrawlReader(BaseReader):
             params=self._base_params,
         )
 
+        # Initialize async Firecrawl client for websocket-enabled workflows
+        self.async_firecrawl_client = AsyncFirecrawl(
+            api_key=self.api_key,
+            api_url=self.api_url,
+        )
+
         self.logger.info(
             f"FirecrawlReader initialized with API URL: {self.api_url}",
             extra={"source": self.source_name, "api_url": self.api_url},
@@ -131,6 +141,7 @@ class FirecrawlReader(BaseReader):
         params: dict[str, Any] = {}
         if self.timeout_ms is not None:
             params["timeout"] = self.timeout_ms
+        params["integration"] = "llamaindex"
         return params
 
     def supports_incremental_sync(self) -> bool:
@@ -142,8 +153,52 @@ class FirecrawlReader(BaseReader):
         """
         return False
 
+    def _resolve_urls(self, url: str | list[str] | None) -> list[str]:
+        """Normalize url parameter into a list of URLs."""
+        if url is None:
+            config_urls = self.config.get("urls", [])
+            if not config_urls:
+                raise ValueError(
+                    "No URLs provided. Either pass url parameter or configure "
+                    "sources.firecrawl.urls in config.yaml"
+                )
+            return config_urls
+
+        if isinstance(url, str):
+            return [url]
+
+        return url
+
+    def _ensure_url_allowed(self, url: str, mode: str) -> None:
+        """Validate URL against exclude patterns when applicable."""
+        if mode == "crawl" or not self.exclude_paths:
+            return
+
+        import re
+
+        parsed = urlparse(url)
+        path = parsed.path
+        for pattern in self.exclude_paths:
+            if pattern.startswith("^"):
+                try:
+                    if re.search(pattern, path):
+                        raise ValueError(
+                            f"URL path '{path}' matches exclude pattern '{pattern}'. "
+                            "This URL is excluded by your configuration."
+                        )
+                except re.error:
+                    continue
+            else:
+                pattern_normalized = pattern.strip("*").strip("/")
+                if pattern_normalized and pattern_normalized in path.split("/"):
+                    raise ValueError(
+                        f"URL path '{path}' matches exclude pattern '{pattern}'. "
+                        "This URL is excluded by your configuration."
+                    )
+
     def load_data(
         self,
+        progress_callback: Callable[[int, int], None] | None = None,
         url: str | list[str] | None = None,
         mode: Literal["scrape", "crawl", "map", "extract"] = "scrape",
         limit: int | None = None,
@@ -190,21 +245,7 @@ class FirecrawlReader(BaseReader):
             ... )
         """
         # Determine URL(s) to process
-        urls_to_process: list[str] = []
-
-        if url is None:
-            # Use URLs from config
-            config_urls = self.config.get("urls", [])
-            if not config_urls:
-                raise ValueError(
-                    "No URLs provided. Either pass url parameter or configure "
-                    "sources.firecrawl.urls in config.yaml"
-                )
-            urls_to_process = config_urls
-        elif isinstance(url, str):
-            urls_to_process = [url]
-        else:
-            urls_to_process = url
+        urls_to_process = self._resolve_urls(url)
 
         # Validate URLs
         for url_str in urls_to_process:
@@ -275,6 +316,91 @@ class FirecrawlReader(BaseReader):
 
         return all_documents
 
+    async def aload_data(
+        self,
+        progress_callback: Callable[[int, int | None, str], None] | None = None,
+        url: str | list[str] | None = None,
+        mode: Literal["scrape", "crawl", "map", "extract"] = "scrape",
+        limit: int | None = None,
+        max_depth: int | None = None,
+        formats: list[str] | None = None,
+        **kwargs: Any,
+    ) -> list[Document]:
+        """Asynchronously load documents from Firecrawl using the AsyncFirecrawl SDK."""
+        urls_to_process = self._resolve_urls(url)
+
+        for url_str in urls_to_process:
+            if not self._validate_url(url_str):
+                raise ValueError(f"Invalid URL: {url_str}")
+
+        # Get configuration parameters
+        limit = limit or self.config.get("max_pages", 1000)
+        max_depth = max_depth or self.config.get("default_crawl_depth", 3)
+        formats = formats or self.config.get("formats", ["markdown"])
+
+        self.logger.info(
+            f"Asynchronously loading data from {len(urls_to_process)} URL(s) in {mode} mode",
+            extra={
+                "source": self.source_name,
+                "mode": mode,
+                "url_count": len(urls_to_process),
+                "limit": limit,
+                "max_depth": max_depth if mode == "crawl" else None,
+            },
+        )
+
+        all_documents: list[Document] = []
+        error_count = 0
+
+        for url_str in urls_to_process:
+            try:
+                documents = await self._aload_single_url(
+                    url=url_str,
+                    mode=mode,
+                    limit=limit,
+                    max_depth=max_depth,
+                    formats=formats,
+                    progress_callback=progress_callback,
+                    **kwargs,
+                )
+
+                all_documents.extend(documents)
+
+                self.logger.info(
+                    f"Asynchronously loaded {len(documents)} documents from {url_str}",
+                    extra={
+                        "source": self.source_name,
+                        "url": url_str,
+                        "document_count": len(documents),
+                        "mode": mode,
+                    },
+                )
+
+            except Exception as e:
+                error_count += 1
+                self.logger.error(
+                    f"Failed to asynchronously load URL {url_str}: {e}",
+                    extra={
+                        "source": self.source_name,
+                        "url": url_str,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "mode": mode,
+                    },
+                )
+                continue
+
+        self.log_load_summary(
+            total_fetched=len(all_documents),
+            filtered_count=0,
+            error_count=error_count,
+            mode=mode,
+            url_count=len(urls_to_process),
+            async_mode=True,
+        )
+
+        return all_documents
+
     @retry_with_backoff(max_attempts=3, initial_delay=2.0, max_delay=60.0)
     def _load_single_url(
         self,
@@ -304,31 +430,8 @@ class FirecrawlReader(BaseReader):
         Raises:
             ValueError: If URL matches exclude_paths pattern
         """
-        # Validate URL against exclude_paths for all modes except crawl
-        # (crawl mode applies filters server-side via Firecrawl API)
-        if mode != "crawl" and self.exclude_paths:
-            import re
-            parsed = urlparse(url)
-            path = parsed.path
-            for pattern in self.exclude_paths:
-                # Try regex pattern first
-                if pattern.startswith("^"):
-                    try:
-                        if re.search(pattern, path):
-                            raise ValueError(
-                                f"URL path '{path}' matches exclude pattern '{pattern}'. "
-                                f"This URL is excluded by your configuration."
-                            )
-                    except re.error:
-                        pass  # Invalid regex, skip
-                else:
-                    # Handle glob patterns like **/fr/** or */fr/*
-                    pattern_normalized = pattern.strip("*").strip("/")
-                    if pattern_normalized in path.split("/"):
-                        raise ValueError(
-                            f"URL path '{path}' matches exclude pattern '{pattern}'. "
-                            f"This URL is excluded by your configuration."
-                        )
+        # Validate URL against exclude_paths for applicable modes
+        self._ensure_url_allowed(url, mode)
 
         # Build Firecrawl parameters based on mode
         params = self._build_firecrawl_params(
@@ -344,6 +447,9 @@ class FirecrawlReader(BaseReader):
             extra={"url": url, "mode": mode, "params": params},
         )
 
+        if mode == "crawl":
+            return self._run_sync_crawl_with_watcher(url=url, params=params)
+
         # Create a FireCrawlWebReader instance with the specific mode and params
         # Note: FireCrawlWebReader requires mode and params at initialization, not in load_data()
         reader_instance = FireCrawlWebReader(
@@ -354,16 +460,289 @@ class FirecrawlReader(BaseReader):
         )
 
         self.logger.debug(f"Calling load_data() for {url}")
-        
         # Call load_data() with just the URL (load_data only accepts url/query/urls)
         llamaindex_docs = reader_instance.load_data(url=url)
-        
+
         self.logger.debug(f"Loaded {len(llamaindex_docs)} documents from {url}")
 
         # Convert LlamaIndex documents to our Document model
         documents = self._convert_to_documents(llamaindex_docs, source_url=url)
 
         return documents
+
+    @async_retry_with_backoff(max_attempts=3, initial_delay=2.0, max_delay=60.0)
+    async def _aload_single_url(
+        self,
+        url: str,
+        mode: Literal["scrape", "crawl", "map", "extract"],
+        limit: int,
+        max_depth: int,
+        formats: list[str],
+        progress_callback: Callable[[int, int | None, str], None] | None = None,
+        **kwargs: Any,
+    ) -> list[Document]:
+        """Async variant of _load_single_url using the official AsyncFirecrawl SDK."""
+        self._ensure_url_allowed(url, mode)
+
+        params = self._build_firecrawl_params(
+            mode=mode,
+            limit=limit,
+            max_depth=max_depth,
+            formats=formats,
+            **kwargs,
+        )
+
+        if mode == "crawl":
+            return await self._async_crawl_with_watcher(
+                url=url,
+                params=params,
+                progress_callback=progress_callback,
+            )
+
+        # For other modes, run the synchronous loader in a worker thread
+        return await asyncio.to_thread(
+            self._load_single_url,
+            url,
+            mode,
+            limit,
+            max_depth,
+            formats,
+            **kwargs,
+        )
+
+    async def _async_crawl_with_polling(
+        self,
+        *,
+        url: str,
+        params: dict[str, Any],
+        progress_callback: Callable[[int, int | None, str], None] | None = None,
+    ) -> list[Document]:
+        """Run a Firecrawl crawl using periodic HTTP polling."""
+        request_kwargs = self._prepare_async_crawl_params(params)
+
+        self.logger.info(
+            "Starting async Firecrawl crawl job",
+            extra={
+                "url": url,
+                "params": request_kwargs,
+            },
+        )
+
+        start_response = await self.async_firecrawl_client.start_crawl(url=url, **request_kwargs)
+        job_id = getattr(start_response, "id", None) or start_response.get("id")  # type: ignore[union-attr]
+        if not job_id:
+            raise RuntimeError("Failed to start Firecrawl crawl job (missing job ID)")
+
+        timeout_seconds = math.ceil(self.timeout_ms / 1000) if self.timeout_ms else None
+        poll_interval = max(params.get("delay", 0) / 1000 if params.get("delay") else 2, 1)
+        start_time = asyncio.get_event_loop().time()
+
+        collected_docs: list[Any] = []
+        status: str = "discovering"
+        completed_count = 0
+        total_count: int | None = None
+
+        while True:
+            try:
+                response = await self.async_firecrawl_client._v2_client.async_http_client.get(
+                    f"/v2/crawl/{job_id}"
+                )
+                body = response.json()
+            except Exception as exc:  # pragma: no cover - defensive
+                self.logger.warning(
+                    "Failed to poll Firecrawl crawl status",
+                    extra={"job_id": job_id, "error": str(exc)},
+                )
+                await asyncio.sleep(poll_interval)
+                continue
+
+            status = body.get("status", status)
+            completed_count = body.get("completed", completed_count) or 0
+            total_count = body.get("total", total_count)
+            docs = body.get("data", []) or []
+
+            self.logger.debug(
+                "Firecrawl crawl poll",
+                extra={
+                    "job_id": job_id,
+                    "status": status,
+                    "completed": completed_count,
+                    "total": total_count,
+                    "docs": len(docs),
+                },
+            )
+
+            if docs:
+                collected_docs = docs
+
+            if progress_callback:
+                progress_callback(completed_count, total_count, status)
+
+            if status in {"completed", "failed", "cancelled"}:
+                break
+
+            if timeout_seconds is not None:
+                elapsed = asyncio.get_event_loop().time() - start_time
+                if elapsed >= timeout_seconds:
+                    raise TimeoutError(
+                        f"Firecrawl crawl timed out after {timeout_seconds} seconds"
+                    )
+
+            await asyncio.sleep(poll_interval)
+
+        if status == "failed":
+            raise RuntimeError(
+                f"Firecrawl crawl job {job_id} failed to complete successfully"
+            )
+
+        self.logger.info(
+            "Async Firecrawl crawl completed",
+            extra={"job_id": job_id, "document_count": len(collected_docs)},
+        )
+
+        return self._convert_to_documents(collected_docs, source_url=url)
+
+    async def _async_crawl_with_watcher(
+        self,
+        *,
+        url: str,
+        params: dict[str, Any],
+        progress_callback: Callable[[int, int | None, str], None] | None = None,
+    ) -> list[Document]:
+        """Run a Firecrawl crawl using WebSocket-based watcher for real-time progress.
+
+        This method uses Firecrawl's AsyncWatcher which connects via WebSocket
+        for real-time job progress updates, falling back to HTTP polling if
+        WebSocket connection fails.
+        """
+        request_kwargs = self._prepare_async_crawl_params(params)
+
+        self.logger.info(
+            "Starting async Firecrawl crawl job with watcher",
+            extra={
+                "url": url,
+                "params": request_kwargs,
+            },
+        )
+
+        # Start the crawl job
+        start_response = await self.async_firecrawl_client.start_crawl(url=url, **request_kwargs)
+        job_id = getattr(start_response, "id", None) or start_response.get("id")  # type: ignore[union-attr]
+        if not job_id:
+            raise RuntimeError("Failed to start Firecrawl crawl job (missing job ID)")
+
+        timeout_seconds = math.ceil(self.timeout_ms / 1000) if self.timeout_ms else None
+        poll_interval = max(params.get("delay", 0) / 1000 if params.get("delay") else 2, 1)
+
+        self.logger.info(
+            "Watching crawl job via WebSocket",
+            extra={
+                "job_id": job_id,
+                "timeout": timeout_seconds,
+                "poll_interval": poll_interval,
+            },
+        )
+
+        collected_docs: list[Any] = []
+        final_status: str = "unknown"
+
+        # Use AsyncWatcher for real-time progress
+        async for snapshot in AsyncWatcher(
+            self.async_firecrawl_client,
+            job_id,
+            kind="crawl",
+            poll_interval=int(poll_interval),
+            timeout=timeout_seconds,
+        ):
+            final_status = snapshot.status
+            completed_count = getattr(snapshot, "completed", 0)
+            total_count = getattr(snapshot, "total", None)
+
+            # Extract documents from snapshot
+            if hasattr(snapshot, "data") and snapshot.data:
+                collected_docs = snapshot.data
+
+            self.logger.debug(
+                "Firecrawl crawl progress",
+                extra={
+                    "job_id": job_id,
+                    "status": final_status,
+                    "completed": completed_count,
+                    "total": total_count,
+                    "docs": len(collected_docs) if collected_docs else 0,
+                },
+            )
+
+            # Call progress callback if provided
+            if progress_callback:
+                progress_callback(completed_count, total_count, final_status)
+
+            # Terminal status check
+            if final_status in ("completed", "failed", "cancelled"):
+                break
+
+        if final_status == "failed":
+            raise RuntimeError(f"Firecrawl crawl job {job_id} failed")
+
+        if final_status == "cancelled":
+            raise RuntimeError(f"Firecrawl crawl job {job_id} was cancelled")
+
+        self.logger.info(
+            "Async Firecrawl crawl completed via watcher",
+            extra={"job_id": job_id, "document_count": len(collected_docs)},
+        )
+
+        # Convert Firecrawl Document objects to our Document model
+        return self._convert_to_documents(collected_docs, source_url=url)
+
+    def _prepare_async_crawl_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Filter and adapt crawl parameters for the async Firecrawl client."""
+        allowed_keys = {
+            "limit",
+            "max_discovery_depth",
+            "include_paths",
+            "exclude_paths",
+            "max_concurrency",
+            "delay",
+            "integration",
+            "prompt",
+            "crawl_entire_domain",
+            "allow_external_links",
+            "allow_subdomains",
+            "sitemap",
+            "ignore_sitemap",
+            "ignore_query_parameters",
+            "zero_data_retention",
+            "scrape_options",
+        }
+
+        request: dict[str, Any] = {}
+        for key, value in params.items():
+            if key in allowed_keys and value is not None:
+                request[key] = value
+
+        scrape_options = request.get("scrape_options")
+        if isinstance(scrape_options, dict) and scrape_options:
+            request["scrape_options"] = scrape_options
+
+        return request
+
+    def _run_sync_crawl_with_watcher(self, *, url: str, params: dict[str, Any]) -> list[Document]:
+        """Synchronously run the async crawl helper for CLI compatibility."""
+
+        async def _runner() -> list[Document]:
+            return await self._async_crawl_with_watcher(url=url, params=params)
+
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(_runner())
+
+        new_loop = asyncio.new_event_loop()
+        try:
+            return new_loop.run_until_complete(_runner())
+        finally:
+            new_loop.close()
 
     def _glob_to_regex(self, pattern: str) -> str:
         """Convert glob pattern to regex pattern for Firecrawl API.
@@ -427,7 +806,8 @@ class FirecrawlReader(BaseReader):
 
             # Add include_paths/exclude_paths for URL-based filtering (Layer 1)
             # Firecrawl Python SDK expects regex patterns in snake_case
-            # NOTE: Only convert glob patterns - skip raw regex (^...) as they may trigger ReDoS detector
+            # NOTE: Only convert glob patterns - skip raw regex (^...)
+            # as they may trigger Firecrawl's ReDoS detector
             if self.include_paths and len(self.include_paths) > 0:
                 converted_includes = [
                     self._glob_to_regex(p) for p in self.include_paths
@@ -527,6 +907,62 @@ class FirecrawlReader(BaseReader):
         languages = self.location.get("languages", ["en-US"]) if self.location else ["en-US"]
         return {"country": country, "languages": languages}
 
+    def _metadata_to_dict(self, metadata: Any) -> dict[str, Any]:
+        """Convert Firecrawl metadata structures into plain dictionaries."""
+        if metadata is None:
+            return {}
+        if isinstance(metadata, dict):
+            return {k: v for k, v in metadata.items() if v not in (None, "", [], {})}
+        if hasattr(metadata, "model_dump") and callable(metadata.model_dump):
+            try:
+                return {
+                    k: v
+                    for k, v in metadata.model_dump(exclude_none=True).items()
+                    if v not in (None, "", [], {})
+                }
+            except Exception:
+                pass
+        if hasattr(metadata, "dict") and callable(metadata.dict):
+            try:
+                return {
+                    k: v
+                    for k, v in metadata.dict(exclude_none=True).items()  # type: ignore[attr-defined]
+                    if v not in (None, "", [], {})
+                }
+            except Exception:
+                pass
+        return {}
+
+    def _extract_content(self, raw_doc: Any) -> str:
+        """Extract best-effort textual content from Firecrawl documents."""
+        candidates: list[str] = []
+
+        def _add_candidate(value: Any) -> None:
+            if isinstance(value, str) and value.strip():
+                candidates.append(value)
+
+        if isinstance(raw_doc, dict):
+            for key in ("content", "markdown", "text", "html", "raw_html", "rawHtml", "summary"):
+                _add_candidate(raw_doc.get(key))
+        else:
+            for attr in ("text", "markdown", "content", "html", "raw_html", "rawHtml", "summary"):
+                value = getattr(raw_doc, attr, None)
+                if callable(value):
+                    try:
+                        value = value()
+                    except Exception:
+                        value = None
+                _add_candidate(value)
+
+        if candidates:
+            return candidates[0]
+
+        # Fallback: convert entire object to string if nothing else
+        if isinstance(raw_doc, dict):
+            return str(raw_doc)
+
+        return str(getattr(raw_doc, "__dict__", raw_doc))
+
     def _convert_to_documents(
         self, llamaindex_docs: list[Any], source_url: str
     ) -> list[Document]:
@@ -543,10 +979,28 @@ class FirecrawlReader(BaseReader):
         filtered_by_language = 0
         timestamp = datetime.now(UTC)
 
-        for idx, llama_doc in enumerate(llamaindex_docs):
-            # Extract content and metadata
-            content = llama_doc.text or llama_doc.get_content()
-            llama_metadata = llama_doc.metadata or {}
+        for idx, raw_doc in enumerate(llamaindex_docs):
+            content = self._extract_content(raw_doc)
+
+            if isinstance(raw_doc, dict):
+                metadata_source = raw_doc.get("metadata", {})
+            else:
+                metadata_source = getattr(raw_doc, "metadata", {})
+
+            llama_metadata = self._metadata_to_dict(metadata_source)
+
+            # Include top-level fields that may carry useful metadata
+            if isinstance(raw_doc, dict):
+                for key in ("url", "title", "description", "language"):
+                    value = raw_doc.get(key)
+                    if value and key not in llama_metadata:
+                        llama_metadata[key] = value
+            else:
+                for attr in ("url", "title", "description", "language"):
+                    value = getattr(raw_doc, attr, None)
+                    if value and attr not in llama_metadata:
+                        llama_metadata[attr] = value
+
             sanitized_metadata = self._sanitize_firecrawl_metadata(llama_metadata)
 
             # Filter by metadata language if enabled
@@ -554,7 +1008,12 @@ class FirecrawlReader(BaseReader):
                 detected_lang = sanitized_metadata.get("language", "").lower()
                 if detected_lang and detected_lang not in ["en", "en-us", "en-gb"]:
                     filtered_by_language += 1
-                    doc_url = llama_metadata.get("url", source_url)
+                    doc_url = (
+                        sanitized_metadata.get("url")
+                        or sanitized_metadata.get("source_url")
+                        or llama_metadata.get("url")
+                        or source_url
+                    )
                     self.logger.debug(
                         f"Filtered document by metadata language: {detected_lang}",
                         extra={
@@ -567,7 +1026,13 @@ class FirecrawlReader(BaseReader):
 
             # Generate unique document ID
             # Use URL from metadata if available, otherwise use source_url
-            doc_url = llama_metadata.get("url", source_url)
+            doc_url = (
+                sanitized_metadata.get("url")
+                or sanitized_metadata.get("source_url")
+                or llama_metadata.get("url")
+                or getattr(raw_doc, "url", None)
+                or source_url
+            )
             doc_id = self._generate_doc_id(doc_url, idx)
 
             # Compute content hash for deduplication
@@ -643,7 +1108,7 @@ class FirecrawlReader(BaseReader):
             if len(value) > self.max_metadata_chars:
                 return value[: self.max_metadata_chars] + "..."
             return value
-        if isinstance(value, (int, float, bool)) or value is None:
+        if isinstance(value, int | float | bool) or value is None:
             return value
         if isinstance(value, list):
             truncated_items = [

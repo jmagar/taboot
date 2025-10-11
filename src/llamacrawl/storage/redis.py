@@ -16,14 +16,14 @@ Key naming conventions (from shared.md):
 import json
 import time
 import uuid
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 import redis
+from llama_index.storage.kvstore.redis import RedisKVStore
 from redis.asyncio import Redis as AsyncRedis
 from redis.connection import ConnectionPool
-from llama_index.storage.kvstore.redis import RedisKVStore
 
 
 class RedisClient:
@@ -603,7 +603,7 @@ class PickleableRedisKVStore(RedisKVStore):
         for key, value in raw_kwargs.items():
             if key in {"connection_class", "parser_class"}:
                 continue
-            if isinstance(value, (str, int, float, bool)) or value is None:
+            if isinstance(value, str | int | float | bool) or value is None:
                 sanitized[key] = value
         return sanitized
 

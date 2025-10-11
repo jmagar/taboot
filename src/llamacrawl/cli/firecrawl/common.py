@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
-from typing import Any
 from urllib.parse import urlparse
 
 import typer
@@ -80,7 +80,7 @@ def run_firecrawl_map(state: CLIState, *, url: str, limit: int) -> None:
     ) as progress:
         task_id = progress.add_task("Mapping URLs...", total=None)
         try:
-            documents = reader.load_data(url=url, mode="map", limit=limit)
+            documents = asyncio.run(reader.aload_data(url=url, mode="map", limit=limit))
         except Exception as error:
             progress.update(task_id, description="[red]✗ Map operation failed")
             console.print(f"[red]Error during map:[/red] {error}")
@@ -228,12 +228,16 @@ def run_firecrawl_ingestion(
     # Temporarily disable progress bar for debugging
     console.print(f"[dim]Processing with {mode} mode...[/dim]")
     try:
-        documents = reader.load_data(
+        documents = asyncio.run(
+            reader.aload_data(
                 url=url,
                 mode=mode,
                 limit=limit,
                 max_depth=max_depth,
-            formats=formats,
+                formats=formats,
+                schema=schema,
+                prompt=prompt,
+            )
         )
     except Exception as error:
         console.print(f"[red]✗ Ingestion failed: {error}[/red]")
@@ -270,9 +274,23 @@ def run_firecrawl_ingestion(
         return 0
 
     if filtered_count:
-        console.print(f"[dim]Language filter kept {len(documents)}/{original_count} documents; ingesting...[/dim]")
+        console.print(
+            f"[dim]Language filter kept {len(documents)}/{original_count} "
+            f"documents; ingesting...[/dim]"
+        )
     else:
         console.print(f"[dim]Loaded {len(documents)} documents, ingesting...[/dim]")
+
+    # Print scraped content for scrape mode
+    if mode == "scrape":
+        console.print("\n[cyan]═══ Scraped Content ═══[/cyan]\n")
+        for i, doc in enumerate(documents, 1):
+            if len(documents) > 1:
+                console.print(f"[bold]Document {i}:[/bold]")
+            console.print(doc.content)
+            if i < len(documents):
+                console.print("\n[dim]───────────────────────[/dim]\n")
+        console.print("\n[cyan]═══════════════════════[/cyan]\n")
 
     try:
         summary = pipeline.ingest_documents(

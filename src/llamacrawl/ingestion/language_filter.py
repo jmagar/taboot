@@ -13,7 +13,7 @@ from collections import Counter
 from collections.abc import Sequence
 from typing import Any, Literal
 
-from fast_langdetect.infer import LangDetector, LangDetectConfig
+from fast_langdetect.infer import LangDetectConfig, LangDetector
 from llama_index.core.schema import BaseNode, TextNode, TransformComponent
 from pydantic import Field
 
@@ -54,9 +54,21 @@ class LanguageFilter(TransformComponent):
     """
 
     # Pydantic fields with defaults for LlamaIndex TransformComponent
-    allowed_languages: set[str] = Field(default_factory=set, description="Set of ISO 639-1 language codes to keep")
-    confidence_threshold: float = Field(default=0.8, ge=0.0, le=1.0, description="Minimum detection confidence")
-    min_content_length: int = Field(default=50, ge=0, description="Minimum text length for detection")
+    allowed_languages: set[str] = Field(
+        default_factory=set,
+        description="Set of ISO 639-1 language codes to keep"
+    )
+    confidence_threshold: float = Field(
+        default=0.8,
+        ge=0.0,
+        le=1.0,
+        description="Minimum detection confidence"
+    )
+    min_content_length: int = Field(
+        default=50,
+        ge=0,
+        description="Minimum text length for detection"
+    )
     log_filtered: bool = Field(default=True, description="Log filtering statistics")
     detection_model: Literal["lite", "full", "auto"] = Field(
         default="lite",
@@ -85,8 +97,10 @@ class LanguageFilter(TransformComponent):
             confidence_threshold: Minimum detection confidence (0.0-1.0). Default: 0.8
             min_content_length: Skip detection for text shorter than this. Default: 50
             log_filtered: Log filtering statistics. Default: True
-            detection_model: fast-langdetect model to use ("lite", "full", or "auto"). Default: "lite"
-            max_detection_chars: Maximum characters sampled for detection. Default: 1000
+            detection_model: fast-langdetect model to use ("lite", "full", or
+                "auto"). Default: "lite"
+            max_detection_chars: Maximum characters sampled for detection.
+                Default: 1000
             **kwargs: Additional arguments for parent class
 
         Raises:
@@ -125,7 +139,9 @@ class LanguageFilter(TransformComponent):
         logger.info(
             "LanguageFilter initialized",
             extra={
-                "allowed_languages": list(self.allowed_languages) if self.allowed_languages else "all",
+                "allowed_languages": (
+                    list(self.allowed_languages) if self.allowed_languages else "all"
+                ),
                 "confidence_threshold": self.confidence_threshold,
                 "min_content_length": self.min_content_length,
             },
@@ -189,7 +205,7 @@ class LanguageFilter(TransformComponent):
                 confidence_value = detection_result.get("score", 0.0)
                 confidence = (
                     float(confidence_value)
-                    if isinstance(confidence_value, (int, float))
+                    if isinstance(confidence_value, int | float)
                     else 0.0
                 )
 
@@ -217,7 +233,10 @@ class LanguageFilter(TransformComponent):
                     # Language not in allowlist - filter out
                     filtered_count += 1
                     logger.debug(
-                        f"Filtered node with language {detected_lang} (confidence: {confidence:.2f})",
+                        (
+                            f"Filtered node with language {detected_lang} "
+                            f"(confidence: {confidence:.2f})"
+                        ),
                         extra={
                             "detected_lang": detected_lang,
                             "confidence": confidence,
@@ -240,7 +259,10 @@ class LanguageFilter(TransformComponent):
             kept_count = len(filtered_nodes)
 
             logger.info(
-                f"Language filtering complete: kept {kept_count}/{len(nodes)} nodes ({filter_rate:.1f}% filtered)",
+                (
+                    f"Language filtering complete: kept {kept_count}/{len(nodes)} nodes "
+                    f"({filter_rate:.1f}% filtered)"
+                ),
                 extra={
                     "total_nodes": len(nodes),
                     "kept_nodes": kept_count,

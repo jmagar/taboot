@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import typer
 
-from . import init as init_cmd
 from . import ingest as ingest_cmd
+from . import init as init_cmd
 from . import query as query_cmd
 from . import status as status_cmd
 from . import version as version_cmd

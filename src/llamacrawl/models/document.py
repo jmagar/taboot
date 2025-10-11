@@ -32,7 +32,10 @@ class DocumentMetadata(BaseModel):
         }
     )
 
-    source_type: Literal["firecrawl", "github", "reddit", "gmail", "elasticsearch"]
+    source_type: Literal[
+        "firecrawl", "github", "reddit", "gmail",
+        "elasticsearch", "claude_code", "codex"
+    ]
     source_url: str
     timestamp: datetime
     extra: dict[str, Any] = Field(default_factory=dict)
@@ -123,7 +126,10 @@ class SourceAttribution(BaseModel):
     )
 
     doc_id: str
-    source_type: Literal["firecrawl", "github", "reddit", "gmail", "elasticsearch"]
+    source_type: Literal[
+        "firecrawl", "github", "reddit", "gmail",
+        "elasticsearch", "claude_code", "codex"
+    ]
     title: str
     url: str
     score: float = Field(ge=0.0, le=1.0, description="Relevance score between 0.0 and 1.0")

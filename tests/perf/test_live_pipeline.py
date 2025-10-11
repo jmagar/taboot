@@ -31,8 +31,7 @@ def _run_cli(command: list[str]) -> tuple[int, str, str, float]:
     start = time.perf_counter()
     proc = subprocess.run(
         command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         text=True,
         env={**os.environ, "PYTHONUNBUFFERED": "1"},
     )

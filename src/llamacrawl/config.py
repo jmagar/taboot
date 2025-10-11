@@ -52,7 +52,10 @@ class FirecrawlSourceConfig(BaseModel):
     )
     exclude_paths: list[str] = Field(
         default_factory=list,
-        description="URL path patterns to exclude (regex, e.g., ['^/fr/', '^/de/']). Auto-populated from language_filter if empty."
+        description=(
+            "URL path patterns to exclude (regex, e.g., ['^/fr/', '^/de/']). "
+            "Auto-populated from language_filter if empty."
+        )
     )
     cache_max_age_ms: int | None = Field(
         default=172800000,
@@ -166,6 +169,56 @@ class GmailSourceConfig(BaseModel):
     query_filters: list[str] = Field(default_factory=list)
 
 
+class SessionsSourceConfig(BaseModel):
+    """AI coding assistant session ingestion configuration.
+
+    Monitors JSONL session files from Claude Code, Codex CLI, and potentially
+    other AI assistants for real-time ingestion into the RAG pipeline.
+    """
+
+    enabled: bool = False
+    claude_code_path: Path | None = Field(
+        default_factory=lambda: Path.home() / ".claude" / "projects",
+        description="Path to Claude Code project logs"
+    )
+    codex_path: Path | None = Field(
+        default_factory=lambda: Path.home() / ".codex" / "sessions",
+        description="Path to Codex CLI session logs"
+    )
+    gemini_path: Path | None = Field(
+        default=None,
+        description="Path to Gemini CLI session logs (future)"
+    )
+    conversation_stable_time: int = Field(
+        default=600,
+        ge=60,
+        le=3600,
+        description="Seconds to wait before creating conversation-level doc"
+    )
+    enable_message_level: bool = Field(
+        default=True,
+        description="Enable message-level document indexing"
+    )
+    enable_conversation_level: bool = Field(
+        default=True,
+        description="Enable conversation-level document indexing"
+    )
+
+    @field_validator("claude_code_path", "codex_path", "gemini_path", mode="before")
+    @classmethod
+    def expand_path(cls, v: str | Path | None) -> Path | None:
+        """Expand tilde and convert strings to absolute Path objects."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            # Expand tilde and convert to absolute path
+            return Path(v).expanduser().resolve()
+        if isinstance(v, Path):
+            # Expand tilde if present
+            return v.expanduser().resolve()
+        return v
+
+
 class SourceConfig(BaseModel):
     """Configuration for all data sources."""
 
@@ -174,6 +227,7 @@ class SourceConfig(BaseModel):
     reddit: RedditSourceConfig = Field(default_factory=RedditSourceConfig)
     elasticsearch: ElasticsearchSourceConfig = Field(default_factory=ElasticsearchSourceConfig)
     gmail: GmailSourceConfig = Field(default_factory=GmailSourceConfig)
+    sessions: SessionsSourceConfig = Field(default_factory=SessionsSourceConfig)
 
 
 class RetryConfig(BaseModel):
@@ -285,7 +339,10 @@ class GraphConfig(BaseModel):
     # Note: max_keywords_per_document removed - not used in implementation
     # Note: relationship_extraction removed - always enabled, not toggleable
     entity_types: list[str] = Field(
-        default=["PERSON", "ORGANIZATION", "LOCATION", "PRODUCT", "TECHNOLOGY", "EVENT", "FILE", "CONCEPT"]
+        default=[
+            "PERSON", "ORGANIZATION", "LOCATION", "PRODUCT",
+            "TECHNOLOGY", "EVENT", "FILE", "CONCEPT"
+        ]
     )
     extraction_strategy: Literal["simple", "implicit", "schema", "combined"] = "simple"
     confidence_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
@@ -622,6 +679,87 @@ def _validate_source_credentials(config: Config) -> None:
                 "Set API key in .env or disable Elasticsearch in config.yaml"
             )
 
+    # Sessions requires valid paths that exist and are readable
+    if config.sources.sessions.enabled:
+        sessions_config = config.sources.sessions
+
+        # Check Claude Code path
+        if sessions_config.claude_code_path is not None:
+            claude_path = sessions_config.claude_code_path
+            if not claude_path.is_absolute():
+                errors.append(
+                    f"Sessions Claude Code path must be absolute: {claude_path}. "
+                    "Use Path.home() / '.claude' / 'projects' format in config."
+                )
+            elif not claude_path.exists():
+                errors.append(
+                    f"Sessions Claude Code path does not exist: {claude_path}. "
+                    "Create the directory or disable Sessions in config.yaml"
+                )
+            elif not claude_path.is_dir():
+                errors.append(
+                    f"Sessions Claude Code path is not a directory: {claude_path}"
+                )
+            elif not os.access(claude_path, os.R_OK):
+                errors.append(
+                    f"Sessions Claude Code path is not readable: {claude_path}. "
+                    "Check file permissions."
+                )
+
+        # Check Codex path
+        if sessions_config.codex_path is not None:
+            codex_path = sessions_config.codex_path
+            if not codex_path.is_absolute():
+                errors.append(
+                    f"Sessions Codex path must be absolute: {codex_path}. "
+                    "Use Path.home() / '.codex' / 'sessions' format in config."
+                )
+            elif not codex_path.exists():
+                errors.append(
+                    f"Sessions Codex path does not exist: {codex_path}. "
+                    "Create the directory or disable Sessions in config.yaml"
+                )
+            elif not codex_path.is_dir():
+                errors.append(
+                    f"Sessions Codex path is not a directory: {codex_path}"
+                )
+            elif not os.access(codex_path, os.R_OK):
+                errors.append(
+                    f"Sessions Codex path is not readable: {codex_path}. "
+                    "Check file permissions."
+                )
+
+        # Check Gemini path (optional, future use)
+        if sessions_config.gemini_path is not None:
+            gemini_path = sessions_config.gemini_path
+            if not gemini_path.is_absolute():
+                errors.append(
+                    f"Sessions Gemini path must be absolute: {gemini_path}"
+                )
+            elif not gemini_path.exists():
+                errors.append(
+                    f"Sessions Gemini path does not exist: {gemini_path}. "
+                    "Create the directory or remove gemini_path from config.yaml"
+                )
+            elif not gemini_path.is_dir():
+                errors.append(
+                    f"Sessions Gemini path is not a directory: {gemini_path}"
+                )
+            elif not os.access(gemini_path, os.R_OK):
+                errors.append(
+                    f"Sessions Gemini path is not readable: {gemini_path}. "
+                    "Check file permissions."
+                )
+
+        # Validate at least one path is configured
+        if (sessions_config.claude_code_path is None and
+            sessions_config.codex_path is None and
+            sessions_config.gemini_path is None):
+            errors.append(
+                "Sessions is enabled but no paths are configured. "
+                "Set at least one of claude_code_path, codex_path, or gemini_path in config.yaml"
+            )
+
     if errors:
         error_list = "\n".join(f"  - {e}" for e in errors)
         raise ValueError(
@@ -657,7 +795,7 @@ def _apply_language_filter_to_firecrawl(config: Config) -> None:
     }
 
     # Get allowed languages
-    allowed = set(lang.lower() for lang in config.ingestion.language_filter.allowed_languages)
+    allowed = {lang.lower() for lang in config.ingestion.language_filter.allowed_languages}
 
     # Calculate which languages to exclude
     languages_to_exclude = common_language_paths - allowed

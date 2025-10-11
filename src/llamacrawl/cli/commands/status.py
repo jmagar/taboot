@@ -28,7 +28,10 @@ def status(
         typer.Option(
             "--source",
             "-s",
-            help="Show status for specific source (firecrawl, github, reddit, gmail, elasticsearch)",
+            help=(
+                "Show status for specific source "
+                "(firecrawl, github, reddit, gmail, elasticsearch)"
+            ),
         ),
     ] = None,
     output_format: Annotated[

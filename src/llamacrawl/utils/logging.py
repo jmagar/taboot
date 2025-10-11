@@ -106,10 +106,12 @@ class SensitiveDataFilter(logging.Filter):
         Returns:
             Redacted value or original value if not sensitive
         """
-        if isinstance(value, str):
-            # Redact if string looks like a token/key (long alphanumeric)
-            if len(value) > 20 and value.replace("-", "").replace("_", "").isalnum():
-                return "[REDACTED]"
+        if (
+            isinstance(value, str)
+            and len(value) > 20
+            and value.replace("-", "").replace("_", "").isalnum()
+        ):
+            return "[REDACTED]"
         return value
 
     def _redact_dict(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -168,7 +170,11 @@ class SensitiveDataFilter(logging.Filter):
         return True
 
 
-def setup_logging(log_level: str | None = None, log_format: str | None = None, log_sensitive_data: bool = False) -> None:
+def setup_logging(
+    log_level: str | None = None,
+    log_format: str | None = None,
+    log_sensitive_data: bool = False,
+) -> None:
     """Configure root logger with console output.
 
     Args:

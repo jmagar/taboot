@@ -14,7 +14,7 @@ from .common import run_firecrawl_map
 logger = get_logger(__name__)
 
 
-def map(
+def map_urls(
     ctx: typer.Context,
     url: Annotated[str, typer.Argument(help="Base URL to map")],
     limit: Annotated[

@@ -4,9 +4,8 @@ This module tests the LanguageFilter class which filters document chunks
 by detected language before embedding to save costs and improve quality.
 """
 
-from datetime import UTC, datetime
-
 import logging
+from datetime import UTC, datetime
 
 import pytest
 from llama_index.core.schema import TextNode
@@ -166,7 +165,10 @@ class TestLanguageFilterEdgeCases:
         filter_instance = LanguageFilter(allowed_languages={"en"}, min_content_length=0)
         nodes = [
             TextNode(
-                text=("This is primarily English text with detailed explanations." * 4) + " Quelques mots français.",
+                text=(
+                    ("This is primarily English text with detailed explanations." * 4) +
+                    " Quelques mots français."
+                ),
                 id_="1",
             ),
         ]
@@ -199,7 +201,11 @@ class TestLanguageFilterStatistics:
     def test_statistics_logging(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that filtering statistics are logged."""
         caplog.set_level(logging.INFO, logger="llamacrawl.ingestion.language_filter")
-        filter_instance = LanguageFilter(allowed_languages={"en"}, log_filtered=True, min_content_length=0)
+        filter_instance = LanguageFilter(
+            allowed_languages={"en"},
+            log_filtered=True,
+            min_content_length=0,
+        )
         nodes = [
             TextNode(text="English text about data science.", id_="1"),
             TextNode(text="Texte français sur la science des données.", id_="2"),

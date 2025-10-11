@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Annotated, Any, Iterable
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console

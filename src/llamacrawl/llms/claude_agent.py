@@ -9,11 +9,12 @@ claude-agent-sdk to communicate with Claude Code's backend.
 
 import asyncio
 import threading
+from collections.abc import AsyncGenerator, Callable, Coroutine
 from queue import Queue
-from typing import Any, AsyncGenerator, Callable, Coroutine, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, TextBlock
-from llama_index.core.base.llms.types import ChatMessage, MessageRole, LLMMetadata
+from llama_index.core.base.llms.types import ChatMessage, LLMMetadata, MessageRole
 from llama_index.core.llms import CompletionResponse, CompletionResponseGen, CustomLLM
 from llama_index.core.llms.callbacks import llm_completion_callback
 
@@ -124,8 +125,9 @@ class ClaudeAgentLLM(CustomLLM):
         """Generate async completion without asyncio.run().
 
         This method is called by LlamaIndex's async extractors (e.g., PropertyGraphIndex).
-        Unlike the inherited default that calls complete() → asyncio.run(), this directly
-        awaits the async implementation to avoid "cannot be called from a running event loop" errors.
+        Unlike the inherited default that calls complete() → asyncio.run(), this
+        directly awaits the async implementation to avoid "cannot be called from a
+        running event loop" errors.
 
         Args:
             prompt: Input text prompt
@@ -320,7 +322,10 @@ class ClaudeAgentLLM(CustomLLM):
 
         return "\n\n".join(formatted_parts)
 
-    def _run_coroutine_in_thread(self, coroutine_factory: Callable[[], Coroutine[Any, Any, T]]) -> T:
+    def _run_coroutine_in_thread(
+        self,
+        coroutine_factory: Callable[[], Coroutine[Any, Any, T]],
+    ) -> T:
         """Execute coroutine in a fresh event loop running on a background thread."""
 
         result_queue: Queue[tuple[bool, T | BaseException]] = Queue(maxsize=1)
@@ -336,10 +341,10 @@ class ClaudeAgentLLM(CustomLLM):
             else:
                 result_queue.put((True, result))
             finally:
-                try:
+                from contextlib import suppress
+
+                with suppress(Exception):  # pragma: no cover - best effort cleanup
                     loop.run_until_complete(loop.shutdown_asyncgens())
-                except Exception:  # pragma: no cover - best effort cleanup
-                    pass
                 loop.close()
 
         thread = threading.Thread(target=_runner, daemon=True)

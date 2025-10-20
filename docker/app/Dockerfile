@@ -74,7 +74,11 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 # Copy application code (flat layout, no src/)
 COPY apps ./apps
 COPY packages ./packages
-COPY README.md pyproject.toml ./
+COPY README.md pyproject.toml uv.lock ./
+
+# Install workspace and all dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
 # Create a writable home for SSH mounts (from compose)
 RUN mkdir -p /home/llamacrawl/.ssh && chown -R llamacrawl:llamacrawl /home/llamacrawl
@@ -86,4 +90,4 @@ EXPOSE 8000
 # Healthcheck is handled by docker-compose
 
 # Default command; can be overridden by docker-compose
-CMD ["uvicorn", "llamacrawl.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "apps.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

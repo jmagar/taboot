@@ -172,11 +172,11 @@ services:
       OLLAMA_USE_MMAP: "true"
       OLLAMA_MAX_QUEUE: "20000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/version || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 60s
 
   taboot-playwright:
     <<: *common-base
@@ -187,11 +187,11 @@ services:
     ports:
       - "${PLAYWRIGHT_PORT:-3000}:3000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 20s
 
   taboot-crawler:
     <<: *common-base
@@ -221,6 +221,8 @@ services:
     build:
       context: ./docker/postgres
       dockerfile: Dockerfile
+      args:
+        POSTGRES_DB: ${POSTGRES_DB:-taboot}
     image: taboot/postgres:16
     container_name: taboot-db
     env_file:
@@ -250,7 +252,7 @@ services:
       - .:/app
       - ~/.ssh:/home/llamacrawl/.ssh:ro
       - ~/.ssh/config:/home/llamacrawl/.ssh/config:ro
-    command: ["uvicorn", "llamacrawl.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "apps.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "${LLAMACRAWL_HTTP_PORT:-8000}:8000"
     depends_on:
@@ -290,7 +292,15 @@ services:
         condition: service_healthy
       taboot-rerank:
         condition: service_healthy
+      taboot-db:
+        condition: service_healthy
     command: ["uv", "run", "apps/cli", "worker", "start"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'apps/cli worker start' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   taboot-embed:

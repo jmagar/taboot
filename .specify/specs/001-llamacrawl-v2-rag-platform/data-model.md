@@ -15,6 +15,18 @@ This document defines all entities, relationships, state transitions, and valida
 
 ---
 
+## Terminology
+
+To clarify the relationship between commonly-used terms:
+
+- **Job**: A Firecrawl async crawl task. Jobs represent the low-level web scraping operations managed by the Firecrawl service. Each job has states (queued, running, succeeded, failed) and is tracked in PostgreSQL by Firecrawl. Jobs are created when Firecrawl begins crawling a URL or set of URLs.
+
+- **Ingestion**: A higher-level user-initiated operation that may spawn multiple jobs. An ingestion represents the complete process of bringing external content into LlamaCrawl (crawl → normalize → chunk → embed → store). A single ingestion operation (e.g., `taboot ingest web https://docs.example.com`) may create multiple Firecrawl jobs if the site has many pages.
+
+- **Relationship**: Ingestions are 1:N with Jobs (one ingestion may spawn multiple Firecrawl jobs). The API exposes both `/jobs` endpoints (for Firecrawl job status) and `/ingestions` endpoints (for user-facing ingestion operations).
+
+---
+
 ## Neo4j Graph Model
 
 ### Node Types (11 Total)

@@ -48,7 +48,7 @@ User ingests technical documentation from a single web URL, normalizes it, chunk
 
 1. **Given** a web URL containing technical documentation, **When** user runs `taboot ingest web <URL>`, **Then** Firecrawl crawls the URL, content is normalized (HTML → Markdown, boilerplate removed), and status is recorded.
 2. **Given** normalized content from step 1, **When** chunker processes it, **Then** semantic chunks (≤512 tokens) are created with metadata (source URL, section, chunk_id).
-3. **Given** chunks from step 2, **When** TEI embedding service processes them, **Then** vectors (768-dim) are generated and upserted to Qdrant collection with payload metadata.
+3. **Given** chunks from step 2, **When** TEI embedding service processes them, **Then** vectors (1024-dim) are generated and upserted to Qdrant collection with payload metadata.
 4. **Given** chunks in Qdrant, **When** Neo4j writer processes them, **Then** Doc node is created with `doc_id`, and MENTIONS relationships link doc to metadata nodes (Section, Hash).
 5. **Given** ingestion completes, **When** user queries `taboot query "example query"`, **Then** results include chunks from the ingested document.
 
@@ -114,9 +114,9 @@ User queries the system and receives results ranked by relevance using vector si
 
 **Acceptance Scenarios**:
 
-1. **Given** user query "Which services expose port 8080?", **When** system embeds query with TEI, **Then** query vector is 768-dim and ready for Qdrant search.
+1. **Given** user query "Which services expose port 8080?", **When** system embeds query with TEI, **Then** query vector is 1024-dim and ready for Qdrant search.
 2. **Given** query vector, **When** Qdrant searches with metadata filter (e.g., source="Docker Compose"), **Then** top-k (default 100) chunks are returned with similarity scores.
-3. **Given** top-k chunks, **When** reranker (BAAI/bge-reranker-v2-m3) rescores them with BAAI model, **Then** top-5 are semantically more relevant than raw vector order.
+3. **Given** top-k chunks, **When** reranker (Qwen/Qwen3-Reranker-0.6B) rescores them, **Then** top-5 are semantically more relevant than raw vector order.
 4. **Given** reranked results, **When** Neo4j graph traversal explores ≤2 hops from result nodes, **Then** related context nodes (dependencies, bindings) are discovered.
 
 ---
@@ -187,11 +187,11 @@ System exports metrics (throughput, latency, cache hit-rate, F1 scores) and vali
 
 ### Edge Cases
 
-- What happens when a web page has no body content (boilerplate-only HTML)?
+- **What happens when a web page has no body content (boilerplate-only HTML)?** Accept Firecrawl's judgment. If Firecrawl returns content (even minimal), attempt ingestion. If Firecrawl signals empty/error, log the URL as unprocessable with reason and skip. Increment `skipped_docs` metric for observability.
 - What happens when chunker encounters a token-counting discrepancy (estimated ≠ actual)?
-- How does system handle Tier C LLM timeout or malformed JSON output?
-- What happens when Neo4j constraint violation occurs (duplicate Service.name)?
-- How does reranker handle very short queries (<3 tokens)?
+- **How does system handle Tier C LLM timeout or malformed JSON output?** Mark window as failed with error details (timeout duration, JSON parse error), add to DLQ (dead-letter queue) in Redis sorted set with timestamp and doc_id, continue processing remaining windows in batch. Operators can query DLQ via `taboot status dlq` and selectively retry failed windows. Prevents single window failure from blocking entire document extraction.
+- **What happens when Neo4j constraint violation occurs (duplicate Service.name)?** MERGE nodes idempotently using Cypher MERGE clause. If node exists, update properties with new values (if changed), preserve existing values (if unchanged). Add `updated_at` timestamp for observability. Enables multi-source enrichment: e.g., Service discovered in Docker Compose can be enriched with version info from docs. Last-write-wins for conflicting property values.
+- **How does reranker handle very short queries (<3 tokens)?** Skip reranking entirely; return vector search results directly. Reranking cross-encoders require semantic context to meaningfully compare relevance. For queries like "redis", "port 80", vector similarity is sufficient and faster. Threshold configurable via `MIN_RERANK_TOKENS` env var (default: 3). Log skipped reranking events for observability.
 - What happens when embeddings service is slow; does ingestion queue back up?
 - How does system recover from partial extraction failure (some windows succeed, some fail)?
 - What happens when a source is revoked (e.g., GitHub token expires)?
@@ -211,11 +211,11 @@ System exports metrics (throughput, latency, cache hit-rate, F1 scores) and vali
 
 **Extraction Plane (Async, Decoupled)**
 
-- **FR-009**: System MUST buffer all extracted triples (Tier A/B/C output) in Redis during batch processing with TTL-based auto-cleanup. DLQ pattern via Redis sorted sets tracks failed windows for manual retry or reprocessing.
+- **FR-009**: System MUST buffer all extracted triples (Tier A/B/C output) in Redis during batch processing with 24-hour TTL-based auto-cleanup. DLQ pattern via Redis sorted sets tracks failed windows for manual retry or reprocessing.
 - **FR-010**: System MUST implement Tier A extraction (regex, JSON/YAML parsing, Aho-Corasick dictionaries) for deterministic triple extraction ≥50 pages/sec (CPU).
 - **FR-011**: System MUST implement Tier B extraction (spaCy entity_ruler, dependency matchers, sentence classifier) for entity recognition and window selection ≥200 sentences/sec (en_core_web_md) or ≥40 (trf).
 - **FR-012**: System MUST implement Tier C extraction (Qwen3-4B-Instruct via Ollama) with ≤512-token windows, temperature=0, JSON schema enforcement, batched 8–16, median ≤250ms/window.
-- **FR-013**: System MUST cache Tier C LLM requests by SHA-256 window hash in Redis with configurable TTL to avoid duplicate calls.
+- **FR-013**: System MUST cache Tier C LLM requests by SHA-256 window hash in Redis with 24-hour TTL to avoid duplicate calls.
 - **FR-014**: System MUST extract deterministic triples (subject, predicate, object) from text, buffer them in Redis during batch processing with configurable TTL, and atomically commit batches to Neo4j. Enables recovery from partial failures, dead-letter queue (DLQ) pattern for failed windows, and observability of pending extractions.
 - **FR-015**: System MUST handle service failures by failing fast with clear error reporting. If external service (Firecrawl, TEI, Neo4j, Ollama, Qdrant) fails during ingestion/extraction, stop immediately, log the failure, and require manual intervention to restart. No silent partial data or fallback modes. Aligns with pre-production error-early culture.
 
@@ -233,7 +233,7 @@ System exports metrics (throughput, latency, cache hit-rate, F1 scores) and vali
 - **FR-030**: System MUST embed user queries using TEI to match chunk vectors.
 - **FR-031**: System MUST filter retrieval results by metadata (source, date, tags) before vector search.
 - **FR-032**: System MUST search Qdrant for top-k (default 100) similar chunks using HNSW indexing.
-- **FR-033**: System MUST rerank top-k results using BAAI/bge-reranker-v2-m3 to improve precision.
+- **FR-033**: System MUST rerank top-k results using Qwen/Qwen3-Reranker-0.6B to improve precision, except for queries <3 tokens (configurable via MIN_RERANK_TOKENS) where vector results are returned directly.
 - **FR-034**: System MUST traverse Neo4j graph (≤2 hops) from result nodes to discover related context (dependencies, relationships).
 - **FR-035**: System MUST generate natural-language answers using Qwen3-4B with inline numeric citations `[1]`, `[2]`, etc.
 - **FR-036**: System MUST build and return source bibliography with document ID, section, URL, and chunk hash for verification.
@@ -261,12 +261,14 @@ System exports metrics (throughput, latency, cache hit-rate, F1 scores) and vali
 - **FR-061**: System MUST fail CI if F1 drops ≥2 points from baseline.
 - **FR-062**: System MUST provide unit tests for all adapters with ≥85% coverage in packages/core.
 - **FR-063**: System MUST provide integration tests for end-to-end pipelines (ingest → extract → query).
+- **FR-064**: System MUST implement unit tests before implementation code following TDD Red-Green-Refactor cycle (write failing test, write minimal passing code, refactor).
+- **FR-065**: System MUST achieve ≥85% test coverage in packages/core and extraction logic before merging to main branch.
 
 ### Key Entities
 
 - **Document**: Represents a single ingested source (web URL, GitHub repo, Reddit thread, etc.). Attributes: `doc_id` (PK), `source_type`, `url`, `title`, `ingested_at`, `updated_at`, `retention_policy`.
 
-- **Chunk**: Semantic segment of a document. Attributes: `chunk_id` (PK), `doc_id`, `text`, `token_count`, `section`, `chunk_hash`, `embedding` (768-dim vector in Qdrant).
+- **Chunk**: Semantic segment of a document. Attributes: `chunk_id` (PK), `doc_id`, `text`, `token_count`, `section`, `chunk_hash`, `embedding` (1024-dim vector in Qdrant).
 
 - **Triple**: Extracted fact (subject, predicate, object). Attributes: `triple_id` (PK), `chunk_id`, `subject`, `predicate`, `object`, `confidence`, `tier` (A/B/C), `span`.
 
@@ -290,8 +292,8 @@ System exports metrics (throughput, latency, cache hit-rate, F1 scores) and vali
 - **SC-004**: Tier B extraction processes text at ≥200 sentences/sec (en_core_web_md model) or ≥40 sentences/sec (transformer model).
 - **SC-005**: Tier C extraction window processing median ≤250ms, p95 ≤750ms, with batch size 8–16 on RTX 4070.
 - **SC-006**: Neo4j bulk writes achieve ≥20,000 edges/minute with 2k-row UNWIND batches.
-- **SC-007**: Qdrant vector upserts achieve ≥5,000 vectors/second (768-dim, HNSW indexing).
-- **SC-008**: Extraction precision/recall/F1 ≥0.80 on ~300 labeled windows, with precision-first optimization (target precision ≥0.85, recall ≥0.75). False triples in infrastructure graphs are operationally dangerous; minimize false positives over missed facts.
+- **SC-007**: Qdrant vector upserts achieve ≥5,000 vectors/second (1024-dim, HNSW indexing).
+- **SC-008**: Extraction precision/recall/F1 ≥0.80 on ~300 labeled windows, with precision-first optimization (target precision ≥0.85, recall ≥0.75). False triples in infrastructure graphs are operationally dangerous; minimize false positives over missed facts. **Note:** F1 ≥0.80 is MVP target; production readiness requires F1 ≥0.90 per constitution.
 - **SC-009**: User query retrieval completes in <3 seconds (embedding + vector search + rerank + graph traversal + synthesis).
 - **SC-010**: Inline citations in synthesis responses are accurate; 100% of cited sources are correct and relevant.
 - **SC-011**: System supports end-to-end ingestion from 11+ sources (web, GitHub, Reddit, YouTube, Gmail, Elasticsearch, Docker Compose, SWAG, Tailscale, Unifi, AI sessions).
@@ -305,8 +307,8 @@ System exports metrics (throughput, latency, cache hit-rate, F1 scores) and vali
 ## Assumptions
 
 - **LLM Model**: Qwen3-4B-Instruct via Ollama is the initial model; others can be swapped by changing config/env vars.
-- **Embedding Model**: TEI-served BGE/e5/EmbeddingGemma-class (768-dim) is baseline; other models supported with config change.
-- **Reranker Model**: BAAI/bge-reranker-v2-m3 is baseline; alternative rerankers can be plugged in.
+- **Embedding Model**: TEI-served Qwen3-Embedding-0.6B (1024-dim) is baseline; other models supported with config change.
+- **Reranker Model**: Qwen/Qwen3-Reranker-0.6B is baseline; alternative rerankers can be plugged in.
 - **spaCy Model**: en_core_web_md is baseline for Tier B; en_core_web_trf available for higher accuracy at cost of speed.
 - **Graph Traversal Depth**: ≤2 hops is sufficient for most queries; deeper traversal adds noise and latency.
 - **Extraction Quality Gate**: F1 ≥0.80 is acceptable baseline; can be tuned per deployment.
@@ -337,4 +339,9 @@ System exports metrics (throughput, latency, cache hit-rate, F1 scores) and vali
 - Q: Extraction output lifecycle (FR-014) — where do triples live during processing? → A: Redis with TTL. Enables DLQ pattern, partial failure recovery, observability of pending extractions. Atomic Neo4j batch commits prevent partially-committed data.
 - Q: External service failure strategy (FR-015)? → A: Fail fast with clear error. Stop ingestion immediately if any external service fails; require manual restart. No fallback modes or silent partial data. Aligns with pre-production error-early culture.
 - Q: Extraction quality trade-off — precision vs recall (SC-008)? → A: Precision-first (target precision ≥0.85, recall ≥0.75). False triples in infrastructure graphs are operationally dangerous; minimize false positives over missed facts.
+- Q: Redis buffering TTL duration for extraction triples (FR-009)? → A: 24 hours. Balances memory efficiency with reasonable failure recovery window for batch reprocessing within business day.
+- Q: Handling web pages with no body content (boilerplate-only HTML)? → A: Accept Firecrawl's judgment. If it returns content, ingest it; if it returns empty/error, log URL as unprocessable and skip. Delegates boilerplate filtering to specialized crawler.
+- Q: Handling Tier C LLM timeout or malformed JSON output? → A: Mark window as failed, add to DLQ (dead-letter queue) in Redis with error details, continue processing other windows. Enables batch resilience while preserving fail-fast culture. Operators can inspect/retry DLQ manually.
+- Q: Handling Neo4j constraint violations (duplicate Service.name)? → A: MERGE nodes idempotently. Update properties if changed, preserve existing if unchanged. Enables multi-source enrichment without duplication. Last-write-wins with timestamp tracking for observability.
+- Q: Handling very short queries (<3 tokens) for reranking? → A: Skip reranking, return vector search results directly. Reranking models need semantic context; short queries perform adequately with vector similarity alone. Saves GPU cycles. Threshold configurable via MIN_RERANK_TOKENS env var.
 

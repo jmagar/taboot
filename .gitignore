@@ -82,6 +82,7 @@ credentials.json
 token.json
 *.key
 *.pem
+.mcp.json
 
 # --------------------------------------------
 # Logs & temp data

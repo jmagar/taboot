@@ -49,12 +49,16 @@ RUN python -m spacy download en_core_web_md
 # Copy application code
 COPY apps ./apps
 COPY packages ./packages
-COPY README.md pyproject.toml ./
+COPY README.md pyproject.toml uv.lock ./
+
+# Install workspace and all dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
 # Non-root user
 RUN useradd -m -u 10002 taboot && chown -R taboot:taboot /app
 
 USER taboot
 
-CMD ["uv", "run", "apps/cli", "worker", "start"]
+CMD ["python", "-m", "apps.cli", "worker", "start"]
 

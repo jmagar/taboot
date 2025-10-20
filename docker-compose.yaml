@@ -273,34 +273,38 @@ services:
       retries: 3
       start_period: 20s
 
-  taboot-worker:
-    <<: *common-base
-    build:
-      context: .
-      dockerfile: docker/worker/Dockerfile
-    container_name: taboot-worker
-    env_file:
-      - .env
-    depends_on:
-      taboot-cache:
-        condition: service_healthy
-      taboot-vectors:
-        condition: service_healthy
-      taboot-graph:
-        condition: service_healthy
-      taboot-embed:
-        condition: service_healthy
-      taboot-rerank:
-        condition: service_healthy
-      taboot-db:
-        condition: service_healthy
-    command: ["uv", "run", "apps/cli", "worker", "start"]
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'apps/cli worker start' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+  # taboot-worker: Extraction worker (spaCy Tier B + LLM Tier C)
+  # Disabled until extraction pipeline implementation is complete
+  # To enable, uncomment below and implement packages/extraction/ services
+  #
+  # taboot-worker:
+  #   <<: *common-base
+  #   build:
+  #     context: .
+  #     dockerfile: docker/worker/Dockerfile
+  #   container_name: taboot-worker
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     taboot-cache:
+  #       condition: service_healthy
+  #     taboot-vectors:
+  #       condition: service_healthy
+  #     taboot-graph:
+  #       condition: service_healthy
+  #     taboot-embed:
+  #       condition: service_healthy
+  #     taboot-rerank:
+  #       condition: service_healthy
+  #     taboot-db:
+  #       condition: service_healthy
+  #   command: ["python", "-m", "packages.extraction.worker"]
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pgrep -f 'extraction.worker' || exit 1"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
 
 volumes:
   taboot-embed:

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "taboot-vector"
+version = "0.4.0"
+description = "Taboot Qdrant client, hybrid search, reranking"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Jacob Magar", email = "jmagar@gmail.com" }]
+license = { text = "Proprietary" }
+
+dependencies = [
+  "qdrant-client>=1.15.1",
+  "pydantic>=2.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4.2",
+  "pytest-asyncio>=1.2.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["taboot_vector"]

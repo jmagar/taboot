@@ -1,0 +1,857 @@
+{
+  "_comment": "Extraction Tier Output Schemas for LlamaCrawl v2",
+  "_feature": "001-llamacrawl-v2-rag-platform",
+  "_date": "2025-10-20",
+  "_version": "2.0.0",
+  "_tiers": 3,
+  "_description": "JSON schemas for deterministic extraction (Tier A), spaCy NLP (Tier B), and LLM windows (Tier C)",
+
+  "tier_a": {
+    "_description": "Tier A: Deterministic extraction via regex, JSON/YAML parsing, Aho-Corasick dictionaries",
+    "_performance_target": "≥50 pages/sec (CPU-bound)",
+    "_determinism": "byte-identical outputs for same input + extractor version",
+
+    "output_schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": ["entities", "relations", "provenance", "extractor_version"],
+      "additionalProperties": false,
+      "properties": {
+        "entities": {
+          "type": "array",
+          "description": "Extracted entities (nodes)",
+          "items": {
+            "type": "object",
+            "required": ["type", "name", "props"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Service",
+                  "Host",
+                  "IP",
+                  "ReverseProxy",
+                  "Endpoint",
+                  "Network",
+                  "Container",
+                  "Image",
+                  "VPNTunnel",
+                  "TailscaleNode"
+                ],
+                "description": "Entity type (Neo4j node label)"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Entity identifier (primary key)"
+              },
+              "props": {
+                "type": "object",
+                "description": "Entity properties (varies by type)",
+                "examples": [
+                  {"version": "1.25", "port": 80, "protocol": "http"}
+                ]
+              }
+            }
+          }
+        },
+        "relations": {
+          "type": "array",
+          "description": "Extracted relationships (edges)",
+          "items": {
+            "type": "object",
+            "required": ["type", "src", "dst", "props"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "DEPENDS_ON",
+                  "ROUTES_TO",
+                  "BINDS",
+                  "RUNS",
+                  "EXPOSES_ENDPOINT",
+                  "CONNECTS_TO",
+                  "RESOLVES_TO",
+                  "RUNS_IN",
+                  "BUILDS",
+                  "USES_VPN"
+                ],
+                "description": "Relationship type"
+              },
+              "src": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Source entity name"
+              },
+              "dst": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Target entity name"
+              },
+              "props": {
+                "type": "object",
+                "description": "Relationship properties",
+                "examples": [
+                  {"port": 5432, "protocol": "tcp", "confidence": 1.0}
+                ]
+              }
+            }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "required": ["docId", "source", "extractionMethod"],
+          "additionalProperties": false,
+          "properties": {
+            "docId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "description": "Source document UUID"
+            },
+            "section": {
+              "type": "string",
+              "description": "Document section (e.g., 'services', 'networks')"
+            },
+            "span": {
+              "type": "array",
+              "items": {"type": "integer", "minimum": 0},
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "Character offsets [start, end] in document"
+            },
+            "source": {
+              "type": "string",
+              "enum": ["tier_a"],
+              "description": "Extraction tier (always tier_a for deterministic)"
+            },
+            "extractionMethod": {
+              "type": "string",
+              "description": "Specific parser used",
+              "examples": [
+                "docker_compose_parser",
+                "swag_config_parser",
+                "tailscale_status_parser",
+                "yaml_depends_on_regex",
+                "aho_corasick_service_names"
+              ]
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0,
+              "description": "Confidence score (1.0 for deterministic parsers)"
+            }
+          }
+        },
+        "extractor_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Semantic version of extractor (for cache invalidation)"
+        }
+      }
+    },
+
+    "example": {
+      "entities": [
+        {
+          "type": "Service",
+          "name": "nginx",
+          "props": {
+            "version": "1.25",
+            "protocol": "http",
+            "port": 80
+          }
+        },
+        {
+          "type": "Service",
+          "name": "postgres",
+          "props": {
+            "version": "15.4",
+            "protocol": "postgres",
+            "port": 5432
+          }
+        },
+        {
+          "type": "Host",
+          "name": "web01.example.com",
+          "props": {
+            "ip": "192.168.1.10",
+            "osType": "linux"
+          }
+        }
+      ],
+      "relations": [
+        {
+          "type": "DEPENDS_ON",
+          "src": "nginx",
+          "dst": "postgres",
+          "props": {
+            "confidence": 1.0
+          }
+        },
+        {
+          "type": "BINDS",
+          "src": "nginx",
+          "dst": "web01.example.com",
+          "props": {
+            "port": 80,
+            "protocol": "tcp",
+            "confidence": 1.0
+          }
+        }
+      ],
+      "provenance": {
+        "docId": "550e8400-e29b-41d4-a716-446655440000",
+        "section": "services",
+        "span": [0, 450],
+        "source": "tier_a",
+        "extractionMethod": "docker_compose_parser",
+        "confidence": 1.0
+      },
+      "extractor_version": "1.0.0"
+    },
+
+    "parsers": {
+      "docker_compose_parser": {
+        "description": "Parse Docker Compose YAML for services, dependencies, ports, networks",
+        "input_format": "YAML",
+        "determinism": "byte-identical",
+        "confidence": 1.0
+      },
+      "swag_config_parser": {
+        "description": "Parse SWAG reverse proxy configs for routes, TLS, backends",
+        "input_format": "NGINX config files",
+        "determinism": "byte-identical",
+        "confidence": 1.0
+      },
+      "tailscale_status_parser": {
+        "description": "Parse Tailscale status JSON for nodes, IPs, tunnels",
+        "input_format": "JSON",
+        "determinism": "byte-identical",
+        "confidence": 1.0
+      },
+      "unifi_config_parser": {
+        "description": "Parse UniFi configs for networks, devices, firewall rules",
+        "input_format": "JSON",
+        "determinism": "byte-identical",
+        "confidence": 1.0
+      },
+      "aho_corasick_service_names": {
+        "description": "Multi-pattern string matching for known service names (nginx, postgres, redis, etc.)",
+        "input_format": "Plain text",
+        "determinism": "byte-identical",
+        "confidence": 0.95
+      }
+    }
+  },
+
+  "tier_b": {
+    "_description": "Tier B: spaCy NLP extraction with entity_ruler, dependency matchers, sentence classifier",
+    "_performance_target": "≥200 sentences/sec (en_core_web_md model)",
+    "_model": "en_core_web_md or en_core_web_trf (transformer)",
+
+    "output_schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": ["entities", "relations", "windows", "provenance", "extractor_version"],
+      "additionalProperties": false,
+      "properties": {
+        "entities": {
+          "type": "array",
+          "description": "Extracted entities from spaCy NER + entity_ruler",
+          "items": {
+            "type": "object",
+            "required": ["type", "name", "span", "confidence"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Service",
+                  "Host",
+                  "IP",
+                  "ReverseProxy",
+                  "Endpoint",
+                  "Network",
+                  "Container"
+                ],
+                "description": "Entity type"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Entity text"
+              },
+              "span": {
+                "type": "array",
+                "items": {"type": "integer", "minimum": 0},
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "Character offsets [start, end] in sentence"
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "description": "Confidence from entity_ruler pattern match or NER model"
+              }
+            }
+          }
+        },
+        "relations": {
+          "type": "array",
+          "description": "Extracted relationships from dependency matcher",
+          "items": {
+            "type": "object",
+            "required": ["type", "src", "dst", "span", "confidence"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "DEPENDS_ON",
+                  "ROUTES_TO",
+                  "BINDS",
+                  "EXPOSES_ENDPOINT",
+                  "CONNECTS_TO"
+                ],
+                "description": "Relationship type"
+              },
+              "src": {
+                "type": "string",
+                "description": "Source entity name"
+              },
+              "dst": {
+                "type": "string",
+                "description": "Target entity name"
+              },
+              "span": {
+                "type": "array",
+                "items": {"type": "integer"},
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "Span covering entire relationship mention"
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "description": "Confidence from dependency pattern match"
+              }
+            }
+          }
+        },
+        "windows": {
+          "type": "array",
+          "description": "Selected text windows for Tier C LLM processing (≤512 tokens)",
+          "items": {
+            "type": "object",
+            "required": ["text", "span", "token_count", "relevance_score"],
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Window text"
+              },
+              "span": {
+                "type": "array",
+                "items": {"type": "integer"},
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "Character offsets in document"
+              },
+              "token_count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 512,
+                "description": "Token count (must be ≤512 for Tier C)"
+              },
+              "relevance_score": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "description": "Relevance score from sentence classifier"
+              }
+            }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "required": ["docId", "source", "extractionMethod"],
+          "properties": {
+            "docId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "section": {"type": "string"},
+            "source": {
+              "type": "string",
+              "enum": ["tier_b"]
+            },
+            "extractionMethod": {
+              "type": "string",
+              "examples": [
+                "spacy_entity_ruler",
+                "spacy_dependency_matcher",
+                "spacy_sentence_classifier"
+              ]
+            },
+            "model": {
+              "type": "string",
+              "enum": ["en_core_web_md", "en_core_web_trf"],
+              "description": "spaCy model used"
+            }
+          }
+        },
+        "extractor_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        }
+      }
+    },
+
+    "example": {
+      "entities": [
+        {
+          "type": "Service",
+          "name": "nginx",
+          "span": [45, 50],
+          "confidence": 0.95
+        },
+        {
+          "type": "Service",
+          "name": "postgres",
+          "span": [82, 90],
+          "confidence": 0.92
+        },
+        {
+          "type": "IP",
+          "name": "192.168.1.10",
+          "span": [120, 132],
+          "confidence": 1.0
+        }
+      ],
+      "relations": [
+        {
+          "type": "DEPENDS_ON",
+          "src": "nginx",
+          "dst": "postgres",
+          "span": [45, 90],
+          "confidence": 0.85
+        }
+      ],
+      "windows": [
+        {
+          "text": "The nginx service depends on postgres for session storage. It listens on port 80 and routes traffic to backend services.",
+          "span": [0, 122],
+          "token_count": 25,
+          "relevance_score": 0.92
+        }
+      ],
+      "provenance": {
+        "docId": "550e8400-e29b-41d4-a716-446655440000",
+        "section": "Architecture",
+        "source": "tier_b",
+        "extractionMethod": "spacy_dependency_matcher",
+        "model": "en_core_web_md"
+      },
+      "extractor_version": "1.0.0"
+    },
+
+    "patterns": {
+      "entity_ruler_patterns": [
+        {
+          "label": "Service",
+          "pattern": [
+            {"LOWER": {"IN": ["nginx", "postgres", "redis", "traefik", "mysql"]}},
+            {"IS_SPACE": true, "OP": "?"},
+            {"LOWER": "service", "OP": "?"}
+          ]
+        },
+        {
+          "label": "IP",
+          "pattern": [
+            {"TEXT": {"REGEX": "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$"}}
+          ]
+        },
+        {
+          "label": "Host",
+          "pattern": [
+            {"TEXT": {"REGEX": "^[a-z0-9][a-z0-9.-]+\\.[a-z]{2,}$"}}
+          ]
+        }
+      ],
+      "dependency_matcher_patterns": [
+        {
+          "relation_type": "DEPENDS_ON",
+          "pattern": [
+            {"RIGHT_ID": "subject", "RIGHT_ATTRS": {"ENT_TYPE": "Service"}},
+            {"LEFT_ID": "subject", "REL_OP": ">", "RIGHT_ID": "verb", "RIGHT_ATTRS": {"LEMMA": "depend"}},
+            {"LEFT_ID": "verb", "REL_OP": ">", "RIGHT_ID": "object", "RIGHT_ATTRS": {"ENT_TYPE": "Service"}}
+          ]
+        },
+        {
+          "relation_type": "BINDS",
+          "pattern": [
+            {"RIGHT_ID": "service", "RIGHT_ATTRS": {"ENT_TYPE": "Service"}},
+            {"LEFT_ID": "service", "REL_OP": ">", "RIGHT_ID": "verb", "RIGHT_ATTRS": {"LEMMA": {"IN": ["listen", "bind", "expose"]}}},
+            {"LEFT_ID": "verb", "REL_OP": ">", "RIGHT_ID": "port", "RIGHT_ATTRS": {"LIKE_NUM": true}}
+          ]
+        }
+      ],
+      "sentence_classifier_rules": [
+        {
+          "description": "Sentences mentioning services and relationships",
+          "pattern": "contains 2+ service entities OR contains dependency/routing verbs",
+          "relevance_threshold": 0.80
+        },
+        {
+          "description": "Sentences with IP addresses and ports",
+          "pattern": "contains IP entity AND numeric token (port)",
+          "relevance_threshold": 0.85
+        },
+        {
+          "description": "Configuration sentences",
+          "pattern": "contains keywords: [config, configuration, setting, parameter]",
+          "relevance_threshold": 0.75
+        }
+      ]
+    }
+  },
+
+  "tier_c": {
+    "_description": "Tier C: LLM-powered window extraction with JSON schema enforcement",
+    "_performance_target": "≤250ms/window median, p95 ≤750ms (batched 8-16)",
+    "_model": "Qwen3-4B-Instruct via Ollama",
+    "_temperature": 0.0,
+    "_max_tokens": 512,
+
+    "output_schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": ["entities", "relations", "provenance", "extractor_version"],
+      "additionalProperties": false,
+      "properties": {
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "name", "props"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Service",
+                  "Host",
+                  "IP",
+                  "ReverseProxy",
+                  "Endpoint",
+                  "Network",
+                  "Container",
+                  "Image",
+                  "VPNTunnel",
+                  "TailscaleNode"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "props": {
+                "type": "object",
+                "description": "Additional properties extracted from context"
+              }
+            }
+          }
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "src", "dst", "props"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "DEPENDS_ON",
+                  "ROUTES_TO",
+                  "BINDS",
+                  "RUNS",
+                  "EXPOSES_ENDPOINT",
+                  "CONNECTS_TO",
+                  "RESOLVES_TO",
+                  "RUNS_IN",
+                  "BUILDS",
+                  "USES_VPN"
+                ]
+              },
+              "src": {"type": "string", "minLength": 1},
+              "dst": {"type": "string", "minLength": 1},
+              "props": {
+                "type": "object",
+                "description": "Relationship properties (e.g., port, protocol, confidence)"
+              }
+            }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "required": ["docId", "source", "extractionMethod", "windowHash"],
+          "properties": {
+            "docId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "section": {"type": "string"},
+            "span": {
+              "type": "array",
+              "items": {"type": "integer"},
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "source": {
+              "type": "string",
+              "enum": ["tier_c"]
+            },
+            "extractionMethod": {
+              "type": "string",
+              "enum": ["llm_window_qwen3_4b"]
+            },
+            "windowHash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "description": "SHA-256 hash of window text (for Redis caching)"
+            },
+            "cached": {
+              "type": "boolean",
+              "description": "True if result was cached, false if LLM was called"
+            },
+            "latency_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "LLM call latency in milliseconds"
+            }
+          }
+        },
+        "extractor_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        }
+      }
+    },
+
+    "example": {
+      "entities": [
+        {
+          "type": "Service",
+          "name": "api-gateway",
+          "props": {
+            "description": "Main API gateway service",
+            "framework": "FastAPI"
+          }
+        },
+        {
+          "type": "Service",
+          "name": "postgres",
+          "props": {
+            "version": "15.4",
+            "database": "production"
+          }
+        },
+        {
+          "type": "Endpoint",
+          "name": "https://api.example.com/v1/users",
+          "props": {
+            "method": "GET",
+            "auth": "bearer"
+          }
+        }
+      ],
+      "relations": [
+        {
+          "type": "DEPENDS_ON",
+          "src": "api-gateway",
+          "dst": "postgres",
+          "props": {
+            "confidence": 0.92,
+            "reason": "mentions database connection"
+          }
+        },
+        {
+          "type": "EXPOSES_ENDPOINT",
+          "src": "api-gateway",
+          "dst": "https://api.example.com/v1/users",
+          "props": {
+            "confidence": 0.95
+          }
+        }
+      ],
+      "provenance": {
+        "docId": "550e8400-e29b-41d4-a716-446655440000",
+        "section": "API Architecture",
+        "span": [450, 920],
+        "source": "tier_c",
+        "extractionMethod": "llm_window_qwen3_4b",
+        "windowHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "cached": false,
+        "latency_ms": 245
+      },
+      "extractor_version": "1.0.0"
+    },
+
+    "prompt_template": {
+      "description": "Few-shot prompt template for LLM extraction",
+      "system_message": "You are a technical documentation analyst. Extract entities and relationships from infrastructure documentation. Output valid JSON matching the schema.",
+      "user_message_template": [
+        "Extract infrastructure entities and relationships from this text:",
+        "",
+        "TEXT:",
+        "{{window_text}}",
+        "",
+        "INSTRUCTIONS:",
+        "1. Identify entities: services, hosts, IPs, endpoints, networks, containers",
+        "2. Identify relationships: dependencies, routes, bindings, connections",
+        "3. Include confidence scores (0.0-1.0) based on clarity of mention",
+        "4. Output valid JSON matching the schema",
+        "",
+        "SCHEMA:",
+        "{{json_schema}}",
+        "",
+        "OUTPUT (valid JSON only):"
+      ],
+      "few_shot_examples": [
+        {
+          "input": "The nginx service depends on postgres for session storage. It listens on port 80.",
+          "output": {
+            "entities": [
+              {"type": "Service", "name": "nginx", "props": {"port": 80}},
+              {"type": "Service", "name": "postgres", "props": {}}
+            ],
+            "relations": [
+              {"type": "DEPENDS_ON", "src": "nginx", "dst": "postgres", "props": {"confidence": 0.95}}
+            ]
+          }
+        },
+        {
+          "input": "Traefik routes requests to https://api.example.com/v1 to the backend API service.",
+          "output": {
+            "entities": [
+              {"type": "ReverseProxy", "name": "Traefik", "props": {}},
+              {"type": "Endpoint", "name": "https://api.example.com/v1", "props": {"scheme": "https"}},
+              {"type": "Service", "name": "backend API", "props": {}}
+            ],
+            "relations": [
+              {"type": "ROUTES_TO", "src": "Traefik", "dst": "backend API", "props": {"path": "/v1", "tls": true, "confidence": 0.90}}
+            ]
+          }
+        }
+      ]
+    },
+
+    "caching_strategy": {
+      "description": "Redis caching by window hash to avoid duplicate LLM calls",
+      "cache_key_pattern": "extraction:tier_c:{{window_hash}}:{{extractor_version}}",
+      "ttl_days": 7,
+      "invalidation": "Cache invalidated when extractor_version changes",
+      "hit_rate_target": "≥60% after warmup"
+    },
+
+    "batching_strategy": {
+      "batch_size": 8,
+      "max_batch_size": 16,
+      "description": "Group windows into batches for parallel LLM inference via Ollama OLLAMA_NUM_PARALLEL=8"
+    },
+
+    "error_handling": {
+      "malformed_json": {
+        "action": "Add to DLQ for retry (max 3 attempts)",
+        "retry_delay": "1s, 5s, 25s (exponential backoff)"
+      },
+      "schema_validation_failure": {
+        "action": "Log error, add to DLQ, mark as permanently failed after 3 retries"
+      },
+      "low_confidence": {
+        "threshold": 0.70,
+        "action": "Filter out extractions with confidence <0.70"
+      },
+      "token_limit_exceeded": {
+        "action": "Truncate window to 512 tokens, log warning"
+      }
+    }
+  },
+
+  "tier_comparison": {
+    "_comment": "Performance and accuracy comparison across tiers",
+
+    "performance": {
+      "tier_a": {
+        "throughput": "≥50 pages/sec",
+        "latency": "<20ms per page",
+        "resource": "CPU-bound"
+      },
+      "tier_b": {
+        "throughput": "≥200 sentences/sec (md), ≥40 (trf)",
+        "latency": "~5ms per sentence (md)",
+        "resource": "CPU-bound (GPU optional for trf)"
+      },
+      "tier_c": {
+        "throughput": "~60-120 windows/sec (batched)",
+        "latency": "≤250ms median, ≤750ms p95",
+        "resource": "GPU-bound (RTX 4070)"
+      }
+    },
+
+    "accuracy": {
+      "tier_a": {
+        "precision": "1.0 (deterministic)",
+        "recall": "0.70-0.80 (misses free-form mentions)",
+        "f1": "0.82-0.89"
+      },
+      "tier_b": {
+        "precision": "0.80-0.85",
+        "recall": "0.75-0.85",
+        "f1": "0.77-0.85"
+      },
+      "tier_c": {
+        "precision": "0.85-0.90 (target ≥0.85)",
+        "recall": "0.75-0.85",
+        "f1": "0.80-0.87 (target ≥0.80)"
+      }
+    },
+
+    "use_cases": {
+      "tier_a": "Structured configs (Docker Compose, SWAG, Tailscale, UniFi)",
+      "tier_b": "Technical prose with clear entity mentions (documentation, READMEs)",
+      "tier_c": "Nuanced mentions, implicit relationships, complex infrastructure descriptions"
+    }
+  },
+
+  "validation_rules": {
+    "global": {
+      "all_tiers_must_include_provenance": true,
+      "confidence_range": [0.0, 1.0],
+      "entity_names_must_be_non_empty": true,
+      "relation_src_dst_must_exist_in_entities": true
+    },
+    "tier_a": {
+      "determinism_required": true,
+      "confidence_must_be_1.0_for_parsers": true
+    },
+    "tier_b": {
+      "windows_must_be_512_tokens_or_less": true,
+      "relevance_score_threshold": 0.70
+    },
+    "tier_c": {
+      "json_schema_validation_required": true,
+      "window_hash_required": true,
+      "max_window_tokens": 512
+    }
+  },
+
+  "schema_version": "2.0.0",
+  "last_updated": "2025-10-20"
+}

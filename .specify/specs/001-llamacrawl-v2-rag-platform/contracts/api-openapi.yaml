@@ -1,0 +1,1218 @@
+openapi: 3.0.3
+info:
+  title: LlamaCrawl v2 API
+  description: |
+    Doc-to-Graph RAG Platform API for multi-source ingestion, extraction, and hybrid retrieval.
+
+    **Features:**
+    - Ingest from 11+ sources (web, GitHub, Reddit, YouTube, Gmail, Elasticsearch, configs)
+    - 3-tier extraction (deterministic → spaCy NLP → LLM windows)
+    - Hybrid retrieval (vector search + graph traversal + reranking)
+    - Inline citations with source traceability
+
+    **Authentication:** Bearer JWT tokens with expiry and refresh mechanics.
+  version: 2.0.0
+  contact:
+    name: LlamaCrawl v2 Support
+    url: https://github.com/yourusername/taboot
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: http://taboot-app:8000
+    description: Docker Compose internal
+  - url: https://api.llamacrawl.example.com
+    description: Production
+
+tags:
+  - name: health
+    description: Health check and status endpoints
+  - name: jobs
+    description: Firecrawl job management
+  - name: ingestions
+    description: Document ingestion operations
+  - name: extraction
+    description: Extraction pipeline operations
+  - name: query
+    description: Query and retrieval operations
+  - name: graph
+    description: Neo4j graph queries
+  - name: documents
+    description: Document management and governance
+  - name: sessions
+    description: Session management
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      description: Returns service health status and version information
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health/services:
+    get:
+      tags: [health]
+      summary: Check all service dependencies
+      description: Returns health status of all dependencies (Neo4j, Qdrant, Redis, Ollama, TEI, Firecrawl)
+      operationId: servicesHealth
+      security: []
+      responses:
+        '200':
+          description: All services healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServicesHealthResponse'
+        '503':
+          description: One or more services unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServicesHealthResponse'
+
+  /jobs/firecrawl:
+    get:
+      tags: [jobs]
+      summary: List Firecrawl jobs
+      description: Returns paginated list of Firecrawl crawl jobs with status
+      operationId: listFirecrawlJobs
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: status
+          in: query
+          description: Filter by job status
+          schema:
+            $ref: '#/components/schemas/JobStatus'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirecrawlJobsResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /jobs/firecrawl/{job_id}:
+    get:
+      tags: [jobs]
+      summary: Get Firecrawl job details
+      description: Returns detailed information about a specific Firecrawl job
+      operationId: getFirecrawlJob
+      parameters:
+        - $ref: '#/components/parameters/JobIdParam'
+      responses:
+        '200':
+          description: Job found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirecrawlJob'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /jobs/firecrawl/{job_id}/cancel:
+    post:
+      tags: [jobs]
+      summary: Cancel Firecrawl job
+      description: Cancels a running Firecrawl job
+      operationId: cancelFirecrawlJob
+      parameters:
+        - $ref: '#/components/parameters/JobIdParam'
+      responses:
+        '200':
+          description: Job canceled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirecrawlJob'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: Job already completed or failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /jobs/firecrawl/purge:
+    delete:
+      tags: [jobs]
+      summary: Purge old Firecrawl jobs
+      description: Deletes Firecrawl jobs older than specified age
+      operationId: purgeFirecrawlJobs
+      parameters:
+        - name: older_than_days
+          in: query
+          description: Delete jobs older than this many days
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            example: 30
+      responses:
+        '200':
+          description: Jobs purged successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted_count:
+                    type: integer
+                    example: 42
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /ingestions:
+    post:
+      tags: [ingestions]
+      summary: Create ingestion job
+      description: Starts ingestion from a specified source
+      operationId: createIngestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestionRequest'
+      responses:
+        '202':
+          description: Ingestion started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    get:
+      tags: [ingestions]
+      summary: List ingestion jobs
+      description: Returns paginated list of ingestion jobs
+      operationId: listIngestions
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: source
+          in: query
+          description: Filter by source type
+          schema:
+            $ref: '#/components/schemas/SourceType'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionsListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /ingestions/{ingestion_id}:
+    get:
+      tags: [ingestions]
+      summary: Get ingestion details
+      description: Returns detailed information about a specific ingestion job
+      operationId: getIngestion
+      parameters:
+        - $ref: '#/components/parameters/IngestionIdParam'
+      responses:
+        '200':
+          description: Ingestion found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /ingestions/{ingestion_id}/cancel:
+    post:
+      tags: [ingestions]
+      summary: Cancel ingestion job
+      description: Cancels a running ingestion job
+      operationId: cancelIngestion
+      parameters:
+        - $ref: '#/components/parameters/IngestionIdParam'
+      responses:
+        '200':
+          description: Ingestion canceled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: Ingestion already completed or failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /crawl:sync:
+    post:
+      tags: [ingestions]
+      summary: Synchronous web crawl
+      description: Crawls a single URL and returns results synchronously (for small pages only)
+      operationId: crawlSync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  example: https://example.com/docs
+                namespace:
+                  type: string
+                  example: prod-docs
+                  description: Namespace for organizing chunks
+      responses:
+        '200':
+          description: Crawl completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrawlSyncResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '504':
+          description: Crawl timeout (use async ingestion for large sites)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /extraction/pending:
+    get:
+      tags: [extraction]
+      summary: Get pending extraction jobs
+      description: Returns count of pending extraction windows by tier
+      operationId: getPendingExtractions
+      responses:
+        '200':
+          description: Pending extractions count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tier_a_pending:
+                    type: integer
+                    example: 0
+                  tier_b_pending:
+                    type: integer
+                    example: 142
+                  tier_c_pending:
+                    type: integer
+                    example: 87
+                  dlq_count:
+                    type: integer
+                    example: 3
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /extraction/reprocess:
+    post:
+      tags: [extraction]
+      summary: Reprocess documents with new extractor
+      description: Reprocesses documents with current extractor version
+      operationId: reprocessExtractions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                since_days:
+                  type: integer
+                  minimum: 1
+                  example: 7
+                  description: Reprocess documents ingested in last N days
+                doc_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Specific document IDs to reprocess
+      responses:
+        '202':
+          description: Reprocessing started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                    example: reprocess_abc123
+                  document_count:
+                    type: integer
+                    example: 45
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /query:
+    post:
+      tags: [query]
+      summary: Query the knowledge graph
+      description: Executes hybrid retrieval query with vector search + graph traversal + synthesis
+      operationId: query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Query successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /graph/query:
+    post:
+      tags: [graph]
+      summary: Execute Cypher query
+      description: Executes a read-only Cypher query against Neo4j
+      operationId: graphQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cypher]
+              properties:
+                cypher:
+                  type: string
+                  example: "MATCH (s:Service)-[:DEPENDS_ON]->(d:Service) RETURN s.name, d.name LIMIT 10"
+                parameters:
+                  type: object
+                  additionalProperties: true
+                  example:
+                    serviceName: nginx
+      responses:
+        '200':
+          description: Query successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                  execution_time_ms:
+                    type: integer
+        '400':
+          description: Invalid Cypher or write operation attempted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /documents:
+    get:
+      tags: [documents]
+      summary: List documents
+      description: Returns paginated list of ingested documents
+      operationId: listDocuments
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: source_type
+          in: query
+          description: Filter by source type
+          schema:
+            $ref: '#/components/schemas/SourceType'
+        - name: namespace
+          in: query
+          description: Filter by namespace
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentsListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /documents/{doc_id}:
+    get:
+      tags: [documents]
+      summary: Get document details
+      description: Returns detailed information about a document
+      operationId: getDocument
+      parameters:
+        - $ref: '#/components/parameters/DocIdParam'
+      responses:
+        '200':
+          description: Document found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    delete:
+      tags: [documents]
+      summary: Delete document (data governance)
+      description: Deletes document and all associated data (Neo4j, Qdrant, Redis)
+      operationId: deleteDocument
+      parameters:
+        - $ref: '#/components/parameters/DocIdParam'
+      responses:
+        '200':
+          description: Document deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                    example: true
+                  neo4j_nodes_deleted:
+                    type: integer
+                    example: 45
+                  neo4j_relationships_deleted:
+                    type: integer
+                    example: 87
+                  qdrant_points_deleted:
+                    type: integer
+                    example: 234
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /sessions/active:
+    get:
+      tags: [sessions]
+      summary: List active sessions
+      description: Returns list of active Playwright browser sessions
+      operationId: listActiveSessions
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /sessions/{session_id}/force-close:
+    post:
+      tags: [sessions]
+      summary: Force close session
+      description: Forcefully closes a Playwright browser session
+      operationId: forceCloseSession
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: session_abc123
+      responses:
+        '200':
+          description: Session closed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  closed:
+                    type: boolean
+                    example: true
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Authenticate and get JWT token
+      description: Authenticates user and returns JWT access + refresh tokens
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  example: admin
+                password:
+                  type: string
+                  format: password
+                  example: changeme
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Refresh JWT token
+      description: Refreshes access token using refresh token
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from /auth/login endpoint.
+        Include in Authorization header: `Authorization: Bearer <token>`
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number (1-indexed)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSizeParam:
+      name: page_size
+      in: query
+      description: Items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    JobIdParam:
+      name: job_id
+      in: path
+      required: true
+      description: Firecrawl job ID
+      schema:
+        type: string
+        example: fwl_abc123
+    IngestionIdParam:
+      name: ingestion_id
+      in: path
+      required: true
+      description: Ingestion job ID
+      schema:
+        type: string
+        format: uuid
+    DocIdParam:
+      name: doc_id
+      in: path
+      required: true
+      description: Document UUID
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          example: healthy
+        version:
+          type: string
+          example: 2.0.0
+        timestamp:
+          type: string
+          format: date-time
+          example: '2025-10-20T14:30:00Z'
+
+    ServicesHealthResponse:
+      type: object
+      properties:
+        neo4j:
+          $ref: '#/components/schemas/ServiceHealth'
+        qdrant:
+          $ref: '#/components/schemas/ServiceHealth'
+        redis:
+          $ref: '#/components/schemas/ServiceHealth'
+        ollama:
+          $ref: '#/components/schemas/ServiceHealth'
+        tei_embedding:
+          $ref: '#/components/schemas/ServiceHealth'
+        tei_reranker:
+          $ref: '#/components/schemas/ServiceHealth'
+        firecrawl:
+          $ref: '#/components/schemas/ServiceHealth'
+
+    ServiceHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+          example: healthy
+        latency_ms:
+          type: integer
+          example: 45
+        error:
+          type: string
+          nullable: true
+          example: null
+
+    JobStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, canceled]
+      example: running
+
+    SourceType:
+      type: string
+      enum: [web, github, reddit, youtube, gmail, elasticsearch, compose, swag, tailscale, unifi, ai_session]
+      example: web
+
+    FirecrawlJob:
+      type: object
+      properties:
+        job_id:
+          type: string
+          example: fwl_abc123
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        url:
+          type: string
+          format: uri
+          example: https://example.com/docs
+        started_at:
+          type: string
+          format: date-time
+          example: '2025-10-20T14:30:00Z'
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2025-10-20T14:35:12Z'
+        pages_crawled:
+          type: integer
+          example: 42
+        error:
+          type: string
+          nullable: true
+          example: null
+
+    FirecrawlJobsResponse:
+      type: object
+      properties:
+        jobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/FirecrawlJob'
+        total:
+          type: integer
+          example: 156
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 20
+
+    IngestionRequest:
+      type: object
+      required: [source, url]
+      properties:
+        source:
+          $ref: '#/components/schemas/SourceType'
+        url:
+          type: string
+          format: uri
+          example: https://example.com/docs
+        namespace:
+          type: string
+          example: prod-docs
+          description: Namespace for organizing chunks
+        credentials:
+          type: object
+          description: Source-specific credentials (e.g., GitHub token)
+          additionalProperties: true
+        retention_days:
+          type: integer
+          minimum: 1
+          example: 90
+          description: Auto-delete document after N days
+        tags:
+          type: array
+          items:
+            type: string
+          example: [production, nginx]
+
+    IngestionResponse:
+      type: object
+      properties:
+        ingestion_id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        source:
+          $ref: '#/components/schemas/SourceType'
+        url:
+          type: string
+          format: uri
+          example: https://example.com/docs
+        started_at:
+          type: string
+          format: date-time
+          example: '2025-10-20T14:30:00Z'
+        firecrawl_job_id:
+          type: string
+          nullable: true
+          example: fwl_abc123
+        progress:
+          type: object
+          properties:
+            pages_crawled:
+              type: integer
+              example: 12
+            chunks_created:
+              type: integer
+              example: 340
+            triples_extracted:
+              type: integer
+              example: 1205
+
+    IngestionsListResponse:
+      type: object
+      properties:
+        ingestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/IngestionResponse'
+        total:
+          type: integer
+          example: 89
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 20
+
+    CrawlSyncResponse:
+      type: object
+      properties:
+        doc_id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        url:
+          type: string
+          format: uri
+          example: https://example.com/docs
+        title:
+          type: string
+          example: API Documentation
+        chunks_created:
+          type: integer
+          example: 23
+        duration_ms:
+          type: integer
+          example: 3450
+
+    QueryRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          example: Which services depend on postgres?
+        filters:
+          type: object
+          properties:
+            namespace:
+              type: string
+              example: prod-configs
+            source:
+              $ref: '#/components/schemas/SourceType'
+            date_range:
+              type: object
+              properties:
+                start:
+                  type: string
+                  format: date-time
+                end:
+                  type: string
+                  format: date-time
+            tags:
+              type: array
+              items:
+                type: string
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 100
+          description: Number of results before reranking
+        rerank_top_n:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+          description: Number of results after reranking
+        graph_hops:
+          type: integer
+          minimum: 0
+          maximum: 3
+          default: 2
+          description: Graph traversal depth
+
+    QueryResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+          example: |
+            The nginx service [1] depends on postgres [2] for session storage and user authentication.
+            Traefik [3] also connects to postgres for configuration persistence.
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/Source'
+        query_id:
+          type: string
+          format: uuid
+          example: 660e8400-e29b-41d4-a716-446655440111
+        execution_time_ms:
+          type: integer
+          example: 1850
+        stages:
+          type: object
+          properties:
+            embedding_ms:
+              type: integer
+              example: 45
+            vector_search_ms:
+              type: integer
+              example: 120
+            reranking_ms:
+              type: integer
+              example: 180
+            graph_traversal_ms:
+              type: integer
+              example: 95
+            synthesis_ms:
+              type: integer
+              example: 1200
+
+    Source:
+      type: object
+      properties:
+        citation_number:
+          type: integer
+          example: 1
+        doc_id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        title:
+          type: string
+          example: docker-compose.yaml
+        url:
+          type: string
+          format: uri
+          example: https://example.com/docker-compose.yaml
+        section:
+          type: string
+          nullable: true
+          example: services
+        ingested_at:
+          type: string
+          format: date-time
+          example: '2025-10-20T14:30:00Z'
+
+    Document:
+      type: object
+      properties:
+        doc_id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        url:
+          type: string
+          format: uri
+          example: https://example.com/docs/api.md
+        title:
+          type: string
+          example: API Documentation
+        source_type:
+          $ref: '#/components/schemas/SourceType'
+        namespace:
+          type: string
+          example: prod-docs
+        ingested_at:
+          type: string
+          format: date-time
+          example: '2025-10-20T14:30:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2025-10-20T14:30:00Z'
+        retention_policy:
+          type: integer
+          nullable: true
+          example: 90
+        chunks_count:
+          type: integer
+          example: 45
+        triples_count:
+          type: integer
+          example: 234
+        tags:
+          type: array
+          items:
+            type: string
+          example: [production, database]
+
+    DocumentsListResponse:
+      type: object
+      properties:
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+        total:
+          type: integer
+          example: 234
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 20
+
+    Session:
+      type: object
+      properties:
+        session_id:
+          type: string
+          example: session_abc123
+        browser_type:
+          type: string
+          enum: [chromium, firefox, webkit]
+          example: chromium
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-10-20T14:30:00Z'
+        active_pages:
+          type: integer
+          example: 3
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        token_type:
+          type: string
+          example: bearer
+        expires_in:
+          type: integer
+          example: 3600
+          description: Access token expiry in seconds
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [
+                E_URL_BAD,
+                E_ROBOTS,
+                E_403_WAF,
+                E_429_RATE,
+                E_5XX_ORIGIN,
+                E_PARSE,
+                E_TIMEOUT,
+                E_BROWSER,
+                E_QDRANT,
+                E_NEO4J,
+                E_GPU_OOM,
+                E_TOKEN_LIMIT,
+                E_SCHEMA_INVALID,
+                E_LLM_TIMEOUT,
+                E_LLM_MALFORMED
+              ]
+              example: E_NEO4J
+            message:
+              type: string
+              example: Failed to write triples to Neo4j after 5 retries
+            details:
+              type: object
+              additionalProperties: true
+              example:
+                doc_id: 550e8400-e29b-41d4-a716-446655440000
+                retry_count: 5
+            timestamp:
+              type: string
+              format: date-time
+              example: '2025-10-20T14:30:00Z'
+            request_id:
+              type: string
+              example: req_xyz789
+
+  responses:
+    BadRequestError:
+      description: Invalid request (malformed input, validation error)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: E_URL_BAD
+              message: Invalid URL format
+              details:
+                url: "not-a-url"
+              timestamp: '2025-10-20T14:30:00Z'
+              request_id: req_xyz789
+
+    UnauthorizedError:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: E_AUTH_INVALID
+              message: Invalid or expired JWT token
+              timestamp: '2025-10-20T14:30:00Z'
+              request_id: req_xyz789
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: E_NOT_FOUND
+              message: Document not found
+              details:
+                doc_id: 550e8400-e29b-41d4-a716-446655440000
+              timestamp: '2025-10-20T14:30:00Z'
+              request_id: req_xyz789

@@ -147,11 +147,10 @@ markers = [
 addopts = "-v --tb=short --strict-markers"
 cache_dir = ".cache/pytest"
 
-# TODO: Add workspace members after migrating to individual pyproject.toml files
-# [tool.uv.workspace]
-# members = [
-#   "apps/api", "apps/cli", "apps/mcp",
-#   "packages/core", "packages/extraction", "packages/ingest",
-#   "packages/graph", "packages/vector", "packages/retrieval",
-#   "packages/schemas", "packages/clients", "packages/common"
-# ]
+[tool.uv.workspace]
+members = [
+  "apps/api", "apps/cli", "apps/mcp",
+  "packages/core", "packages/extraction", "packages/ingest",
+  "packages/graph", "packages/vector", "packages/retrieval",
+  "packages/schemas", "packages/clients", "packages/common"
+]

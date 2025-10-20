@@ -10,8 +10,8 @@ adapter layer.
   added). Keep command functions small; call into `packages.core` use-cases.
 - CLI schemas (argument and response DTOs) should reuse models from
   `packages.schemas` where possible.
-- Shared utilities belong in `apps/cli/services/` or `apps/cli/dependencies/`
-  once the structure is in place—avoid duplicating logic from adapters.
+- Shared utilities belong in `apps/cli/services/` or `apps/cli/deps/` once the
+  structure is in place—avoid duplicating logic from adapters.
 
 ## Getting started
 

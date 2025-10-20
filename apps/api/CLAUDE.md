@@ -6,7 +6,7 @@
   `jobs.py`, `ingestions.py`), and keep handlers thin.
 - Shared request/response models belong in `packages/schemas`. Local
   Pydantic classes should be limited to transport-only helpers.
-- Use dependency modules (`apps/api/dependencies/`) for auth, DB sessions, and
+- Use dependency modules (`apps/api/deps/`) for auth, DB sessions, and
   other cross-route dependencies. Avoid global state.
 - Long-running operations should be delegated to workers via core ports; do not
   block the event loop.

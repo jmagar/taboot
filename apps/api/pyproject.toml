@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "taboot-api"
+version = "0.4.0"
+description = "Taboot FastAPI HTTP service"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Jacob Magar", email = "jmagar@gmail.com" }]
+license = { text = "Proprietary" }
+
+dependencies = [
+  "fastapi>=0.119.0",
+  "uvicorn>=0.37.0",
+  "pydantic>=2.12.0",
+  "python-dotenv>=1.1.1",
+  "python-json-logger>=4.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4.2",
+  "pytest-asyncio>=1.2.0",
+  "httpx>=0.28.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["taboot_api"]

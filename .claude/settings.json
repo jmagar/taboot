@@ -11,11 +11,18 @@
       "WebSearch",
       "Task(**)",
       "TodoWrite",
-      "mcp__qdrant__*",
-      "mcp__neo4j__*",
-      "mcp__neo4j_contrib__*",
-      "mcp__postgres__*",
-      "mcp__redis__*"
+      "mcp__qdrant",
+      "mcp__neo4j",
+      "mcp__neo4j-memory",
+      "mcp__neo4j-data-modeling",
+      "mcp__postgres",
+      "mcp__time",
+      "mcp__fetch",
+      "mcp__searxng",
+      "mcp__github-chat",
+      "mcp__context7",
+      "mcp__deep-directory-tree",
+      "mcp__sequential-thinking"
     ],
     "ask": [
       "Bash(rm:*)",

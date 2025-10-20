@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "taboot-clients"
+version = "0.4.0"
+description = "Taboot external service clients (GitHub, Reddit, Gmail, etc.)"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Jacob Magar", email = "jmagar@gmail.com" }]
+license = { text = "Proprietary" }
+
+dependencies = [
+  "PyGithub>=2.8.1",
+  "praw>=7.8.1",
+  "google-auth-oauthlib>=1.2.2",
+  "google-api-python-client>=2.184.0",
+  "elasticsearch>=9.1.1",
+  "pydantic>=2.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4.2",
+  "pytest-asyncio>=1.2.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["taboot_clients"]

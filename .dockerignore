@@ -1,0 +1,48 @@
+# Existing structure retained
+# Additions below are marked with comments
+
+# ------------------------------------------------------------------------------
+# Build Cache & Dependencies
+# ------------------------------------------------------------------------------
+__pypackages__/          # uv local cache
+.cache/uv/               # uv lock/build cache
+node_modules/            # JS/TS workspace dependencies
+.pnpm-store/             # pnpm global store
+.npm/                    # npm cache (if present)
+package-lock.json        # not used with pnpm
+yarn.lock                # legacy
+*.whl                    # wheel artifacts
+*.tar.gz                 # sdist archives
+
+# ------------------------------------------------------------------------------
+# Project-Specific Artifacts
+# ------------------------------------------------------------------------------
+uv.lock                  # optional if not needed in image
+turbo/                   # turborepo build cache
+apps/web/.next/          # Next.js output
+apps/web/out/            # static exports
+apps/web/.vercel/        # vercel metadata
+apps/web/node_modules/   # redundant per pnpm workspace
+packages/**/node_modules/
+
+# ------------------------------------------------------------------------------
+# Development & Local Files
+# ------------------------------------------------------------------------------
+*.code-workspace
+.pre-commit-config.yaml
+.editorconfig
+docker-compose.override.yml
+.env                     # ensure runtime env files aren’t copied in
+.envrc
+.gitmodules
+
+# ------------------------------------------------------------------------------
+# Logs & Temporary Files
+# ------------------------------------------------------------------------------
+*.pid
+*.seed
+*.sqlite*
+nohup.out
+/tmp/
+data/
+logs/

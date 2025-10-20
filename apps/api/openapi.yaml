@@ -1,0 +1,477 @@
+openapi: 3.1.0
+info:
+  title: TABOOT Ingestion Orchestrator API
+  version: "1.0.0"
+  description: FastAPI surface for orchestrating Firecrawl jobs and ingesting results into Qdrant, Neo4j, or both.
+servers:
+  - url: http://localhost:8000
+security:
+  - ApiKeyAuth: []
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses:
+        '200':
+          description: Service is healthy
+  /jobs/firecrawl:
+    post:
+      summary: Create a Firecrawl job
+      operationId: createFirecrawlJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FirecrawlJobCreateRequest'
+      responses:
+        '202':
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirecrawlJobCreateResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /jobs:
+    get:
+      summary: List jobs
+      operationId: listJobs
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/JobStatus' }
+        - in: query
+          name: mode
+          schema: { $ref: '#/components/schemas/FirecrawlMode' }
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated jobs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirecrawlJobPage'
+  /jobs/{job_id}:
+    get:
+      summary: Get job detail
+      operationId: getJob
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Job detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirecrawlJobDetailResponse'
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Delete job and artifacts
+      operationId: deleteJob
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /jobs/{job_id}/cancel:
+    post:
+      summary: Cancel a running job
+      operationId: cancelJob
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: { type: string }
+      responses:
+        '202':
+          description: Cancellation requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirecrawlJobDetailResponse'
+        '404': { $ref: '#/components/responses/NotFound' }
+  /jobs/{job_id}/result:
+    get:
+      summary: Get job result documents
+      operationId: getJobResult
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Result payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirecrawlResultResponse'
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Job not completed yet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /jobs/{job_id}/logs:
+    get:
+      summary: Tail job logs
+      operationId: getJobLogs
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: Log lines
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LogPage' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /crawl:sync:
+    post:
+      summary: Synchronous crawl/scrape
+      operationId: crawlSync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FirecrawlSyncRequest' }
+      responses:
+        '200':
+          description: Synchronous result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FirecrawlSyncResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /ingestions:
+    post:
+      summary: Create ingestion task
+      operationId: createIngestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IngestionRequest' }
+      responses:
+        '202':
+          description: Ingestion accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IngestionResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    get:
+      summary: List ingestions
+      operationId: listIngestions
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/IngestionStatus' }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated ingestions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IngestionPage' }
+  /ingestions/{ingestion_id}:
+    get:
+      summary: Get ingestion detail
+      operationId: getIngestion
+      parameters:
+        - in: path
+          name: ingestion_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Ingestion detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IngestionDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /ingestions/{ingestion_id}/cancel:
+    post:
+      summary: Cancel an ingestion
+      operationId: cancelIngestion
+      parameters:
+        - in: path
+          name: ingestion_id
+          required: true
+          schema: { type: string }
+      responses:
+        '202':
+          description: Cancellation requested
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IngestionDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /sessions:
+    get:
+      summary: List active browser sessions
+      operationId: listSessions
+      responses:
+        '200':
+          description: Active sessions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionPage' }
+  /sessions/{session_id}:
+    delete:
+      summary: Terminate a session
+      operationId: deleteSession
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    FirecrawlMode:
+      type: string
+      enum: [crawl, scrape]
+    JobStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, canceled]
+    IngestionStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, canceled]
+    FirecrawlJobCreateRequest:
+      type: object
+      required: [urls]
+      properties:
+        urls:
+          type: array
+          minItems: 1
+          items: { type: string, format: uri }
+        mode: { $ref: '#/components/schemas/FirecrawlMode' }
+        max_depth: { type: integer, minimum: 0, default: 1 }
+        include_patterns:
+          type: array
+          items: { type: string }
+        exclude_patterns:
+          type: array
+          items: { type: string }
+        respect_robots: { type: boolean, default: true }
+        render_js: { type: boolean, default: true }
+        concurrency: { type: integer, minimum: 1, maximum: 64, default: 4 }
+        timeout_seconds: { type: integer, minimum: 1, maximum: 3600, default: 300 }
+        metadata:
+          type: object
+          additionalProperties: true
+    FirecrawlJobCreateResponse:
+      type: object
+      required: [job_id, status, queued_at]
+      properties:
+        job_id: { type: string }
+        status: { $ref: '#/components/schemas/JobStatus' }
+        queued_at: { type: string, format: date-time }
+    FirecrawlJobDetailResponse:
+      type: object
+      required: [job_id, status, created_at]
+      properties:
+        job_id: { type: string }
+        status: { $ref: '#/components/schemas/JobStatus' }
+        mode: { $ref: '#/components/schemas/FirecrawlMode' }
+        created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        urls_total: { type: integer, minimum: 0 }
+        urls_processed: { type: integer, minimum: 0 }
+        error: { type: string, nullable: true }
+        metadata:
+          type: object
+          additionalProperties: true
+    Document:
+      type: object
+      properties:
+        url: { type: string, format: uri }
+        title: { type: string }
+        content: { type: string }
+        markdown: { type: string }
+        html: { type: string }
+        extracted_at: { type: string, format: date-time }
+        meta:
+          type: object
+          additionalProperties: true
+    FirecrawlResultResponse:
+      type: object
+      required: [job_id, status]
+      properties:
+        job_id: { type: string }
+        status: { $ref: '#/components/schemas/JobStatus' }
+        documents:
+          type: array
+          items: { $ref: '#/components/schemas/Document' }
+        stats:
+          type: object
+          properties:
+            documents: { type: integer }
+            tokens_estimated: { type: integer }
+            duration_seconds: { type: number }
+    FirecrawlSyncRequest:
+      allOf:
+        - $ref: '#/components/schemas/FirecrawlJobCreateRequest'
+      properties:
+        max_documents: { type: integer, minimum: 1, maximum: 5000 }
+    FirecrawlSyncResult:
+      type: object
+      properties:
+        documents:
+          type: array
+          items: { $ref: '#/components/schemas/Document' }
+        stats:
+          type: object
+          properties:
+            documents: { type: integer }
+            tokens_estimated: { type: integer }
+            duration_seconds: { type: number }
+    IngestionRequest:
+      type: object
+      properties:
+        source:
+          oneOf:
+            - type: object
+              required: [job_id]
+              properties:
+                job_id: { type: string }
+            - type: object
+              required: [documents]
+              properties:
+                documents:
+                  type: array
+                  items: { $ref: '#/components/schemas/Document' }
+        destination:
+          type: string
+          enum: [qdrant, neo4j, both]
+        namespace: { type: string }
+        upsert: { type: boolean, default: true }
+        chunking:
+          type: object
+          properties:
+            strategy: { type: string, enum: [token, markdown, sentences], default: token }
+            chunk_size: { type: integer, default: 800 }
+            chunk_overlap: { type: integer, default: 150 }
+        embedding_model: { type: string, example: "tei:gte-large" }
+        rerank_model: { type: string, example: "tei:bge-reranker-v2" }
+        graph_extraction: { type: boolean, default: false }
+        tags:
+          type: array
+          items: { type: string }
+    IngestionResponse:
+      type: object
+      required: [ingestion_id, status]
+      properties:
+        ingestion_id: { type: string }
+        status: { $ref: '#/components/schemas/IngestionStatus' }
+        queued_at: { type: string, format: date-time }
+    IngestionDetail:
+      type: object
+      required: [ingestion_id, status]
+      properties:
+        ingestion_id: { type: string }
+        status: { $ref: '#/components/schemas/IngestionStatus' }
+        created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        counts:
+          type: object
+          properties:
+            documents: { type: integer }
+            nodes: { type: integer }
+            edges: { type: integer }
+        error: { type: string, nullable: true }
+    FirecrawlJobPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/FirecrawlJobDetailResponse' }
+        next_cursor: { type: string, nullable: true }
+    IngestionPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/IngestionDetail' }
+        next_cursor: { type: string, nullable: true }
+    LogPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              ts: { type: string, format: date-time }
+              level: { type: string }
+              msg: { type: string }
+        next_offset: { type: integer }
+    Session:
+      type: object
+      properties:
+        id: { type: string }
+        created_at: { type: string, format: date-time }
+        last_seen_at: { type: string, format: date-time }
+        url: { type: string }
+    SessionPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Session' }
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              type: object
+              additionalProperties: true

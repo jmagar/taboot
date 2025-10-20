@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read(**)",
+      "Write(**)",
+      "Edit(**)",
+      "Glob(**)",
+      "Grep(**)",
+      "WebFetch",
+      "WebSearch",
+      "Task(**)",
+      "TodoWrite",
+      "mcp__qdrant__*",
+      "mcp__neo4j__*",
+      "mcp__neo4j_contrib__*",
+      "mcp__postgres__*",
+      "mcp__redis__*"
+    ],
+    "ask": [
+      "Bash(rm:*)",
+      "Bash(git push:*)",
+      "Bash(git force-push:*)",
+      "Bash(docker rm:*)",
+      "Bash(sudo:*)"
+    ],
+    "deny": [
+      "Read(./secrets/**)"
+    ]
+  },
+  "enableAllProjectMcpServers": true
+}

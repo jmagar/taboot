@@ -1,0 +1,157 @@
+[project]
+name = "llamacrawl"
+version = "0.4.0"
+description = "Doc-to-Graph RAG Platform built on LlamaIndex and Firecrawl"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+license = { text = "Proprietary" }
+keywords = [
+  "RAG", "Neo4j", "Qdrant", "LlamaIndex", "Firecrawl", "spaCy", "Ollama",
+  "TEI", "Qwen3", "homelab", "knowledge-graph"
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "License :: Other/Proprietary License",
+  "Operating System :: OS Independent",
+]
+
+# ---------- Runtime Dependencies ----------
+dependencies = [
+  # LlamaIndex core + readers + stores
+  "llama-index-core>=0.14.4",
+  "llama-index-readers-web>=0.5.5",
+  "llama-index-readers-github>=0.8.2",
+  "llama-index-readers-file>=0.5.4",
+  "llama-index-readers-youtube-transcript>=0.4.1",
+  "llama-index-vector-stores-qdrant>=0.8.6",
+  "llama-index-graph-stores-neo4j>=0.5.1",
+  "llama-index-workflows>=0.3.0",
+  "llama-index-storage-docstore-redis>=0.4.1",
+
+  # LLM + embeddings adapters (self-hosted)
+  "llama-index-llms-ollama>=0.3.0",
+  "llama-index-embeddings-huggingface>=0.3.0",
+
+  # Optional OpenAI (used by Firecrawl extract, can be disabled)
+  "llama-index-llms-openai>=0.6.4",
+
+  # Data & external APIs
+  "firecrawl-py>=4.4.0",
+  "qdrant-client>=1.15.1",
+  "neo4j>=5.26.0,<6",
+  "redis>=5.0.1,<6",
+  "elasticsearch>=9.1.1",
+  "PyGithub>=2.8.1",
+  "praw>=7.8.1",
+  "google-auth-oauthlib>=1.2.2",
+  "google-api-python-client>=2.184.0",
+
+  # Service & HTTP
+  "fastapi>=0.119.0",
+  "uvicorn>=0.37.0",
+  "httpx>=0.28.1",
+  "anyio>=4.11.0",
+
+  # Config & models
+  "pydantic>=2.12.0",
+  "python-dotenv>=1.1.1",
+  "python-json-logger>=4.0.0",
+  "pyyaml>=6.0.3",
+  "typer>=0.19.2",
+
+  # Filesystems / SSH
+  "fsspec[ssh]>=2025.9.0",
+  "paramiko>=4.0.0",
+
+  # NLP & extraction stack
+  "spacy>=3.8.1",
+  "pyahocorasick>=2.0.0",
+  "transformers>=4.44.0",
+  "torch>=2.4.0",
+  "accelerate>=0.33.0",
+  "fast-langdetect>=1.0.0",
+
+  # Utilities
+  "watchdog>=6.0.0",
+  "orjson>=3.10.7",
+  "rich>=13.9.1",
+  "youtube-transcript-api>=1.2.3",
+  "yt-dlp>=2024.3.10",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4.2",
+  "pytest-asyncio>=1.2.0",
+  "pytest-docker>=3.2.3",
+  "pytest-mock>=3.15.1",
+  "pytest-cov>=7.0.0",
+  "responses>=0.25.8",
+  "faker>=37.11.0",
+  "mypy>=1.18.2",
+  "ruff>=0.14.0",
+  "types-pyyaml>=6.0.12",
+  "types-redis>=4.6.0.20241004",
+  "types-paramiko>=4.0.0.20250822",
+  "types-python-dateutil>=2.9.0.20241003",
+  "types-requests>=2.32.4.20250913",
+]
+
+[project.scripts]
+# CLI and API entrypoints (no src/ layout required)
+llama = "llamacrawl.cli.app:app"
+llamacrawl-api = "llamacrawl.api.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# ---------- Tooling ----------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+cache-dir = ".cache/ruff"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "SIM"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+cache_dir = ".cache/mypy"
+
+[tool.hatch.build.targets.wheel]
+packages = ["apps", "packages"]
+only-include = ["apps", "packages"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+  "unit: Fast unit tests with mocked dependencies",
+  "integration: Integration tests requiring Docker services",
+  "slow: Long-running tests (>5s)",
+  "gmail: Gmail-specific tests (requires credentials)",
+  "github: GitHub-specific tests (requires token)",
+  "reddit: Reddit-specific tests (requires credentials)",
+  "elasticsearch: Elasticsearch-specific tests",
+  "firecrawl: Firecrawl-specific tests",
+]
+addopts = "-v --tb=short --strict-markers"
+cache_dir = ".cache/pytest"
+
+# TODO: Add workspace members after migrating to individual pyproject.toml files
+# [tool.uv.workspace]
+# members = [
+#   "apps/api", "apps/cli", "apps/mcp",
+#   "packages/core", "packages/extraction", "packages/ingest",
+#   "packages/graph", "packages/vector", "packages/retrieval",
+#   "packages/schemas", "packages/clients", "packages/common"
+# ]

@@ -4,8 +4,8 @@
 
 ## Health Checks
 
-* API: `curl -sSf http://localhost:8000/healthz`
-* Qdrant: `curl -sSf http://localhost:6333/healthz`
+* API: `curl -sSf http://localhost:8000/health`
+* Qdrant: `curl -sSf http://localhost:6333/health`
 * Neo4j: `curl -sSf http://localhost:7474/ || true` then check logs
 * Redis: `redis-cli PING`
 * Postgres: `pg_isready -h localhost -p 5432`
@@ -15,7 +15,7 @@
 
 ```bash
 # restart a single service
-docker compose restart taboot-api
+docker compose restart taboot-app
 
 # nuke & relaunch crawler workers
 docker compose restart taboot-crawler taboot-playwright
@@ -28,7 +28,7 @@ docker compose restart taboot-vectors taboot-embed taboot-rerank
 
 ```bash
 # tail API
-docker compose logs -f --since=10m taboot-api
+docker compose logs -f --since=10m taboot-app
 
 # find repeated 429s
 docker compose logs taboot-crawler | grep -E "429|rate|Retry-After" | sort | uniq -c
@@ -62,7 +62,7 @@ docker compose logs taboot-graph | grep -i "deadlock\|lock"
 
 ### 4. Qdrant unavailable
 
-* Check healthz, then restart `taboot-vectors`.
+* Check /health endpoint, then restart `taboot-vectors`.
 * Inspect disk usage; ensure WAL directory has free space.
 * If collection corrupted, restore from snapshot.
 

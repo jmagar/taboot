@@ -1,4 +1,4 @@
-# Extraction Specification — LlamaCrawl v2 (October 2025)
+# Extraction Specification — Taboot v2 (October 2025)
 
 A detailed design of the tiered extraction system responsible for converting ingested documentation and configurations into structured triples for the Neo4j property graph. This defines patterns, schemas, and operational guidance for deterministic, NLP-based, and LLM-based extraction tiers.
 

@@ -1,255 +1,154 @@
-<!--
-Sync Impact Report:
-- Version change: N/A (new) → 1.0.0
-- New constitution created from template
-- Added principles:
-  1. Type-Safe Architecture (no any type, mypy strict mode)
-  2. Fail-Fast Error Handling (throw early, no fallbacks)
-  3. Test-Driven Development (≥85% core coverage, TDD mandatory)
-  4. Layered Dependency Flow (apps → adapters → core)
-  5. Performance First (quantified targets per tier)
-- Added sections:
-  - Quality Gates (compliance checkpoints)
-  - Development Standards (tooling and conventions)
-- Templates requiring updates:
-  ✅ Updated - N/A (initial creation)
-- Follow-up TODOs: None
--->
-
-# LlamaCrawl v2 Constitution
+# Taboot Constitution
 
 ## Core Principles
 
-### I. Type-Safe Architecture
+### I. Single-User, Break-Fast Philosophy (NON-NEGOTIABLE)
+Taboot is a single-developer system optimized for rapid iteration without backwards compatibility constraints.
 
-All code MUST use strict type hints with zero `any` types. Mypy runs in strict mode with no exclusions. Look up actual types from library documentation rather than guessing or using escape hatches. Pre-production status means no fallbacks—type errors MUST be fixed, not suppressed.
+**Rules**:
+- Breaking changes are acceptable and expected
+- No backwards compatibility guarantees
+- When in doubt, wipe and rebuild databases
+- No migration guides, multi-environment configs, or CONTRIBUTING/SECURITY docs needed
+- Optimize for development speed over stability
 
-**Rationale:** Type safety catches integration bugs at compile time, prevents runtime surprises in graph/vector adapters, and ensures contract clarity across the apps → adapters → core boundary.
+### II. Strict Architectural Layering
+Business logic must be separated from infrastructure through a clean dependency flow: `apps → adapters → core`
 
-### II. Fail-Fast Error Handling
+**Rules**:
+- **Core** (`packages/core/`): Domain models, use-cases, business rules only. No framework dependencies except Pydantic.
+- **Adapters** (`packages/{graph,vector,ingest,extraction,retrieval}/`): Framework-specific implementations (Neo4j, Qdrant, LlamaIndex, spaCy)
+- **Apps** (`apps/{api,cli,mcp}/`): Thin I/O shells only. No business logic.
+- Core may import from adapters directly (no abstract ports pattern needed)
+- Apps must never contain business logic - move to core or adapters
 
-Throw errors early and often. NEVER use fallbacks, default values, or silent error suppression. If data is invalid, the system MUST halt immediately with a clear error message indicating the problem and location.
+### III. Framework-Agnostic Core
+Core business logic must remain testable and replaceable without framework coupling.
 
-**Rationale:** Pre-production codebase optimizes for debuggability and correctness. Silent failures obscure root causes; explicit failures expose issues immediately during development, preventing compounding errors in downstream components.
+**Rules**:
+- Core never imports `llama_index.*`, `neo4j.*`, `qdrant_client.*`, or other framework code
+- Use direct imports from adapter packages when core needs infrastructure (e.g., `from packages.graph.client import Neo4jClient`)
+- All external dependencies isolated to adapter packages
+- Schemas in `packages/schemas/` define contracts using only Pydantic
 
-### III. Test-Driven Development (NON-NEGOTIABLE)
+### IV. Deterministic-First Extraction
+Use deterministic parsing before resorting to LLM-based extraction.
 
-**All new code MUST follow Red-Green-Refactor cycle:**
-1. Write failing test first (Red phase)
-2. Write minimal code to pass (Green phase)
-3. Refactor for clarity (Refactor phase)
+**Rules**:
+- **Tier A (Deterministic)**: Regex, YAML/JSON parsing, Aho-Corasick for known patterns. Target ≥50 pages/sec.
+- **Tier B (spaCy NLP)**: Entity extraction, dependency parsing. Target ≥200 sentences/sec.
+- **Tier C (LLM Windows)**: Only for ambiguous/unstructured content. Qwen3-4B-Instruct, ≤512 tokens, batched. Target ≤250ms median.
+- Always try cheaper tiers first, escalate only when necessary
 
-**Specific requirements:**
-- Unit and integration tests MUST be written before implementation
-- Target: ≥85% coverage in `packages/core` and extraction logic
-- Tests mirror `tests/<package>/<module>/test_*.py` structure
-- Markers: `unit`, `integration`, `slow`, plus source-specific (`gmail`, `github`, `reddit`, `elasticsearch`, `firecrawl`)
-- Full integration tests require Docker services healthy
-- Use lightweight fixtures over static payloads
+### V. Fail Fast, Throw Early (NON-NEGOTIABLE)
+Errors must be caught immediately at the boundary, not deep in execution.
 
-**Extraction Quality Gates:**
-- F1 score guardrails: CI fails if F1 drops ≥2 points
-- Labeled validation set: ~300 windows minimum before tier changes merge
-- Tier performance benchmarks: Must meet target throughput in CI
+**Rules**:
+- Never use fallbacks or silent error handling (we're pre-production)
+- Validate inputs at function entry
+- Use strict type hints everywhere (`mypy --strict`)
+- Never use `any` type - look up actual types
+- Break code loudly when refactoring
 
-**Rationale:** TDD ensures testable design, prevents regressions, and guarantees extraction/retrieval logic meets precision requirements. Given early project stage (5% implementation), TDD discipline catches architectural issues before 5k LOC implementation accumulates technical debt.
+### VI. Test Coverage Standards
+Maintain high confidence in core business logic through testing.
 
-### IV. Explicit Dependency Declaration & Layered Flow
+**Rules**:
+- Target ≥85% coverage in `packages/core/` and extraction logic
+- Unit tests with mocked dependencies for speed
+- Integration tests require Docker services healthy
+- Markers: `unit`, `integration`, `slow`, source-specific markers
+- Test command: `uv run pytest -m "not slow"`
 
-**Strict dependency direction:** `apps → adapters → core`
+## Technology Stack Requirements
 
-- **`packages/core/`:** Business logic, domain models, ports (interfaces). No framework dependencies. Depends only on `packages/schemas` and `packages/common`.
-- **Adapter packages:** Pluggable implementations (`ingest`, `extraction`, `graph`, `vector`, `retrieval`, `schemas`, `common`). Each has explicit `pyproject.toml` with declared dependencies.
-- **App shells:** Thin I/O layers (`apps/api`, `apps/cli`, `apps/mcp`, `apps/web`). Apps NEVER contain business logic. Each has explicit `pyproject.toml`.
+### Mandatory Technologies
+- **Python**: 3.11+ managed via `uv`
+- **Graph Database**: Neo4j 5.23+ with APOC
+- **Vector Database**: Qdrant with GPU acceleration (HNSW indexing)
+- **Embeddings**: TEI with Qwen3-Embedding-0.6B
+- **Reranking**: SentenceTransformers Qwen3-Reranker-0.6B
+- **LLM**: Ollama with Qwen3-4B-Instruct (temperature 0 for extraction)
+- **NLP**: spaCy `en_core_web_md` or `trf` models
+- **Web Crawling**: Firecrawl v2
+- **Retrieval Framework**: LlamaIndex (used across adapter packages: readers in `ingest/`, LLM adapters in `extraction/` Tier C, stores in `vector/` and `graph/`, indices/query engines in `retrieval/`)
+- **API Framework**: FastAPI + Typer CLI
+- **Orchestration**: Docker Compose with GPU support
 
-**Dependency Materialization Rules:**
-- Every `packages/<adapter>/` MUST have its own `pyproject.toml` with explicit dependencies
-- No implicit transitive dependencies via another package
-- All third-party libraries must be explicitly declared (even if brought in by another package)
-- Adapters can depend on their specific framework (`neo4j`, `qdrant_client`, `llama_index`, etc.)
+### Code Quality Tools (NON-NEGOTIABLE)
+- **Linting & Formatting**: Ruff (100 char line length)
+- **Type Checking**: mypy in strict mode
+- **Testing**: pytest with asyncio support
+- **Logging**: JSON structured logs via `python-json-logger`
 
-Enforced via: `uv sync` (workspace validation), `import-linter` (Python), and CI import audits.
+## Development Workflow
 
-**Rationale:** Layered architecture ensures core business logic remains framework-agnostic, testable, and replaceable. Apps serve as minimal adapters between external interfaces. Explicit dependencies prevent implicit transitive coupling and enable clear adapter substitution.
+### Pre-Implementation Checklist
+1. **Read neighboring files** - understand existing patterns before creating new code
+2. **Extend before creating** - modify existing components rather than duplicating
+3. **Match conventions** - follow established naming, structure, and import patterns
+4. **Use precise types** - research actual types instead of guessing or using `any`
 
-### V. Performance First (Expanded)
+### Implementation Flow
+1. **Pattern Discovery**: Search for similar implementations (use Grep/Glob)
+2. **Context Assembly**: Read all relevant files upfront
+3. **Analysis Before Action**: Investigate thoroughly before implementing
+4. **Direct Work** for 1-4 file changes or active debugging
+5. **Deploy Agents** for complex features, parallel work, or large investigations
 
-Quantified performance targets (RTX 4070):
+### Code Standards
+- Line length: 100 characters (Ruff enforced)
+- Naming: `snake_case` modules, `PascalCase` classes, `UPPER_SNAKE_CASE` constants
+- Adapters named for their system: `neo4j_writer.py`, `qdrant_client.py`
+- All functions have type hints
+- No comments unless explicitly requested (code should be self-documenting)
+- No emoji in code (breaks across environments)
 
-- **Tier A extraction:** ≥50 pages/sec (CPU)
-- **Tier B extraction:** ≥200 sentences/sec (`en_core_web_md`), ≥40 (`trf`)
-- **Tier C extraction:** median ≤250ms/window, p95 ≤750ms (batched 8–16)
-- **Neo4j writes:** ≥20k edges/min (2k-row UNWIND batches)
-- **Qdrant upserts:** ≥5k vectors/sec (768-dim, HNSW)
-- **E2E query latency:** p95 <3 seconds (search + rerank + synthesis)
+## Performance Targets (RTX 4070 GPU)
 
-**Regression Policy:**
-- Benchmarks run on every commit (CI gate)
-- Regressions >5% block merge
-- New features must include perf test or measurement
-- Monthly performance audit against baseline
+**Extraction Pipeline**:
+- Tier A: ≥50 pages/sec (CPU)
+- Tier B: ≥200 sentences/sec (md model) or ≥40 (trf model)
+- Tier C: median ≤250ms/window, p95 ≤750ms (batched 8-16)
 
-**Profiling Requirement:**
-All new performance-critical code (extraction tiers, graph writers, retrievers) MUST include:
-- Flame graph or profiler output in PR
-- Latency/throughput measurement
-- Comparison vs. targets
+**Database Operations**:
+- Neo4j: ≥20k edges/min with 2k-row UNWIND batches
+- Qdrant: ≥5k vectors/sec (768-dim HNSW indexing)
 
-**Rationale:** RAG platform value depends on ingestion speed and retrieval latency. Explicit targets and regression policy prevent performance erosion and guide optimization efforts.
+## Observability Requirements
 
-### VI. Framework Isolation (Core Layer)
+### Logging
+- JSON structured logs in all production code
+- Chain traceability: `doc_id → section → windows → triples → Neo4j txId`
+- Include: timestamp, level, service, operation, duration, error details
 
-The `packages/core/` layer MUST have ZERO framework dependencies. Core can only import from:
-- Standard library (`typing`, `dataclasses`, `abc`, `enum`, `datetime`, `uuid`)
-- `packages.schemas` (Pydantic models)
-- `packages.common` (logging, config, utilities)
-
-**Prohibited in core:** `llama_index`, `fastapi`, `typer`, `neo4j`, `qdrant_client`, `firecrawl`, `playwright`
-
-Verified via: `import-linter` configuration + code review checklist.
-
-**Rationale:** Core business logic must remain testable, replaceable, and independent of any particular framework. This enables:
-- Framework migration without rewriting core
-- Isolated unit testing without Docker
-- Adapter substitution for testing/alternate implementations
-- Clear contract definition via ports/interfaces
-
-### VII. Observability & Validation
-
-- **Metrics:** windows/sec, tier hit ratios, LLM p95, cache hit-rate, DB throughput.
-- **Tracing:** Chain `doc_id → section → windows → triples → Neo4j txId`.
-- **Validation:** ~300 labeled windows with F1 guardrails; CI fails if F1 drops ≥2 points.
-- **Logging:** JSON structured via `python-json-logger`.
-
-Every component MUST expose structured logs and metrics. Extraction quality MUST be validated against labeled datasets before merging.
-
-**Rationale:** Production-grade systems require observability to diagnose failures, optimize performance, and verify correctness. F1 guardrails prevent silent quality degradation.
-
-### VIII. Extraction Pipeline Contracts
-
-The multi-tier extraction system MUST maintain these invariants:
-
-**Tier A (Deterministic):** All outputs cached, reproducible, 0 latency variance
-- No LLM calls, no ML model inference
-- Regex/JSON/YAML parsing only
-- Must complete ≥50 pages/sec on CPU
-
-**Tier B (spaCy NLP):** Stateless, reproducible with fixed seed, GPU-optional
-- Entity ruler + dependency matchers only
-- No LLM calls
-- Must complete ≥200 sentences/sec (md) or ≥40 (trf)
-
-**Tier C (LLM Windows):** Cacheable, temperature=0, JSON schema validation
-- Redis cache keyed by window hash
-- Ollama Qwen3-4B-Instruct only (no GPT/Claude API)
-- Batched 8–16 windows; median ≤250ms, p95 ≤750ms
-
-**No tier may skip/bypass lower tiers.** Every document flows: Tier A → Tier B → Tier C.
-
-**Rationale:** Explicit tier contracts prevent implementation shortcuts that degrade pipeline quality and latency.
-
-## Quality Gates
-
-All pull requests MUST pass these gates before merge:
-
-1. **Linting & Formatting:** Ruff (Python), ESLint + Prettier (TypeScript). No warnings.
-2. **Type Checking:** Mypy strict mode (Python), TypeScript strict mode. Zero errors.
-3. **Tests:** All tests pass; ≥85% coverage in `packages/core` and extraction logic.
-4. **Performance:** Benchmarks meet targets; no regressions >5%.
-5. **F1 Validation:** Extraction quality on labeled dataset maintains F1 score (no drop ≥2 points).
-6. **Integration Health:** Docker services healthy before integration tests run.
-
-## Development Standards
-
-### Code Style & Conventions
-
-- **Line length:** 100 characters (enforced by Ruff).
-- **Python naming:** modules `snake_case`, classes `PascalCase`, constants `UPPER_SNAKE_CASE`.
-- **Adapters:** Name for their system (`neo4j_writer.py`, `qdrant_client.py`).
-- **Type hints:** All functions annotated; never use bare `any` type.
-- **Imports:** Ruff auto-formats; respect layering rules (no reverse imports).
-
-### Tooling
-
-- **Python:** `uv` workspace, Ruff, Mypy, Pytest.
-- **JS/TS:** `pnpm` + Turborepo, ESLint, Vitest/Playwright.
-- **Pre-commit:** Ruff/Black/Mypy + ESLint/Prettier.
-- **CI (GitHub Actions):** lint, typecheck, test, build, dockerize `api`/`mcp`; cache `uv` + `pnpm` + turbo.
-
-### Commits & Pull Requests
-
-- Use Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`.
-- Keep commits focused on a single concern.
-- Note executed test command in PR body.
-- Request reviewers for cross-layer work (core + adapters).
-- Link related issues or docs.
-
-## Implementation Phases (MVP Roadmap)
-
-This constitution governs all 8 phases of LlamaCrawl v2 implementation:
-
-**Phase 1 (Weeks 1–2): Core Layer**
-- Implement `packages/core/` domain models, ports, value objects
-- Establishes all domain contracts
-- Must pass mypy strict, ≥85% test coverage
-
-**Phase 2 (Weeks 3–4): Ingestion Pipeline**
-- Implement `packages/ingest/` (normalizer, chunker, Firecrawl integration)
-- First API endpoint: `POST /api/ingest`
-- Must pass performance target ≥5k vectors/sec into Qdrant
-
-**Phase 3 (Weeks 5–6): Extraction Tier A**
-- Implement deterministic extractors (regex, JSON, YAML)
-- Must pass target ≥50 pages/sec
-
-**Phase 4–5 (Weeks 7–10): Extraction Tiers B & C**
-- Implement spaCy (Tier B) and Ollama LLM (Tier C)
-- Targets: ≥200 sentences/sec, ≤250ms median/window
-- Enable `taboot-worker` container
-
-**Phase 6 (Weeks 11): Retrieval Pipeline**
-- Wire 6-stage retrieval (embed → search → rerank → traverse → synthesize)
-- Query endpoint: `POST /api/query`
-- Add citation generation
-
-**Phase 7 (Week 12): CLI & MCP**
-- Implement CLI commands and MCP handlers
-- Cover: ingest, extract, query, status, list workflows
-
-**Phase 8 (Weeks 13–14): Test Suite & Tuning**
-- Full integration tests (≥85% coverage)
-- Performance optimization to meet all targets
-- F1 score validation on labeled dataset (≥0.90)
-
-Each phase MUST maintain compliance with all constitution principles.
-
-## Pre-Production Status (Temporary Relaxations)
-
-While in pre-production (phases 1–8), the following relaxations apply:
-
-1. **No data migrations required** — Can break schema between commits (no backward compatibility needed)
-2. **No API versioning** — Single API version; clients must track `main` branch
-3. **Can refactor liberally** — Breaking changes allowed; deprecation cycles not required
-4. **Experimental features allowed** — Can merge experimental code behind feature flags if ≥85% test coverage maintained
-
-**Production Transition Checklist (When Applying Constitution to Prod):**
-- [ ] All tests at ≥85% coverage
-- [ ] All performance targets met consistently (3-run median)
-- [ ] Extraction F1 score validated at ≥0.90 on labeled dataset
-- [ ] Observability (metrics, traces, logs) production-ready
-- [ ] Security audit completed (credential handling, input validation)
-- [ ] Schema stability: first schema version frozen and documented
-- [ ] API versioning established; v1 released
-- [ ] Data governance and retention policies enacted
+### Metrics (Aspirational)
+- Windows/sec processed per tier
+- Tier hit ratios (A vs B vs C usage)
+- LLM latency p50/p95/p99
+- Cache hit rates
+- Database throughput
 
 ## Governance
 
-This constitution supersedes all other practices. Amendments require:
+### Authority
+This constitution supersedes all other development practices. When in conflict, constitution rules take precedence.
 
-1. Documentation of rationale and impact analysis.
-2. Approval from project maintainers.
-3. Migration plan if principle change affects existing code.
+### Amendment Process
+1. Document the proposed change with rationale
+2. Update constitution version (MAJOR for principle changes, MINOR for additions)
+3. Update CHANGELOG.md with amendment details
+4. No approval process needed (single-user system)
 
-All PRs and code reviews MUST verify compliance with these principles. Complexity MUST be justified; simplicity is the default. Use `CLAUDE.md` for runtime development guidance specific to Claude Code.
+### Compliance
+- All code must verify compliance with layering rules (core → adapters → apps)
+- Complexity must be justified (default to simplicity)
+- Violations should be fixed immediately (breaking changes are OK)
 
-**Version**: 2.0.0 | **Ratified**: 2025-10-20 | **Last Amended**: 2025-10-20 (Phase 1 Implementation Focus)
+### Reference Documents
+- **Architecture**: [CLAUDE.md](CLAUDE.md) - Development guidance for AI assistants
+- **Setup**: [README.md](README.md) - Getting started and deployment
+- **Changes**: [CHANGELOG.md](CHANGELOG.md) - Version history
+- **API**: [apps/api/docs/](apps/api/docs/) - Service interfaces
+
+**Version**: 1.0.0 | **Ratified**: 2025-10-20 | **Last Amended**: 2025-10-20

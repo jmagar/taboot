@@ -1,6 +1,6 @@
 # MCP App
 
-FastMCP server exposing LlamaCrawl workflows to MCP-compatible clients.
+FastMCP server exposing Taboot workflows to MCP-compatible clients.
 Implements the MCP transport shell; relies on `packages/core` for business
 logic.
 
@@ -16,8 +16,8 @@ logic.
 ## Running locally
 
 ```bash
-uv run python -m llamacrawl.mcp.server --help
-uv run python -m llamacrawl.mcp.server --port 8020
+uv run python -m taboot.mcp.server --help
+uv run python -m taboot.mcp.server --port 8020
 ```
 
 The `taboot-app` container runs the MCP server alongside the API and web

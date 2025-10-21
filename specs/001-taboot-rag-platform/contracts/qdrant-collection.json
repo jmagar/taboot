@@ -1,0 +1,136 @@
+{
+  "collection_name": "documents",
+  "vectors": {
+    "size": 768,
+    "distance": "Cosine",
+    "on_disk": false
+  },
+  "hnsw_config": {
+    "m": 16,
+    "ef_construct": 200,
+    "full_scan_threshold": 10000,
+    "max_indexing_threads": 0,
+    "on_disk": false
+  },
+  "optimizers_config": {
+    "deleted_threshold": 0.2,
+    "vacuum_min_vector_number": 1000,
+    "default_segment_number": 0,
+    "max_segment_size": null,
+    "memmap_threshold": null,
+    "indexing_threshold": 20000,
+    "flush_interval_sec": 5,
+    "max_optimization_threads": 1
+  },
+  "wal_config": {
+    "wal_capacity_mb": 32,
+    "wal_segments_ahead": 0
+  },
+  "quantization_config": null,
+  "payload_schema": {
+    "chunk_id": {
+      "type": "keyword",
+      "index": true
+    },
+    "doc_id": {
+      "type": "keyword",
+      "index": true
+    },
+    "source_url": {
+      "type": "keyword",
+      "index": true
+    },
+    "source_type": {
+      "type": "keyword",
+      "index": true
+    },
+    "section": {
+      "type": "text",
+      "index": true
+    },
+    "ingested_at": {
+      "type": "integer",
+      "index": true
+    },
+    "tags": {
+      "type": "keyword",
+      "index": true
+    }
+  },
+  "description": "Qdrant collection configuration for Taboot document chunks. 768-dimensional vectors from Qwen3-Embedding-0.6B model with HNSW indexing optimized for RTX 4070 GPU. Payload schema enables metadata filtering by source, date, and tags.",
+  "initialization_notes": [
+    "1. Create collection with vectors config: POST /collections/{collection_name}",
+    "2. Verify collection exists: GET /collections/{collection_name}",
+    "3. Create payload indexes: PUT /collections/{collection_name}/index",
+    "4. Test upsert: POST /collections/{collection_name}/points/upsert with sample point",
+    "5. Test search: POST /collections/{collection_name}/points/search with sample vector"
+  ],
+  "expected_performance": {
+    "upsert_throughput": "≥5000 vectors/sec on RTX 4070",
+    "search_latency_p95": "<100ms for 10k+ points",
+    "memory_usage": "~2GB for HNSW index + vectors (10k points, 768-dim)"
+  },
+  "filtering_examples": [
+    {
+      "description": "Filter by source type (web only)",
+      "filter": {
+        "must": [
+          {
+            "key": "source_type",
+            "match": {
+              "value": "web"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "description": "Filter by date range (after Oct 15, 2025)",
+      "filter": {
+        "must": [
+          {
+            "key": "ingested_at",
+            "range": {
+              "gte": 1729036800
+            }
+          }
+        ]
+      }
+    },
+    {
+      "description": "Filter by multiple sources and tags",
+      "filter": {
+        "must": [
+          {
+            "key": "source_type",
+            "match": {
+              "any": ["web", "docker_compose"]
+            }
+          },
+          {
+            "key": "tags",
+            "match": {
+              "any": ["kubernetes", "networking"]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "sample_point": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "vector": [0.01, 0.02, "... 768 dimensions total ..."],
+    "payload": {
+      "chunk_id": "123e4567-e89b-12d3-a456-426614174000",
+      "doc_id": "abc12345-1234-5678-9abc-def012345678",
+      "content": "The API service exposes port 8080 and depends on PostgreSQL database running on port 5432.",
+      "source_url": "https://docs.example.com/api-service",
+      "source_type": "web",
+      "section": "Configuration > Ports",
+      "position": 42,
+      "token_count": 18,
+      "ingested_at": 1729555200,
+      "tags": ["api", "database"]
+    }
+  }
+}

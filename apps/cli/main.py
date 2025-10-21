@@ -1,4 +1,4 @@
-"""LlamaCrawl v2 CLI - Typer command-line interface for orchestrating RAG workflows."""
+"""Taboot CLI - Typer command-line interface for orchestrating RAG workflows."""
 
 import logging
 from typing import Optional
@@ -7,8 +7,8 @@ import typer
 from rich.console import Console
 
 app = typer.Typer(
-    name="llamacrawl",
-    help="LlamaCrawl v2 CLI - Doc-to-Graph RAG Platform",
+    name="taboot",
+    help="Taboot CLI - Doc-to-Graph RAG Platform",
     add_completion=False,
 )
 console = Console()
@@ -28,9 +28,9 @@ def ingest(
     docker-compose, swag, tailscale, unifi.
 
     Examples:
-        llama ingest web https://example.com --limit 20
-        llama ingest github owner/repo
-        llama ingest reddit r/python --limit 100
+        tabootingest web https://example.com --limit 20
+        tabootingest github owner/repo
+        tabootingest reddit r/python --limit 100
     """
     raise NotImplementedError(
         f"Ingest command not yet implemented (source={source}, target={target}, limit={limit})"
@@ -60,9 +60,9 @@ def extract(
         Tier C: LLM-based structured extraction (≤250ms/window median)
 
     Examples:
-        llama extract pending
-        llama extract reprocess --since 7d
-        llama extract status
+        tabootextract pending
+        tabootextract reprocess --since 7d
+        tabootextract status
     """
     raise NotImplementedError(
         f"Extract command not yet implemented (mode={mode}, since={since})"
@@ -85,14 +85,14 @@ def query(
         1. Query embedding (TEI)
         2. Metadata filtering (source, date)
         3. Vector search (Qdrant, top-k)
-        4. Reranking (BAAI/bge-reranker-v2-m3)
+        4. Reranking (Qwen/Qwen3-Reranker-0.6B)
         5. Graph traversal (≤2 hops Neo4j)
         6. Synthesis (Qwen3-4B) with inline citations
 
     Examples:
-        llama query "what changed in auth?"
-        llama query "docker compose services" --sources docker-compose,swag
-        llama query "recent updates" --after 2025-01-01 --top-k 20
+        tabootquery "what changed in auth?"
+        tabootquery "docker compose services" --sources docker-compose,swag
+        tabootquery "recent updates" --after 2025-01-01 --top-k 20
     """
     raise NotImplementedError(
         f"Query command not yet implemented (question={question}, "
@@ -123,9 +123,9 @@ def status(
         - Database throughput
 
     Examples:
-        llama status
-        llama status --component graph --verbose
-        llama status --component vector
+        tabootstatus
+        tabootstatus --component graph --verbose
+        tabootstatus --component vector
     """
     raise NotImplementedError(
         f"Status command not yet implemented (component={component}, verbose={verbose})"
@@ -150,9 +150,9 @@ def list(
         docs      - Ingested documents with metadata
 
     Examples:
-        llama list services --limit 50
-        llama list endpoints --filter "auth"
-        llama list docs --filter "source=github"
+        tabootlist services --limit 50
+        tabootlist endpoints --filter "auth"
+        tabootlist docs --filter "source=github"
     """
     raise NotImplementedError(
         f"List command not yet implemented (resource={resource}, "
@@ -163,7 +163,7 @@ def list(
 @app.command()
 def init() -> None:
     """
-    Initialize the LlamaCrawl system: create Neo4j schema, Qdrant collections, and indexes.
+    Initialize the Taboot system: create Neo4j schema, Qdrant collections, and indexes.
 
     This command performs:
         - Neo4j constraints and indexes (Service.name, Host.hostname, etc.)
@@ -174,9 +174,11 @@ def init() -> None:
     Run this once after starting Docker services for the first time.
 
     Example:
-        llama init
+        tabootinit
     """
-    raise NotImplementedError("Init command not yet implemented")
+    from apps.cli.commands.init import init_command
+
+    init_command()
 
 
 if __name__ == "__main__":

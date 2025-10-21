@@ -1,6 +1,8 @@
-# LlamaCrawl v2 — Doc-to-Graph RAG Platform
+# Taboot — Doc-to-Graph RAG Platform
 
-A clean-slate, production-minded foundation for multi-source RAG with a **shared business core**, pluggable adapters (ingest, extraction, vector, graph, retrieval), and thin app shells (API, CLI, MCP, Web). LlamaCrawl v2 ingests from 11+ sources, converts technical docs/configs into a **Neo4j property graph**, stores chunks in **Qdrant**, and answers questions via **hybrid retrieval** (vector → rerank → graph traversal → synthesis) with strict **source attribution**.
+> **Single-User System**: Taboot is designed for a single developer. Breaking changes are acceptable and expected. No backwards compatibility guarantees. When in doubt, wipe and rebuild databases.
+
+A clean-slate, production-minded foundation for multi-source RAG with a **shared business core**, pluggable adapters (ingest, extraction, vector, graph, retrieval), and thin app shells (API, CLI, MCP, Web). Taboot ingests from 11+ sources, converts technical docs/configs into a **Neo4j property graph**, stores chunks in **Qdrant**, and answers questions via **hybrid retrieval** (vector → rerank → graph traversal → synthesis) with strict **source attribution**.
 
 ---
 
@@ -103,7 +105,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for expanded diagrams and compo
 1. Query embedding (TEI)
 2. Metadata filtering (source, date, tags)
 3. Vector search (top-k in Qdrant)
-4. Rerank (BAAI/bge-reranker-v2-m3)
+4. Rerank (Qwen/Qwen3-Reranker-0.6B)
 5. Graph traversal (≤2 hops in Neo4j)
 6. Synthesis (Qwen3-4B) with inline numeric citations and source list.
 
@@ -148,8 +150,8 @@ Full label and relationship definitions live in [packages/graph/docs/GRAPH_SCHEM
 
 ```bash
 # Clone
-git clone https://github.com/your-org/llamacrawl
-cd llamacrawl
+git clone https://github.com/your-org/taboot
+cd taboot
 
 # Install Python deps (workspace)
 uv sync
@@ -183,28 +185,31 @@ uv run apps/cli query "Which services expose port 8080?"
 
 ## Commands (CLI)
 
+**Note**: Most commands are in development. The following shows the planned interface:
+
 ```bash
-# Version & health
-llama version
-llama status [--source github]
+# System initialization
+taboot init                          # Initialize Neo4j schema, Qdrant collections, indexes
 
-# Web
-llama scrape URL
-llama crawl URL --limit 100 --max-depth 2
-llama map URL --limit 1000
+# Ingestion (supports: web, github, reddit, youtube, gmail, elasticsearch,
+#            docker-compose, swag, tailscale, unifi)
+taboot ingest SOURCE TARGET [--limit N]
+taboot ingest web https://example.com --limit 20
+taboot ingest github owner/repo
+taboot ingest reddit r/python --limit 100
 
-# Sources
-llama ingest github|reddit|youtube|gmail|es|swag|compose|tailscale|unifi|sessions
+# Extraction pipeline
+taboot extract pending               # Process all docs awaiting extraction
+taboot extract reprocess --since 7d  # Re-run extraction on docs from last 7 days
+taboot extract status                # Show extraction pipeline status & metrics
 
-# Extraction
-llama extract pending                # process new docs (tiers A/B/C)
-llama extract reprocess --since 7d   # re-run with new extractor version
+# Querying
+taboot query "your question" [--sources SOURCE1,SOURCE2] [--after DATE] [--top-k N]
+taboot query "what changed in auth?" --sources github,reddit --after 2025-01-01
 
-# Graph
-llama graph query "MATCH ... RETURN ..."
-
-# RAG
-llama query "what changed in auth?" --sources github,reddit,youtube --after 2025-01-01
+# System management
+taboot status [--component COMPONENT] [--verbose]
+taboot list RESOURCE [--limit N] [--filter EXPR]
 ```
 
 ---

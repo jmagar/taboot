@@ -1,14 +1,14 @@
-# LlamaCrawl v2 — Data Ingestion & Extraction Planes Investigation Report
+# Taboot v2 — Data Ingestion & Extraction Planes Investigation Report
 
 **Date:** 2025-10-20  
-**Branch:** 001-llamacrawl-v2-rag-platform  
+**Branch:** 001-taboot-v2-rag-platform  
 **Maturity Assessment:** Architecture Complete, Implementation at 5% (Skeleton Phase)
 
 ---
 
 ## Executive Summary
 
-LlamaCrawl v2 is a **greenfield Doc-to-Graph RAG platform** with complete architectural design and specification but **minimal implementation**. All core business logic packages are **empty placeholders** (`__init__.py` files only). The project has:
+Taboot v2 is a **greenfield Doc-to-Graph RAG platform** with complete architectural design and specification but **minimal implementation**. All core business logic packages are **empty placeholders** (`__init__.py` files only). The project has:
 
 - **Fully designed three-tier extraction pipeline** (Tier A/B/C)
 - **Comprehensive Neo4j graph schema** defined
@@ -386,7 +386,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 app = FastAPI(
-    title="LlamaCrawl API",
+    title="Taboot API",
     version="0.4.0",
     description="Doc-to-Graph RAG Platform",
 )
@@ -397,7 +397,7 @@ async def health() -> dict[str, str]:
 
 @app.get("/")
 async def root() -> dict[str, str]:
-    return {"message": "LlamaCrawl API v0.4.0", "docs": "/docs"}
+    return {"message": "Taboot API v0.4.0", "docs": "/docs"}
 ```
 
 **Status:**
@@ -717,7 +717,7 @@ Expected commands (from CLAUDE.md):
 
 ## 15. Conclusion
 
-**LlamaCrawl v2 is a well-designed, well-documented but entirely unimplemented greenfield project.** The architecture is sound, the specifications are complete, and the Docker infrastructure is configured. However, no production code exists for the ingestion or extraction planes—both are at 0% implementation.
+**Taboot v2 is a well-designed, well-documented but entirely unimplemented greenfield project.** The architecture is sound, the specifications are complete, and the Docker infrastructure is configured. However, no production code exists for the ingestion or extraction planes—both are at 0% implementation.
 
 ### Key Findings
 
@@ -750,4 +750,4 @@ Expected commands (from CLAUDE.md):
 **Report generated:** 2025-10-20  
 **Investigator:** Claude AI  
 **Repository:** `/home/jmagar/code/taboot`  
-**Branch:** `001-llamacrawl-v2-rag-platform`
+**Branch:** `001-taboot-v2-rag-platform`

@@ -1,4 +1,4 @@
-# spaCy Patterns Guide for LlamaCrawl v2 Tier B Extraction
+# spaCy Patterns Guide for Taboot v2 Tier B Extraction
 
 **Research Date:** 2025-10-20
 **Target Performance:** ≥200 sentences/sec on RTX 4070 with `en_core_web_md`
@@ -732,7 +732,7 @@ def sentence_classification_example():
     matcher = initialize_sentence_classifier(nlp)
 
     text = """
-    LlamaCrawl is a documentation platform. The nginx service at 192.168.1.10
+    Taboot is a documentation platform. The nginx service at 192.168.1.10
     exposes the /api endpoint on port 8080. This enables efficient data retrieval.
     The system depends on postgres for storage.
     """
@@ -1096,7 +1096,7 @@ def process_with_memory_limit(
 | Technical Docs | 500-2000 chars | 1000 | 1 (GPU) or 2 (CPU) | 3000-5000 |
 | Long Articles | >2000 chars | 100-500 | 1 | 1000-2000 |
 
-**Target for LlamaCrawl:** Technical docs (500-2000 chars), batch_size=1000, ≥200 sentences/sec
+**Target for Taboot:** Technical docs (500-2000 chars), batch_size=1000, ≥200 sentences/sec
 
 ---
 

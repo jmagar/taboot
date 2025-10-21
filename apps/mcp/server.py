@@ -1,11 +1,11 @@
-"""LlamaCrawl v2 MCP Server - Model Context Protocol adapter for knowledge graph access."""
+"""Taboot MCP Server - Model Context Protocol adapter for knowledge graph access."""
 
 import logging
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-server = FastMCP("llamacrawl", version="0.4.0")
+server = FastMCP("taboot", version="0.4.0")
 logger = logging.getLogger(__name__)
 
 
@@ -124,7 +124,7 @@ def query_graph(question: str) -> dict[str, Any]:
         1. Query embedding (TEI) - Convert question to 768-dim vector
         2. Metadata filtering - Apply source/date constraints
         3. Vector search (Qdrant) - Retrieve top-k similar chunks
-        4. Reranking (BAAI/bge-reranker-v2-m3) - Re-score by relevance
+        4. Reranking (Qwen/Qwen3-Reranker-0.6B) - Re-score by relevance
         5. Graph traversal (Neo4j) - Expand with related nodes (≤2 hops)
         6. Synthesis (Qwen3-4B) - Generate answer with citations
 

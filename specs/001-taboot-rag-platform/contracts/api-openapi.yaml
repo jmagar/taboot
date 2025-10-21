@@ -1,0 +1,600 @@
+openapi: 3.0.3
+info:
+  title: Taboot API
+  description: Doc-to-Graph RAG platform API for ingestion, extraction, and retrieval
+  version: 1.0.0
+  contact:
+    name: Taboot Project
+    url: https://github.com/yourusername/taboot
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: http://taboot-app:8000
+    description: Docker container (internal)
+
+tags:
+  - name: initialization
+    description: System initialization and schema setup
+  - name: ingestion
+    description: Document ingestion from multiple sources
+  - name: extraction
+    description: Knowledge graph extraction pipeline
+  - name: retrieval
+    description: Hybrid retrieval and question answering
+  - name: status
+    description: System health and job monitoring
+
+paths:
+  /init:
+    post:
+      tags: [initialization]
+      summary: Initialize database schemas and vector collections
+      description: Creates Neo4j constraints, Qdrant collections, and verifies service health
+      operationId: initialize_system
+      responses:
+        '200':
+          description: Initialization successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  neo4j_constraints:
+                    type: array
+                    items:
+                      type: string
+                    example: ["Service.name UNIQUE", "Host.hostname UNIQUE"]
+                  qdrant_collections:
+                    type: array
+                    items:
+                      type: string
+                    example: ["documents"]
+                  services_healthy:
+                    type: array
+                    items:
+                      type: string
+                    example: ["neo4j", "qdrant", "redis", "tei", "ollama", "firecrawl"]
+        '500':
+          description: Initialization failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ingest:
+    post:
+      tags: [ingestion]
+      summary: Start an ingestion job
+      description: Ingest documents from specified source with optional limit
+      operationId: start_ingestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestionRequest'
+      responses:
+        '202':
+          description: Ingestion job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionJobResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ingest/{job_id}:
+    get:
+      tags: [ingestion]
+      summary: Get ingestion job status
+      description: Retrieve current status and progress of an ingestion job
+      operationId: get_ingestion_status
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Job status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionJobStatus'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /extract/pending:
+    post:
+      tags: [extraction]
+      summary: Process documents awaiting extraction
+      description: Start extraction worker to process documents in pending state
+      operationId: extract_pending
+      responses:
+        '202':
+          description: Extraction started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [started]
+                  documents_queued:
+                    type: integer
+                    example: 42
+        '500':
+          description: Extraction failed to start
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /extract/reprocess:
+    post:
+      tags: [extraction]
+      summary: Reprocess documents with updated extractors
+      description: Re-extract documents ingested after specified date using current extractor version
+      operationId: reprocess_documents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                since:
+                  type: string
+                  format: date
+                  description: ISO 8601 date (re-extract documents ingested after this date)
+                  example: "2025-10-14"
+      responses:
+        '202':
+          description: Reprocessing started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [started]
+                  documents_queued:
+                    type: integer
+                    example: 123
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /extract/status:
+    get:
+      tags: [extraction]
+      summary: Get extraction pipeline metrics
+      description: Retrieve metrics for all extraction tiers (throughput, latency, cache hit rate)
+      operationId: get_extraction_status
+      responses:
+        '200':
+          description: Extraction metrics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractionMetrics'
+
+  /query:
+    post:
+      tags: [retrieval]
+      summary: Execute hybrid retrieval query
+      description: Perform vector search, reranking, graph traversal, and answer synthesis
+      operationId: query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Query executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '400':
+          description: Invalid query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /status:
+    get:
+      tags: [status]
+      summary: Get system health status
+      description: Check health of all services and report configuration
+      operationId: get_status
+      parameters:
+        - name: component
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [neo4j, qdrant, redis, tei, ollama, firecrawl, playwright]
+        - name: verbose
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStatus'
+
+  /documents:
+    get:
+      tags: [status]
+      summary: List ingested documents
+      description: Retrieve paginated list of documents with optional filters
+      operationId: list_documents
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: source_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [web, github, reddit, youtube, gmail, elasticsearch, docker_compose, swag, tailscale, unifi, ai_session]
+        - name: extraction_state
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, tier_a_done, tier_b_done, tier_c_done, completed, failed]
+      responses:
+        '200':
+          description: Documents retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+                  total:
+                    type: integer
+                    example: 150
+                  limit:
+                    type: integer
+                    example: 20
+                  offset:
+                    type: integer
+                    example: 0
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Invalid source type"
+        details:
+          type: object
+          additionalProperties: true
+
+    IngestionRequest:
+      type: object
+      required:
+        - source_type
+        - source_target
+      properties:
+        source_type:
+          type: string
+          enum: [web, github, reddit, youtube, gmail, elasticsearch, docker_compose, swag, tailscale, unifi, ai_session]
+          example: web
+        source_target:
+          type: string
+          description: URL, repo name, file path, or other source identifier
+          example: "https://docs.example.com"
+        limit:
+          type: integer
+          description: Maximum pages/items to ingest (optional, defaults to unlimited)
+          minimum: 1
+          example: 20
+
+    IngestionJobResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        state:
+          type: string
+          enum: [pending, running, completed, failed]
+          example: pending
+        source_type:
+          type: string
+          example: web
+        source_target:
+          type: string
+          example: "https://docs.example.com"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-10-21T12:34:56Z"
+
+    IngestionJobStatus:
+      allOf:
+        - $ref: '#/components/schemas/IngestionJobResponse'
+        - type: object
+          properties:
+            started_at:
+              type: string
+              format: date-time
+              nullable: true
+              example: "2025-10-21T12:35:00Z"
+            completed_at:
+              type: string
+              format: date-time
+              nullable: true
+              example: "2025-10-21T12:36:42Z"
+            pages_processed:
+              type: integer
+              example: 18
+            chunks_created:
+              type: integer
+              example: 342
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  url:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+    ExtractionMetrics:
+      type: object
+      properties:
+        tier_a:
+          type: object
+          properties:
+            pages_per_sec:
+              type: number
+              format: float
+              example: 62.5
+        tier_b:
+          type: object
+          properties:
+            sentences_per_sec:
+              type: number
+              format: float
+              example: 215.3
+            windows_selected:
+              type: integer
+              example: 87
+        tier_c:
+          type: object
+          properties:
+            windows_per_sec:
+              type: number
+              format: float
+              example: 4.2
+            median_latency_ms:
+              type: integer
+              example: 235
+            p95_latency_ms:
+              type: integer
+              example: 680
+            cache_hit_rate:
+              type: number
+              format: float
+              minimum: 0.0
+              maximum: 1.0
+              example: 0.63
+        neo4j:
+          type: object
+          properties:
+            edges_per_min:
+              type: integer
+              example: 22400
+        qdrant:
+          type: object
+          properties:
+            vectors_per_sec:
+              type: integer
+              example: 5320
+
+    QueryRequest:
+      type: object
+      required:
+        - question
+      properties:
+        question:
+          type: string
+          description: Natural language question
+          example: "Which services expose port 8080?"
+        sources:
+          type: array
+          items:
+            type: string
+          description: Filter by source types (optional)
+          example: ["web", "docker_compose"]
+        after:
+          type: string
+          format: date
+          description: Filter documents ingested after this date (optional)
+          example: "2025-10-15"
+        top_k:
+          type: integer
+          description: Number of results to retrieve (default 20)
+          minimum: 1
+          maximum: 100
+          default: 20
+          example: 10
+
+    QueryResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+          description: Synthesized answer with inline citations [1], [2]
+          example: "The following services expose port 8080: api-service [1] and web-frontend [2]. The api-service uses JWT authentication [1]."
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+                example: 1
+              title:
+                type: string
+                example: "API Service Documentation"
+              url:
+                type: string
+                example: "https://docs.example.com/api-service"
+              section:
+                type: string
+                nullable: true
+                example: "Configuration > Ports"
+        latency_ms:
+          type: object
+          properties:
+            embed:
+              type: integer
+              example: 45
+            vector_search:
+              type: integer
+              example: 82
+            rerank:
+              type: integer
+              example: 320
+            graph_traversal:
+              type: integer
+              example: 156
+            synthesis:
+              type: integer
+              example: 890
+            total:
+              type: integer
+              example: 1493
+
+    SystemStatus:
+      type: object
+      properties:
+        services:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [healthy, unhealthy]
+              message:
+                type: string
+                nullable: true
+          example:
+            neo4j:
+              status: healthy
+              message: null
+            qdrant:
+              status: healthy
+              message: null
+            redis:
+              status: healthy
+              message: null
+        queue_depth:
+          type: object
+          properties:
+            ingestion:
+              type: integer
+              example: 0
+            extraction:
+              type: integer
+              example: 5
+        config:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            neo4j_uri: "bolt://taboot-graph:7687"
+            qdrant_url: "http://taboot-vectors:6333"
+            embedding_model: "Qwen3-Embedding-0.6B"
+
+    Document:
+      type: object
+      properties:
+        doc_id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        source_url:
+          type: string
+          example: "https://docs.example.com/page"
+        source_type:
+          type: string
+          enum: [web, github, reddit, youtube, gmail, elasticsearch, docker_compose, swag, tailscale, unifi, ai_session]
+          example: web
+        content_hash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+          example: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        ingested_at:
+          type: string
+          format: date-time
+          example: "2025-10-21T12:00:00Z"
+        extraction_state:
+          type: string
+          enum: [pending, tier_a_done, tier_b_done, tier_c_done, completed, failed]
+          example: completed
+        extraction_version:
+          type: string
+          nullable: true
+          example: "v1.0.0"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-10-21T12:05:30Z"

@@ -20,7 +20,7 @@ http://localhost:8000
 
 ### Health
 
-* **GET /healthz** → 200 when the service is alive.
+* **GET /health** → 200 when the service is alive.
 
 ### Firecrawl Jobs
 

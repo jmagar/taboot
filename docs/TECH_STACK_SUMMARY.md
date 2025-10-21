@@ -1,4 +1,4 @@
-# LlamaCrawl v2 — Technical Implementation Plan Context
+# Taboot v2 — Technical Implementation Plan Context
 
 **Created**: 2025-10-20
 **Based on**: 5 parallel code-finder agent investigations + specification clarifications
@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-LlamaCrawl v2 is a **production-ready architectural design** waiting for implementation. Core layers are defined but mostly skeleton code. This document serves as input for `/speckit.plan` command.
+Taboot v2 is a **production-ready architectural design** waiting for implementation. Core layers are defined but mostly skeleton code. This document serves as input for `/speckit.plan` command.
 
 ### Key Stats
 - **11 Docker services** (4 GPU-accelerated)
@@ -215,7 +215,7 @@ packages/vector/
 1. **Query embedding** — TEI to 1024-dim
 2. **Metadata filtering** — source, date, namespace, tags
 3. **Vector search** — Qdrant top-k (default 100)
-4. **Reranking** — BAAI/bge-reranker-v2-m3 via SentenceTransformers (16-batch)
+4. **Reranking** — Qwen/Qwen3-Reranker-0.6B via SentenceTransformers (16-batch)
 5. **Graph traversal** — Neo4j ≤2-hop neighbor discovery
 6. **Synthesis** — Qwen3-4B-Instruct with inline citations + bibliography
 

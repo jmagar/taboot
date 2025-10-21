@@ -1,8 +1,8 @@
-# LlamaCrawl v2 — Project Architecture
+# Taboot v2 — Project Architecture
 
 ## 1. Overview
 
-LlamaCrawl v2 is a **Doc-to-Graph RAG platform** designed for self-hosted, GPU-accelerated retrieval and structured knowledge extraction. It integrates data ingestion (Firecrawl, APIs, configs) with vector search (Qdrant), graph storage (Neo4j), and selective LLM reasoning (Qwen3 via Ollama). The project emphasizes modularity, deterministic extraction, and reproducible data flow.
+Taboot v2 is a **Doc-to-Graph RAG platform** designed for self-hosted, GPU-accelerated retrieval and structured knowledge extraction. It integrates data ingestion (Firecrawl, APIs, configs) with vector search (Qdrant), graph storage (Neo4j), and selective LLM reasoning (Qwen3 via Ollama). The project emphasizes modularity, deterministic extraction, and reproducible data flow.
 
 ---
 

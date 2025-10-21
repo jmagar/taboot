@@ -1,6 +1,6 @@
 # Packages / Clients
 
-Generated client SDKs that talk to the LlamaCrawl API surfaces. Keep this
+Generated client SDKs that talk to the Taboot API surfaces. Keep this
 package free of handwritten business logic—treat it as output from generators.
 
 ## Layout

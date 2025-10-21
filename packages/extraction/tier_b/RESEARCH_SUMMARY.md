@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Research conducted on spaCy 3.8+ (latest as of May 2025) for LlamaCrawl v2 Tier B extraction confirms that **en_core_web_md can achieve 200-350 sentences/sec on CPU**, meeting the ≥200 sent/sec target. The transformer model (en_core_web_trf) achieves only 80-150 sent/sec on GPU and is **not recommended for Tier B**.
+Research conducted on spaCy 3.8+ (latest as of May 2025) for Taboot v2 Tier B extraction confirms that **en_core_web_md can achieve 200-350 sentences/sec on CPU**, meeting the ≥200 sent/sec target. The transformer model (en_core_web_trf) achieves only 80-150 sent/sec on GPU and is **not recommended for Tier B**.
 
 ### Key Findings
 
@@ -203,7 +203,7 @@ patterns = [
 | **Technical Docs** | **500-2000 chars** | **1000** | **1** | **3000-5000** |
 | Long Articles | >2000 chars | 100-500 | 1 | 1000-2000 |
 
-### LlamaCrawl Configuration
+### Taboot Configuration
 - **Document Type:** Technical docs (500-2000 chars)
 - **Batch Size:** 1000
 - **n_process:** 1 (sufficient with batching)
@@ -643,7 +643,7 @@ def test_tier_a_b_c_flow():
 - [ ] Create TierBExtractor class integrating all components
 - [ ] Write unit tests for entity/relationship extraction
 - [ ] Write performance test (≥200 sent/sec)
-- [ ] Benchmark with real LlamaCrawl documents
+- [ ] Benchmark with real Taboot documents
 - [ ] Integrate with Tier A output
 - [ ] Connect to Tier C input
 - [ ] Deploy to extraction worker container

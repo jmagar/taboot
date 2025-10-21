@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LlamaCrawl v2 is a **Doc-to-Graph RAG platform** built on LlamaIndex, Firecrawl, Neo4j, and Qdrant. It ingests from 11+ sources (web, GitHub, Reddit, YouTube, Gmail, Elasticsearch, Docker Compose, SWAG, Tailscale, Unifi, AI sessions), converts technical docs/configs into a Neo4j property graph, stores chunks in Qdrant, and answers questions via hybrid retrieval with strict source attribution.
+> **⚠️ Single-User System**: Taboot is designed for a single developer. Breaking changes are acceptable and expected. No backwards compatibility guarantees. When in doubt, wipe and rebuild databases. No need for multiple environments, migration guides, or CONTRIBUTING/SECURITY docs.
+
+Taboot is a **Doc-to-Graph RAG platform** built on LlamaIndex, Firecrawl, Neo4j, and Qdrant. It ingests from 11+ sources (web, GitHub, Reddit, YouTube, Gmail, Elasticsearch, Docker Compose, SWAG, Tailscale, Unifi, AI sessions), converts technical docs/configs into a Neo4j property graph, stores chunks in Qdrant, and answers questions via hybrid retrieval with strict source attribution.
 
 **Key Technologies:**
 - Python 3.11+ (managed via `uv`)
@@ -50,7 +52,7 @@ Firecrawl + Playwright → Normalizer (de-boilerplate) → Chunker → TEI embed
 3. **Tier C (LLM Windows):** Qwen3-4B-Instruct (Ollama) on ≤512-token windows, temperature 0, JSON schema, batched 8–16, Redis cache. Target median ≤250ms/window.
 
 ### Retrieval Plane (6-Stage)
-1. Query embedding (TEI) → 2. Metadata filter (source, date) → 3. Vector search (Qdrant, top-k) → 4. Rerank (BAAI/bge-reranker-v2-m3) → 5. Graph traversal (≤2 hops Neo4j) → 6. Synthesis (Qwen3-4B) with inline citations + source list.
+1. Query embedding (TEI) → 2. Metadata filter (source, date) → 3. Vector search (Qdrant, top-k) → 4. Rerank (Qwen/Qwen3-Reranker-0.6B) → 5. Graph traversal (≤2 hops Neo4j) → 6. Synthesis (Qwen3-4B) with inline citations + source list.
 
 ## Neo4j Graph Model
 
@@ -88,10 +90,8 @@ uv run mypy .                                       # strict type-check
 
 ### Running Services
 ```bash
-# Start API
-uv run llamacrawl-api
-# or via Docker:
-docker compose up taboot-api
+# Start API (via Docker only - no CLI entry point)
+docker compose up taboot-app
 
 # View logs
 docker compose logs -f <service-name>
@@ -131,13 +131,18 @@ uv run apps/cli extract reprocess --since 7d
 
 ## Framework Integration Notes
 
-**LlamaIndex:** Lives in `packages/retrieval/` only. Contains:
-- `context/` — Settings (TEI, Ollama LLM), prompts
-- `indices/` — VectorStoreIndex (Qdrant) + PropertyGraphIndex (Neo4jPGStore)
-- `retrievers/` — Hybrid retrievers and reranking
-- `query_engines/` — Graph-augmented QA
+**LlamaIndex:** Used across multiple adapter packages:
+- `packages/ingest/` — LlamaIndex readers (web, GitHub, Reddit, YouTube, Gmail, file formats)
+- `packages/extraction/` — LLM adapters (`llama-index-llms-ollama`) for Tier C extraction
+- `packages/vector/` — VectorStoreIndex integration with Qdrant
+- `packages/graph/` — PropertyGraphIndex integration with Neo4j
+- `packages/retrieval/` — Core retrieval functionality:
+  - `context/` — Settings (TEI, Ollama LLM), prompts
+  - `indices/` — Index management and configuration
+  - `retrievers/` — Hybrid retrievers and reranking
+  - `query_engines/` — Graph-augmented QA
 
-**Core never imports `llama_index.*`.** This ensures core is framework-agnostic. Apps depend on ports in `packages/core` implemented by adapters.
+**Core never imports `llama_index.*`.** This ensures core is framework-agnostic. Core uses direct imports from adapter packages (`packages.graph`, `packages.vector`, etc.) when needed in use-cases.
 
 ## Docker Services & GPU
 
@@ -202,7 +207,7 @@ Per-source credentials (GitHub, Reddit, Gmail, Elasticsearch, Unifi, Tailscale) 
 |-------|-------|
 | Services won't start | `docker compose ps` and `docker compose logs <service-name>` |
 | GPU not detected | NVIDIA driver + `nvidia-container-toolkit` installed |
-| Ollama model missing | First run auto-pulls Qwen3-4B; or `docker exec taboot-ollama ollama pull qwen2.5:4b-instruct` |
+| Ollama model missing | First run auto-pulls Qwen3-4B; or `docker exec taboot-ollama ollama pull qwen2.5:4b-instruct-q4_0` |
 | Neo4j connection refused | Wait for healthcheck: `docker compose ps taboot-graph` |
 | Tests fail | Ensure `docker compose ps` shows all services healthy before running integration tests |
 | spaCy model missing | First run auto-downloads `en_core_web_md`; or manually `python -m spacy download en_core_web_md` |

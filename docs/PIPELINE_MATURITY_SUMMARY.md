@@ -1,4 +1,4 @@
-# LlamaCrawl v2 — Pipeline Maturity Summary
+# Taboot v2 — Pipeline Maturity Summary
 
 ## At a Glance
 
@@ -229,8 +229,8 @@ Blockers:
 - `packages/extraction/README.md` — Extraction layer overview (42 lines)
 - `packages/core/README.md` — Core layer guidance (41 lines)
 - `CLAUDE.md` (repo root) — Project conventions (complete)
-- `specs/001-llamacrawl-v2-rag-platform/spec.md` — Feature spec (200+ lines)
-- `specs/001-llamacrawl-v2-rag-platform/plan.md` — Implementation plan (150+ lines)
+- `specs/001-taboot-v2-rag-platform/spec.md` — Feature spec (200+ lines)
+- `specs/001-taboot-v2-rag-platform/plan.md` — Implementation plan (150+ lines)
 
 ### Implementation Stubs
 
@@ -412,4 +412,4 @@ Blockers:
 **Report Generated:** 2025-10-20  
 **Full Investigation:** See `PIPELINE_INVESTIGATION_REPORT.md` (24 KB, 15 sections)  
 **Repository:** `/home/jmagar/code/taboot`  
-**Branch:** `001-llamacrawl-v2-rag-platform`
+**Branch:** `001-taboot-v2-rag-platform`

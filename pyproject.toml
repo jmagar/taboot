@@ -1,5 +1,5 @@
 [project]
-name = "llamacrawl"
+name = "taboot"
 version = "0.4.0"
 description = "Doc-to-Graph RAG Platform built on LlamaIndex and Firecrawl"
 readme = "README.md"
@@ -30,14 +30,11 @@ dependencies = [
   "llama-index-graph-stores-neo4j>=0.5.1",
   "llama-index-workflows>=0.3.0",
   "llama-index-storage-docstore-redis>=0.4.1",
-
   # LLM + embeddings adapters (self-hosted)
   "llama-index-llms-ollama>=0.3.0",
   "llama-index-embeddings-huggingface>=0.3.0",
-
   # Optional OpenAI (used by Firecrawl extract, can be disabled)
   "llama-index-llms-openai>=0.6.4",
-
   # Data & external APIs
   "firecrawl-py>=4.4.0",
   "qdrant-client>=1.15.1",
@@ -48,24 +45,21 @@ dependencies = [
   "praw>=7.8.1",
   "google-auth-oauthlib>=1.2.2",
   "google-api-python-client>=2.184.0",
-
   # Service & HTTP
   "fastapi>=0.119.0",
   "uvicorn>=0.37.0",
   "httpx>=0.28.1",
   "anyio>=4.11.0",
-
   # Config & models
   "pydantic>=2.12.0",
+  "pydantic-settings>=2.7.0",
   "python-dotenv>=1.1.1",
   "python-json-logger>=4.0.0",
   "pyyaml>=6.0.3",
   "typer>=0.19.2",
-
   # Filesystems / SSH
   "fsspec[ssh]>=2025.9.0",
   "paramiko>=4.0.0",
-
   # NLP & extraction stack
   "spacy>=3.8.1",
   "pyahocorasick>=2.0.0",
@@ -73,13 +67,13 @@ dependencies = [
   "torch>=2.4.0",
   "accelerate>=0.33.0",
   "fast-langdetect>=1.0.0",
-
   # Utilities
   "watchdog>=6.0.0",
   "orjson>=3.10.7",
   "rich>=13.9.1",
   "youtube-transcript-api>=1.2.3",
   "yt-dlp>=2024.3.10",
+  "psycopg2-binary>=2.9.11",
 ]
 
 [project.optional-dependencies]
@@ -101,9 +95,8 @@ dev = [
 ]
 
 [project.scripts]
-# CLI and API entrypoints (no src/ layout required)
-llama = "llamacrawl.cli.app:app"
-llamacrawl-api = "llamacrawl.api.server:main"
+# CLI entrypoint (API runs via Docker only)
+taboot = "apps.cli.main:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -153,4 +146,9 @@ members = [
   "packages/core", "packages/extraction", "packages/ingest",
   "packages/graph", "packages/vector", "packages/retrieval",
   "packages/schemas", "packages/clients", "packages/common"
+]
+
+[dependency-groups]
+dev = [
+    "types-psycopg2>=2.9.21.20251012",
 ]

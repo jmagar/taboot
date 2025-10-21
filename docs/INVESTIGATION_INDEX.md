@@ -1,11 +1,11 @@
-# LlamaCrawl v2 Investigation — Document Index
+# Taboot v2 Investigation — Document Index
 
 ## Overview
 
-This directory contains comprehensive investigation reports on the data ingestion and extraction planes of the LlamaCrawl v2 Doc-to-Graph RAG platform.
+This directory contains comprehensive investigation reports on the data ingestion and extraction planes of the Taboot v2 Doc-to-Graph RAG platform.
 
 **Investigation Date:** 2025-10-20  
-**Branch:** 001-llamacrawl-v2-rag-platform  
+**Branch:** 001-taboot-v2-rag-platform  
 **Status:** Skeleton Phase (5% Implementation)
 
 ---
@@ -261,7 +261,7 @@ Sources (11+) → Ingestion → Extraction (3-tier) → Retrieval → Answers
 
 ### For Implementation Planning
 → See both reports, then reference:
-- `specs/001-llamacrawl-v2-rag-platform/plan.md` — Implementation plan
+- `specs/001-taboot-v2-rag-platform/plan.md` — Implementation plan
 - `packages/extraction/docs/EXTRACTION_SPEC.md` — Tier details
 - `docs/ARCHITECTURE.md` — System architecture
 
@@ -294,7 +294,7 @@ Sources (11+) → Ingestion → Extraction (3-tier) → Retrieval → Answers
 
 ## Project Summary
 
-**LlamaCrawl v2** is a **well-designed but entirely unimplemented greenfield Doc-to-Graph RAG platform.** 
+**Taboot v2** is a **well-designed but entirely unimplemented greenfield Doc-to-Graph RAG platform.** 
 
 The project has:
 - Excellent architecture and layering discipline
@@ -308,7 +308,7 @@ The path forward is clear: implement according to the provided roadmap in phases
 
 **Report Generated:** 2025-10-20  
 **Investigation Repository:** `/home/jmagar/code/taboot`  
-**Branch:** `001-llamacrawl-v2-rag-platform`
+**Branch:** `001-taboot-v2-rag-platform`
 
 **Quick Navigation:**
 - [Full Investigation Report](PIPELINE_INVESTIGATION_REPORT.md)

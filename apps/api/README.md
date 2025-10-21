@@ -29,7 +29,7 @@ only.
 
 ```bash
 # CLI entry (FastAPI uvicorn dev server)
-uv run uvicorn llamacrawl.api.app:app --reload --port 8000
+uv run uvicorn taboot.api.app:app --reload --port 8000
 
 # Inspect OpenAPI once server is running
 open http://localhost:8000/docs

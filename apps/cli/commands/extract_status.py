@@ -109,7 +109,7 @@ async def extract_status_command() -> None:
     except Exception as e:
         # Catch any other errors and report them
         console.print(f"[red]✗ Failed to retrieve system status: {e}[/red]")
-        logger.error(f"Status collection failed: {e}", exc_info=True)
+        logger.exception("Status collection failed")
         raise typer.Exit(1) from None
 
 

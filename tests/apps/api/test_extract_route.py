@@ -202,24 +202,29 @@ class TestGetExtractStatusEndpoint:
     def test_extract_status_returns_200_with_stub_data(
         self, client: TestClient
     ) -> None:
-        """Test that GET /extract/status returns 200 with stub status data.
+        """Test that GET /extract/status returns 200 with stub status data."""
+        from packages.core.use_cases.get_status import (
+            SystemStatus,
+            QueueDepth,
+            MetricsSnapshot,
+        )
 
-        Expected to FAIL initially (endpoint not implemented yet).
-        """
-        # Mock both the Redis client and use case
-        with patch.dict('os.environ', {'REDIS_URL': 'redis://localhost:6379'}), \
-             patch("redis.asyncio.from_url") as mock_redis, \
-             patch("apps.api.routes.extract.GetStatusUseCase") as mock_use_case_class:
-
+        # Mock the use case factory function
+        with patch("apps.api.routes.extract.get_status_use_case") as mock_get_use_case:
             # Setup mock use case
             mock_use_case = AsyncMock()
-            mock_use_case.execute.return_value = {
-                "overall_healthy": True,
-                "services": {},
-                "queue_depth": {"ingestion": 0, "extraction": 0},
-                "metrics": {},
-            }
-            mock_use_case_class.return_value = mock_use_case
+            mock_use_case.execute.return_value = SystemStatus(
+                overall_healthy=True,
+                services={},
+                queue_depth=QueueDepth(ingestion=0, extraction=0),
+                metrics=MetricsSnapshot(
+                    documents_ingested=0,
+                    chunks_indexed=0,
+                    extraction_jobs_completed=0,
+                    graph_nodes_created=0,
+                ),
+            )
+            mock_get_use_case.return_value = mock_use_case
 
             response = client.get("/extract/status")
 
@@ -227,34 +232,41 @@ class TestGetExtractStatusEndpoint:
             data = response.json()
 
             # Verify stub fields exist
-            assert "overall_healthy" in data or "status" in data
+            assert "overall_healthy" in data
             assert "queue_depth" in data
 
     def test_extract_status_stub_returns_ready(self, client: TestClient) -> None:
-        """Test that stub status returns 'ready' and queue_depth 0.
+        """Test that stub status returns 'ready' and queue_depth 0."""
+        from packages.core.use_cases.get_status import (
+            SystemStatus,
+            QueueDepth,
+            MetricsSnapshot,
+        )
 
-        Expected to FAIL initially (endpoint not implemented yet).
-        """
-        # Mock both the Redis client and use case
-        with patch.dict('os.environ', {'REDIS_URL': 'redis://localhost:6379'}), \
-             patch("redis.asyncio.from_url") as mock_redis, \
-             patch("apps.api.routes.extract.GetStatusUseCase") as mock_use_case_class:
-
+        # Mock the use case factory function
+        with patch("apps.api.routes.extract.get_status_use_case") as mock_get_use_case:
             # Setup mock use case
             mock_use_case = AsyncMock()
-            mock_use_case.execute.return_value = {
-                "overall_healthy": True,
-                "services": {},
-                "queue_depth": {"ingestion": 0, "extraction": 0},
-                "metrics": {},
-            }
-            mock_use_case_class.return_value = mock_use_case
+            mock_use_case.execute.return_value = SystemStatus(
+                overall_healthy=True,
+                services={},
+                queue_depth=QueueDepth(ingestion=0, extraction=0),
+                metrics=MetricsSnapshot(
+                    documents_ingested=0,
+                    chunks_indexed=0,
+                    extraction_jobs_completed=0,
+                    graph_nodes_created=0,
+                ),
+            )
+            mock_get_use_case.return_value = mock_use_case
 
             response = client.get("/extract/status")
 
             assert response.status_code == 200
             data = response.json()
 
-            # Verify stub values - accept either format
-            assert data.get("overall_healthy", True) or data.get("status") == "ready"
+            # Verify stub values
+            assert data.get("overall_healthy") is True
             assert data.get("queue_depth") is not None
+            assert data["queue_depth"]["ingestion"] == 0
+            assert data["queue_depth"]["extraction"] == 0

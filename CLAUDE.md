@@ -47,11 +47,13 @@ Taboot is a **Doc-to-Graph RAG platform** built on LlamaIndex, Firecrawl, Neo4j,
 Firecrawl + Playwright → Normalizer (de-boilerplate) → Chunker → TEI embeddings (GPU) → Qdrant upserts. Structured sources (Docker Compose, SWAG, Tailscale, Unifi) parsed deterministically to nodes/edges.
 
 ### Extraction Plane (Async, Decoupled)
+
 1. **Tier A (Deterministic):** Regex, YAML/JSON parsing, Aho-Corasick for known services/IPs/hosts. Target ≥50 pages/sec (CPU).
-2. **Tier B (spaCy):** Entity ruler + dependency matchers + sentence classifier on `en_core_web_md` (or `trf` for prose). Target ≥200 sentences/sec (md).
-3. **Tier C (LLM Windows):** Qwen3-4B-Instruct (Ollama) on ≤512-token windows, temperature 0, JSON schema, batched 8–16, Redis cache. Target median ≤250ms/window.
+1. **Tier B (spaCy):** Entity ruler + dependency matchers + sentence classifier on `en_core_web_md` (or `trf` for prose). Target ≥200 sentences/sec (md).
+1. **Tier C (LLM Windows):** Qwen3-4B-Instruct (Ollama) on ≤512-token windows, temperature 0, JSON schema, batched 8–16, Redis cache. Target median ≤250ms/window.
 
 ### Retrieval Plane (6-Stage)
+
 1. Query embedding (TEI) → 2. Metadata filter (source, date) → 3. Vector search (Qdrant, top-k) → 4. Rerank (Qwen/Qwen3-Reranker-0.6B) → 5. Graph traversal (≤2 hops Neo4j) → 6. Synthesis (Qwen3-4B) with inline citations + source list.
 
 ## Neo4j Graph Model

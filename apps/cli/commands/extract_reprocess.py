@@ -38,17 +38,33 @@ def extract_reprocess_command(
             raise typer.Exit(code=1)
 
         days = int(since[:-1])
+        if days <= 0:
+            console.print(f"[red]✗ Period must be > 0 days: {since}[/red]")
+            raise typer.Exit(code=1)
+
         since_date = datetime.now(UTC) - timedelta(days=days)
 
         console.print(f"[yellow]Reprocessing documents since {since_date.isoformat()}...[/yellow]")
 
-        # TODO: Import and use ReprocessUseCase when implemented
-        console.print("[green]✓ Reprocessing queued (not yet implemented)[/green]")
+        # Import and use ReprocessUseCase
+        from packages.common.db_schema import get_postgres_client
+        from packages.common.postgres_document_store import PostgresDocumentStore
+        from packages.core.use_cases.reprocess import ReprocessUseCase
 
-    except ValueError as e:
-        console.print(f"[red]✗ Invalid period: {e}[/red]")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        logger.exception(f"Reprocessing failed: {e}")
-        console.print(f"[red]✗ Reprocessing failed: {e}[/red]")
-        raise typer.Exit(code=1)
+        conn = get_postgres_client()
+        try:
+            document_store = PostgresDocumentStore(conn)
+            use_case = ReprocessUseCase(document_store=document_store)
+            result = use_case.execute(since_date=since_date)
+            count = result["documents_queued"]
+            console.print(f"[green]✓ Queued {count} documents for reprocessing[/green]")
+        finally:
+            conn.close()
+
+    except ValueError as err:
+        console.print(f"[red]✗ Invalid period: {err}[/red]")
+        raise typer.Exit(code=1) from err
+    except Exception as err:
+        logger.exception("Reprocessing failed")
+        console.print(f"[red]✗ Reprocessing failed: {err}[/red]")
+        raise typer.Exit(code=1) from err

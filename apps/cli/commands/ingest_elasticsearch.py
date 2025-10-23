@@ -41,7 +41,7 @@ def ingest_elasticsearch_command(
             query_dict = json.loads(query)
         except json.JSONDecodeError as e:
             console.print(f"[red]✗ Invalid JSON query: {e}[/red]")
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from e
 
         elasticsearch_reader = ElasticsearchReader(
             endpoint=config.elasticsearch_url,
@@ -55,27 +55,27 @@ def ingest_elasticsearch_command(
             collection_name=config.collection_name,
         )
 
-        console.print(f"[yellow]Loading documents from Elasticsearch...[/yellow]")
+        console.print("[yellow]Loading documents from Elasticsearch...[/yellow]")
         docs = elasticsearch_reader.load_data(query=query_dict, limit=limit)
         console.print(f"[green]✓ Loaded {len(docs)} documents[/green]")
 
-        console.print("[yellow]Normalizing...[/yellow]")
+        console.print("Normalizing...")
         normalized_docs = [normalizer.normalize(doc.text) for doc in docs]
 
-        console.print("[yellow]Chunking...[/yellow]")
+        console.print("Chunking...")
         all_chunks = []
         for norm_doc in normalized_docs:
             all_chunks.extend(chunker.chunk(norm_doc))
         console.print(f"[green]✓ Created {len(all_chunks)} chunks[/green]")
 
-        console.print("[yellow]Generating embeddings...[/yellow]")
+        console.print("Generating embeddings...")
         embeddings = embedder.embed_texts([chunk.text for chunk in all_chunks])
 
-        console.print("[yellow]Writing to Qdrant...[/yellow]")
+        console.print("Writing to Qdrant...")
         qdrant_writer.upsert_batch(chunks=all_chunks, embeddings=embeddings)
-        console.print(f"[green]✓ Elasticsearch ingestion complete![/green]")
+        console.print("[green]✓ Elasticsearch ingestion complete![/green]")
 
     except Exception as e:
-        logger.exception(f"Elasticsearch ingestion failed: {e}")
+        logger.exception("Elasticsearch ingestion failed")
         console.print(f"[red]✗ Elasticsearch ingestion failed: {e}[/red]")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e

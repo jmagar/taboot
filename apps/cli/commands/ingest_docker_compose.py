@@ -12,7 +12,6 @@ This command is thin - parsing logic is in packages/ingest/readers/docker_compos
 and graph writing is in packages/graph/writers/batched.py.
 """
 
-import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import Annotated
@@ -22,7 +21,6 @@ from rich.console import Console
 
 from packages.common.config import get_config
 from packages.graph.client import Neo4jClient
-from packages.graph.writers.batched import BatchedGraphWriter
 from packages.ingest.readers.docker_compose import (
     DockerComposeError,
     DockerComposeReader,
@@ -63,9 +61,6 @@ def ingest_docker_compose_command(
         typer.Exit: Exit with code 1 if ingestion fails.
     """
     try:
-        # Load config
-        config = get_config()
-
         # Display starting message
         console.print(f"[yellow]Starting ingestion: {file_path}[/yellow]")
 
@@ -73,7 +68,7 @@ def ingest_docker_compose_command(
         start_time = datetime.now(UTC)
 
         # Create reader and load data
-        logger.info(f"Parsing docker-compose file: {file_path}")
+        logger.info("Parsing docker-compose file: %s", file_path)
         reader = DockerComposeReader()
         data = reader.load_data(file_path=file_path)
 
@@ -86,12 +81,9 @@ def ingest_docker_compose_command(
 
         # Write to Neo4j
         logger.info("Writing services and relationships to Neo4j")
-        asyncio.run(
-            _write_to_neo4j(
-                config=config,
-                services=services,
-                relationships=relationships,
-            )
+        _write_to_neo4j(
+            services=services,
+            relationships=relationships,
         )
 
         # Calculate duration
@@ -104,26 +96,28 @@ def ingest_docker_compose_command(
         console.print(f"[green]✓ Duration: {duration_seconds:.0f}s[/green]")
 
         logger.info(
-            f"Docker Compose ingestion completed: {len(services)} services, "
-            f"{len(relationships)} relationships in {duration_seconds:.0f}s"
+            "Docker Compose ingestion completed: %s services, %s relationships in %ss",
+            len(services),
+            len(relationships),
+            f"{duration_seconds:.0f}",
         )
 
     except DockerComposeError as e:
         # Handle specific DockerComposeReader errors
         console.print(f"[red]✗ Docker Compose error: {e}[/red]")
-        logger.error(f"Docker Compose ingestion failed for {file_path}: {e}", exc_info=True)
+        logger.exception("Docker Compose ingestion failed for %s", file_path)
         raise typer.Exit(1) from None
 
     except InvalidYAMLError as e:
         # Handle YAML parsing errors
         console.print(f"[red]✗ Invalid YAML: {e}[/red]")
-        logger.error(f"Invalid YAML in {file_path}: {e}", exc_info=True)
+        logger.exception("Invalid YAML in %s", file_path)
         raise typer.Exit(1) from None
 
     except InvalidPortError as e:
         # Handle port validation errors
         console.print(f"[red]✗ Invalid port: {e}[/red]")
-        logger.error(f"Invalid port in {file_path}: {e}", exc_info=True)
+        logger.exception("Invalid port in %s", file_path)
         raise typer.Exit(1) from None
 
     except typer.Exit:
@@ -133,19 +127,17 @@ def ingest_docker_compose_command(
     except Exception as e:
         # Catch any other errors and report them
         console.print(f"[red]✗ Ingestion failed: {e}[/red]")
-        logger.error(f"Ingestion failed for {file_path}: {e}", exc_info=True)
+        logger.exception("Ingestion failed for %s", file_path)
         raise typer.Exit(1) from None
 
 
-async def _write_to_neo4j(
-    config: object,
+def _write_to_neo4j(
     services: list[dict[str, str]],
     relationships: list[dict[str, str | int]],
 ) -> None:
-    """Write services and relationships to Neo4j using BatchedGraphWriter.
+    """Write services and relationships to Neo4j using direct Cypher queries.
 
     Args:
-        config: Application configuration object.
         services: List of service dictionaries with name, image, version.
         relationships: List of relationship dictionaries with type, source, target/port.
     """
@@ -153,70 +145,59 @@ async def _write_to_neo4j(
     client = Neo4jClient()
     client.connect()
 
-    # Create batched writer
-    writer = BatchedGraphWriter(client=client, batch_size=2000)
-
     try:
-        # Write Service nodes
-        await writer.batch_write_nodes(
-            label="Service",
-            nodes=services,
-            unique_key="name",
-        )
-
-        # Separate DEPENDS_ON and BINDS relationships
-        depends_on_rels = [rel for rel in relationships if rel["type"] == "DEPENDS_ON"]
-        binds_rels = [rel for rel in relationships if rel["type"] == "BINDS"]
-
-        # Write DEPENDS_ON relationships
-        if depends_on_rels:
-            # Transform to format expected by batch_write_relationships
-            depends_on_formatted: list[dict[str, str | dict[str, str | int]]] = [
-                {
-                    "source_value": str(rel["source"]),
-                    "target_value": str(rel["target"]),
-                    "rel_properties": {},
-                }
-                for rel in depends_on_rels
-            ]
-
-            await writer.batch_write_relationships(
-                source_label="Service",
-                source_key="name",
-                target_label="Service",
-                target_key="name",
-                rel_type="DEPENDS_ON",
-                relationships=depends_on_formatted,
-            )
-
-        # Write BINDS relationships (Service to Port)
-        # Note: For BINDS, we need to handle port/protocol properties
-        if binds_rels:
-            # For BINDS relationships, we'll store port and protocol as relationship properties
-            # Since there's no explicit Port node in the data model, we store as properties
-            binds_formatted = [
-                {
-                    "source_value": rel["source"],
-                    "target_value": rel["source"],  # Self-reference for now
-                    "rel_properties": {
-                        "port": rel["port"],
-                        "protocol": rel["protocol"],
+        with client.session() as session:
+            # Write Service nodes
+            for service in services:
+                query = """
+                MERGE (s:Service {name: $name})
+                SET s.image = $image,
+                    s.version = $version
+                RETURN s
+                """
+                session.run(
+                    query,
+                    {
+                        "name": service["name"],
+                        "image": service.get("image", ""),
+                        "version": service.get("version", ""),
                     },
-                }
-                for rel in binds_rels
-            ]
+                )
 
-            await writer.batch_write_relationships(
-                source_label="Service",
-                source_key="name",
-                target_label="Service",
-                target_key="name",
-                rel_type="BINDS",
-                relationships=binds_formatted,
-            )
+            # Write relationships
+            for rel in relationships:
+                if rel["type"] == "DEPENDS_ON":
+                    query = """
+                    MATCH (source:Service {name: $source}),
+                          (target:Service {name: $target})
+                    MERGE (source)-[:DEPENDS_ON]->(target)
+                    """
+                    session.run(
+                        query,
+                        {
+                            "source": str(rel["source"]),
+                            "target": str(rel["target"]),
+                        },
+                    )
+
+                elif rel["type"] == "BINDS":
+                    query = """
+                    MATCH (s:Service {name: $service})
+                    MERGE (s)-[b:BINDS]->(s)
+                    SET b.port = $port,
+                        b.protocol = $protocol
+                    """
+                    session.run(
+                        query,
+                        {
+                            "service": rel["source"],
+                            "port": rel["port"],
+                            "protocol": rel["protocol"],
+                        },
+                    )
 
     finally:
-        # Clean up client connection (not async)
+        # Clean up client connection
         client.close()
 
 

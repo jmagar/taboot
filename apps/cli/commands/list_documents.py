@@ -43,7 +43,7 @@ def list_documents_command(
         taboot list documents --extraction-state pending
         taboot list documents --source-type github --extraction-state completed
     """
-    console.print(f"\n[bold blue]Listing documents[/bold blue]")
+    console.print("\n[bold blue]Listing documents[/bold blue]")
     console.print(
         f"[dim]Filters: limit={limit}, offset={offset}, "
         f"source_type={source_type}, extraction_state={extraction_state}[/dim]\n"
@@ -61,7 +61,7 @@ def list_documents_command(
                     f"[red]Error:[/red] Invalid source_type '{source_type}'. "
                     f"Valid values: {valid_values}"
                 )
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
         extraction_state_enum: Optional[ExtractionState] = None
         if extraction_state:
@@ -73,28 +73,30 @@ def list_documents_command(
                     f"[red]Error:[/red] Invalid extraction_state '{extraction_state}'. "
                     f"Valid values: {valid_values}"
                 )
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
         # Import use case and dependencies
-        from packages.core.use_cases.list_documents import ListDocumentsUseCase
+        from packages.core.use_cases.list_documents import (
+            DocumentListResponse,
+            ListDocumentsUseCase,
+        )
         from packages.common.db_schema import get_postgres_client
-
-        # Get PostgreSQL client
-        postgres_url = os.getenv("POSTGRES_URL", "postgresql://taboot:changeme@localhost:5432/taboot")
-        db_client = get_postgres_client(postgres_url)
-
-        # Execute use case
+        from packages.common.postgres_adapter import PostgresDocumentsClient
         import asyncio
 
-        async def _execute():
-            async with db_client as client:
-                use_case = ListDocumentsUseCase(db_client=client)
-                return await use_case.execute(
-                    limit=limit,
-                    offset=offset,
-                    source_type=source_type_enum,
-                    extraction_state=extraction_state_enum,
-                )
+        # Get PostgreSQL client and create adapter
+        db_conn = get_postgres_client()
+        db_client = PostgresDocumentsClient(db_conn)
+
+        # Execute use case
+        async def _execute() -> DocumentListResponse:
+            use_case = ListDocumentsUseCase(db_client=db_client)
+            return await use_case.execute(
+                limit=limit,
+                offset=offset,
+                source_type=source_type_enum,
+                extraction_state=extraction_state_enum,
+            )
 
         result = asyncio.run(_execute())
 
@@ -134,8 +136,8 @@ def list_documents_command(
 
     except ValueError as e:
         console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
-        logger.error(f"List documents command failed: {e}", exc_info=True)
-        raise typer.Exit(1)
+        logger.exception("List documents command failed")
+        raise typer.Exit(1) from None

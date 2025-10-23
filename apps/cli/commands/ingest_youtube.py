@@ -38,27 +38,27 @@ def ingest_youtube_command(
             collection_name=config.collection_name,
         )
 
-        console.print(f"[yellow]Loading transcripts...[/yellow]")
+        console.print("[yellow]Loading transcripts...[/yellow]")
         docs = youtube_reader.load_data(video_urls=urls)
         console.print(f"[green]✓ Loaded {len(docs)} transcripts[/green]")
 
-        console.print("[yellow]Normalizing...[/yellow]")
+        console.print("Normalizing...")
         normalized_docs = [normalizer.normalize(doc.text) for doc in docs]
 
-        console.print("[yellow]Chunking...[/yellow]")
+        console.print("Chunking...")
         all_chunks = []
         for norm_doc in normalized_docs:
             all_chunks.extend(chunker.chunk(norm_doc))
         console.print(f"[green]✓ Created {len(all_chunks)} chunks[/green]")
 
-        console.print("[yellow]Generating embeddings...[/yellow]")
+        console.print("Generating embeddings...")
         embeddings = embedder.embed_texts([chunk.text for chunk in all_chunks])
 
-        console.print("[yellow]Writing to Qdrant...[/yellow]")
+        console.print("Writing to Qdrant...")
         qdrant_writer.upsert_batch(chunks=all_chunks, embeddings=embeddings)
-        console.print(f"[green]✓ YouTube ingestion complete![/green]")
+        console.print("[green]✓ YouTube ingestion complete![/green]")
 
     except Exception as e:
-        logger.exception(f"YouTube ingestion failed: {e}")
+        logger.exception("YouTube ingestion failed")
         console.print(f"[red]✗ YouTube ingestion failed: {e}[/red]")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e

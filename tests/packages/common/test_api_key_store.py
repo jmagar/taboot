@@ -16,7 +16,7 @@ async def redis_client():
     client = await redis.from_url("redis://localhost:6379", decode_responses=True)
     yield client
     await client.flushdb()  # Clean up
-    await client.close()
+    await client.aclose()
 
 
 @pytest.fixture

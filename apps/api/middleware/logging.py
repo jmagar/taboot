@@ -12,6 +12,7 @@ Conforms to observability requirements in docs/OBSERVABILITY.md.
 
 import logging
 import time
+from typing import Awaitable, Callable
 from uuid import uuid4
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -24,7 +25,9 @@ logger = logging.getLogger(__name__)
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Middleware for logging all HTTP requests with correlation IDs."""
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """Process request and log details.
 
         Args:
@@ -36,7 +39,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         """
         # Generate correlation ID for request tracing
         request_id = str(uuid4())
-        start_time = time.time()
+        start_ns = time.perf_counter_ns()
 
         # Log request start
         logger.info(
@@ -45,7 +48,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 "request_id": request_id,
                 "method": request.method,
                 "path": request.url.path,
-                "query_params": str(request.query_params),
+                # Avoid raw query params; optionally whitelist keys
+                "query_params": None,
                 "client_host": request.client.host if request.client else None,
             },
         )
@@ -58,7 +62,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
 
             # Calculate elapsed time
-            elapsed_ms = int((time.time() - start_time) * 1000)
+            elapsed_ms = (time.perf_counter_ns() - start_ns) // 1_000_000
 
             # Log successful request
             logger.info(
@@ -74,24 +78,21 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
             # Add request_id to response headers for client correlation
             response.headers["X-Request-ID"] = request_id
-
             return response
 
         except Exception as e:
             # Calculate elapsed time
-            elapsed_ms = int((time.time() - start_time) * 1000)
+            elapsed_ms = (time.perf_counter_ns() - start_ns) // 1_000_000
 
             # Log failed request
-            logger.error(
+            logger.exception(
                 "Request failed",
                 extra={
                     "request_id": request_id,
                     "method": request.method,
                     "path": request.url.path,
                     "elapsed_ms": elapsed_ms,
-                    "error": str(e),
                 },
-                exc_info=True,
             )
 
             # Re-raise to allow FastAPI error handlers to process

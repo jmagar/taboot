@@ -59,7 +59,7 @@ def list_documents(
                     status_code=400,
                     detail=f"Invalid source_type '{source_type}'. "
                     f"Valid values: {', '.join(valid_values)}",
-                )
+                ) from None
 
         extraction_state_enum: Optional[ExtractionState] = None
         if extraction_state:
@@ -71,7 +71,7 @@ def list_documents(
                     status_code=400,
                     detail=f"Invalid extraction_state '{extraction_state}'. "
                     f"Valid values: {', '.join(valid_values)}",
-                )
+                ) from None
 
         # Import database client and document store
         from packages.common.db_schema import get_postgres_client
@@ -108,17 +108,18 @@ def list_documents(
             conn.close()
 
         logger.info(
-            f"Listed {len(result.documents)} documents "
-            f"(total={result.total}, limit={limit}, offset={offset})"
+            "Listed %d documents (total=%d, limit=%d, offset=%d)",
+            len(result.documents), result.total, limit, offset
         )
-        return result
 
     except HTTPException:
         # Re-raise HTTP exceptions
         raise
     except ValueError as e:
-        logger.error(f"Validation error in list documents: {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("Validation error in list documents: %s", e)
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"List documents failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to list documents: {str(e)}")
+        logger.exception("List documents failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed to list documents: {e!s}") from e
+
+    return result

@@ -79,8 +79,6 @@ def get_extract_use_case() -> ExtractPendingUseCase:
 
     try:
         # Initialize Redis client (async)
-        import redis.asyncio as redis
-
         redis_client = redis.from_url(config.redis_url, decode_responses=True)
 
         # Initialize Tier A components
@@ -109,22 +107,24 @@ def get_extract_use_case() -> ExtractPendingUseCase:
 
         # Stub DocumentStore for now
         # TODO: Replace with actual PostgreSQL adapter
+        from uuid import UUID
+
         from packages.core.use_cases.extract_pending import DocumentStore
+        from packages.schemas.models import Document
 
         class StubDocumentStore(DocumentStore):
             """Stub DocumentStore for MVP."""
 
-            def query_pending(self, limit: int | None = None) -> list[Any]:
+            def query_pending(self, limit: int | None = None) -> list[Document]:
                 """Return empty list - no pending documents."""
                 return []
 
-            def get_content(self, doc_id: Any) -> str:
+            def get_content(self, doc_id: UUID) -> str:
                 """Return empty content."""
                 return ""
 
-            def update_document(self, document: Any) -> None:
+            def update_document(self, document: Document) -> None:
                 """No-op update."""
-                pass
 
         document_store = StubDocumentStore()
 
@@ -134,7 +134,7 @@ def get_extract_use_case() -> ExtractPendingUseCase:
         )
 
     except Exception as e:
-        logger.error(f"Failed to initialize ExtractPendingUseCase: {e}", exc_info=True)
+        logger.exception("Failed to initialize ExtractPendingUseCase: %s", e)
         raise RuntimeError(f"Failed to initialize extraction dependencies: {e}") from e
 
 
@@ -177,7 +177,7 @@ async def trigger_extraction(
         )
 
     except Exception as e:
-        logger.error(f"Extraction pipeline failed: {e}", exc_info=True)
+        logger.exception("Extraction pipeline failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Extraction pipeline failed: {str(e)}",

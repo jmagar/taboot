@@ -62,25 +62,24 @@ def ingest_swag_command(
         path = Path(config_path)
         if not path.exists():
             console.print(f"[red]✗ Config file not found: {config_path}[/red]")
-            logger.error(f"Config file not found: {config_path}")
             raise typer.Exit(1)
 
         # Display starting message
         console.print(f"[yellow]Starting SWAG config ingestion: {config_path}[/yellow]")
-        logger.info(f"Starting SWAG config ingestion: {config_path}")
+        logger.info("Starting SWAG config ingestion: %s", config_path)
 
         # Create SwagReader
         reader = SwagReader(proxy_name=proxy_name)
 
         # Parse config file
-        logger.info(f"Parsing config file: {config_path}")
+        logger.info("Parsing config file: %s", config_path)
         parsed = reader.parse_file(str(config_path))
 
         proxies = parsed["proxies"]
         routes = parsed["routes"]
 
         console.print(f"[green]✓ Parsed: {len(proxies)} proxy, {len(routes)} routes[/green]")
-        logger.info(f"Parsed {len(proxies)} proxies and {len(routes)} routes")
+        logger.info("Parsed %s proxies and %s routes", len(proxies), len(routes))
 
         # Connect to Neo4j
         logger.info("Connecting to Neo4j")
@@ -111,8 +110,8 @@ def ingest_swag_command(
                         },
                     )
 
-                console.print(f"[green]✓ Wrote {len(proxies)} Proxy node to Neo4j[/green]")
-                logger.info(f"Wrote {len(proxies)} Proxy nodes to Neo4j")
+                console.print(f"[green]✓ Wrote {len(proxies)} Proxy node(s) to Neo4j[/green]")
+                logger.info("Wrote %s Proxy nodes to Neo4j", len(proxies))
 
                 # Write ROUTES_TO relationships
                 # First ensure Service nodes exist
@@ -149,7 +148,7 @@ def ingest_swag_command(
                 console.print(
                     f"[green]✓ Wrote {len(routes)} ROUTES_TO relationships to Neo4j[/green]"
                 )
-                logger.info(f"Wrote {len(routes)} ROUTES_TO relationships to Neo4j")
+                logger.info("Wrote %s ROUTES_TO relationships to Neo4j", len(routes))
 
         finally:
             # Always close Neo4j connection
@@ -166,22 +165,22 @@ def ingest_swag_command(
     except SwagReaderError as e:
         # Handle SwagReader-specific errors
         console.print(f"[red]✗ SWAG config parsing failed: {e}[/red]")
-        logger.error(f"SWAG config parsing failed: {e}", exc_info=True)
+        logger.exception("SWAG config parsing failed")
         raise typer.Exit(1) from None
     except Neo4jConnectionError as e:
         # Handle Neo4j connection errors
         console.print(f"[red]✗ Neo4j connection failed: {e}[/red]")
-        logger.error(f"Neo4j connection failed: {e}", exc_info=True)
+        logger.exception("Neo4j connection failed")
         raise typer.Exit(1) from None
     except FileNotFoundError as e:
         # Handle file not found errors
         console.print(f"[red]✗ Config file not found: {e}[/red]")
-        logger.error(f"Config file not found: {e}", exc_info=True)
+        logger.exception("Config file not found")
         raise typer.Exit(1) from None
     except Exception as e:
         # Catch any other errors and report them
         console.print(f"[red]✗ Ingestion failed: {e}[/red]")
-        logger.error(f"Ingestion failed: {e}", exc_info=True)
+        logger.exception("Ingestion failed")
         raise typer.Exit(1) from None
 
 

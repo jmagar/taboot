@@ -121,7 +121,7 @@ def query(
 @app.command()
 def status(
     component: Optional[str] = typer.Option(
-        None, help="Component to check (graph, vector, cache, crawler)"
+        None, help="Component to check (neo4j, qdrant, redis, tei, ollama, firecrawl, playwright)"
     ),
     verbose: bool = typer.Option(False, help="Show detailed metrics"),
 ) -> None:
@@ -129,25 +129,24 @@ def status(
     Display system status, health checks, and performance metrics.
 
     Components:
-        graph   - Neo4j connection, node/edge counts, index status
-        vector  - Qdrant collection stats, memory usage
-        cache   - Redis connection, key counts, memory
-        crawler - Firecrawl API status, job queue depth
-
-    Metrics include:
-        - Extraction throughput (windows/sec by tier)
-        - LLM latency (p50, p95, p99)
-        - Cache hit rates
-        - Database throughput
+        neo4j      - Graph database connection and health
+        qdrant     - Vector database collection stats
+        redis      - Cache connection and memory usage
+        tei        - Text embeddings inference service
+        ollama     - LLM service status
+        firecrawl  - Web crawling service status
+        playwright - Browser automation service
 
     Examples:
-        tabootstatus
-        tabootstatus --component graph --verbose
-        tabootstatus --component vector
+        taboot status
+        taboot status --component neo4j --verbose
+        taboot status --component qdrant
     """
-    raise NotImplementedError(
-        f"Status command not yet implemented (component={component}, verbose={verbose})"
-    )
+    import asyncio
+    from apps.cli.commands.status import status_command
+
+    # Run async command in event loop
+    asyncio.run(status_command(component=component, verbose=verbose))
 
 
 # Create list subcommand group
@@ -185,6 +184,34 @@ def list_documents_sync(
 
 # Register list subcommand group
 app.add_typer(list_app, name="list")
+
+
+# Create graph subcommand group
+graph_app = typer.Typer(name="graph", help="Execute Cypher queries against Neo4j")
+
+
+@graph_app.command(name="query")
+def graph_query_sync(
+    cypher: str = typer.Argument(..., help="Cypher query to execute"),
+    format: str = typer.Option("table", "--format", "-f", help="Output format (table or json)"),
+) -> None:
+    """
+    Execute a raw Cypher query against the Neo4j knowledge graph.
+
+    Use this for debugging, exploration, and direct database queries.
+
+    Examples:
+        taboot graph query "MATCH (s:Service) RETURN s LIMIT 10"
+        taboot graph query "MATCH (s:Service)-[r]->(h:Host) RETURN s.name, type(r), h.hostname LIMIT 5"
+        taboot graph query "MATCH (n) RETURN count(n) as total_nodes" --format json
+    """
+    from apps.cli.commands.graph import query_command
+
+    query_command(cypher=cypher, format=format)
+
+
+# Register graph subcommand group
+app.add_typer(graph_app, name="graph")
 
 
 @app.command()

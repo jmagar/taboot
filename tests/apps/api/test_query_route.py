@@ -1,15 +1,10 @@
 """Tests for POST /query API endpoint."""
 
 import pytest
-from fastapi.testclient import TestClient
-from apps.api.app import app
-
-
-client = TestClient(app)
 
 
 @pytest.mark.unit
-def test_query_endpoint_validates_request():
+def test_query_endpoint_validates_request(client):
     """Test query endpoint validates request body."""
     # Empty question should fail
     response = client.post("/query", json={"question": ""})
@@ -21,7 +16,7 @@ def test_query_endpoint_validates_request():
 
 
 @pytest.mark.unit
-def test_query_endpoint_accepts_valid_request():
+def test_query_endpoint_accepts_valid_request(client):
     """Test query endpoint accepts valid request."""
     response = client.post(
         "/query",
@@ -38,7 +33,7 @@ def test_query_endpoint_accepts_valid_request():
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_query_endpoint_with_real_services(qdrant_client, neo4j_client):
+def test_query_endpoint_with_real_services(client, qdrant_client, neo4j_client):
     """Test query endpoint against real services."""
     response = client.post(
         "/query",

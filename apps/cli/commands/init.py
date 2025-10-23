@@ -101,7 +101,7 @@ def init_command() -> None:
             for service, status in health["services"].items():
                 if not status:
                     console.print(f"  - {service}: unhealthy")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
 
         console.print("[green]✓ All services healthy[/green]")
 
@@ -127,24 +127,15 @@ def init_command() -> None:
         raise
     except Exception as e:
         # Catch any other errors and report them
-        error_msg = str(e).lower()
         console.print(f"[red]❌ Initialization failed: {e}[/red]")
-
-        # Determine which component failed based on error message
-        if "neo4j" in error_msg:
-            console.print("[red]Failed to create Neo4j constraints[/red]")
-        elif "qdrant" in error_msg or "collection" in error_msg:
-            console.print("[red]Failed to create Qdrant collection[/red]")
-        elif "postgresql" in error_msg or "schema" in error_msg:
-            console.print("[red]Failed to create PostgreSQL schema[/red]")
-
-        raise typer.Exit(1) from None
+        logger.exception("Initialization failed")
+        raise typer.Exit(1) from e
 
 
 # Export public API
 __all__ = [
-    "init_command",
     "create_neo4j_constraints",
-    "create_qdrant_collections",
     "create_postgresql_schema",
+    "create_qdrant_collections",
+    "init_command",
 ]

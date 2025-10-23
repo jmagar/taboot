@@ -6,7 +6,7 @@ All notable changes to Taboot will be documented in this file.
 
 ## [Unreleased]
 
-## [1.0.0] - 2025-10-23
+## [0.4.0] - 2025-10-23
 
 ### Added
 - **List Documents Feature (T163-T168)**: Complete implementation with filtering and pagination
@@ -44,6 +44,13 @@ All notable changes to Taboot will be documented in this file.
   - Key features list with technical details
   - Prerequisites and setup instructions (5-minute setup)
 
+- Port mapping documentation in .env.example with inline comments
+- Direct import pattern example in packages/core/README.md
+- CHANGELOG.md for tracking project changes
+- Project constitution (.specify/memory/constitution.md) defining core principles, tech stack, and development workflow
+- Comprehensive testing documentation (docs/TESTING.md) covering unit/integration tests, markers, patterns, and troubleshooting
+- LlamaIndex usage clarified across all adapter packages (ingest, extraction, vector, graph, retrieval)
+
 ### Changed
 - Renamed project from LlamaCrawl to Taboot across all documentation and code
 - Standardized all health check endpoints to `/health` (previously mixed `/health` and `/healthz`)
@@ -61,14 +68,6 @@ All notable changes to Taboot will be documented in this file.
 - Added port mapping comments (host→container) for all services in .env files
 - Fixed Ollama model name in troubleshooting guide
 
-### Added
-- Port mapping documentation in .env.example with inline comments
-- Direct import pattern example in packages/core/README.md
-- CHANGELOG.md for tracking project changes
-- Project constitution (.specify/memory/constitution.md) defining core principles, tech stack, and development workflow
-- Comprehensive testing documentation (docs/TESTING.md) covering unit/integration tests, markers, patterns, and troubleshooting
-- LlamaIndex usage clarified across all adapter packages (ingest, extraction, vector, graph, retrieval)
-
-## [0.4.0] - 2025-10-20
+## [0.3.0] - 2025-10-20
 
 Initial taboot release with complete documentation audit and naming update.

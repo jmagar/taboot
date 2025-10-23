@@ -1,9 +1,12 @@
 """Ingest Gmail command for Taboot CLI."""
 
 import logging
+from datetime import UTC, datetime
 from typing import Annotated
+from uuid import uuid4
 
 import typer
+from llama_index.core import Document
 from rich.console import Console
 
 from packages.common.config import get_config
@@ -11,6 +14,7 @@ from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
 from packages.ingest.normalizer import Normalizer
 from packages.ingest.readers.gmail import GmailReader
+from packages.schemas.models import Chunk, SourceType
 from packages.vector.writer import QdrantWriter
 
 console = Console()
@@ -30,10 +34,19 @@ def ingest_gmail_command(
     """
     try:
         config = get_config()
-        limit_str = f"limit: {limit}" if limit else "no limit"
-        console.print(f"[yellow]Starting Gmail ingestion: '{query}' ({limit_str})[/yellow]")
+        limit_str = f"limit: {limit}" if limit is not None else "no limit"
+        console.print(
+            f"[yellow]Starting Gmail ingestion: '{query}' ({limit_str})[/yellow]"
+        )
 
-        gmail_reader = GmailReader(credentials_path=config.gmail_credentials_path)
+        # Validate credentials
+        gmail_creds = getattr(config, "gmail_credentials_path", None)
+        if not gmail_creds:
+            raise ValueError(
+                "Gmail credentials not configured (GMAIL_CREDENTIALS_PATH env var required)"
+            )
+
+        gmail_reader = GmailReader(credentials_path=gmail_creds)
         normalizer = Normalizer()
         chunker = Chunker()
         embedder = Embedder(tei_url=config.tei_embedding_url)
@@ -42,27 +55,56 @@ def ingest_gmail_command(
             collection_name=config.collection_name,
         )
 
-        console.print(f"[yellow]Loading emails...[/yellow]")
-        docs = gmail_reader.load_data(query=query, limit=limit)
-        console.print(f"[green]✓ Loaded {len(docs)} emails[/green]")
+        try:
+            console.print("[yellow]Loading emails...[/yellow]")
+            docs = gmail_reader.load_data(query=query, limit=limit)
+            console.print(f"[green]✓ Loaded {len(docs)} emails[/green]")
 
-        console.print("[yellow]Normalizing...[/yellow]")
-        normalized_docs = [normalizer.normalize(doc.text) for doc in docs]
+            console.print("[yellow]Normalizing...[/yellow]")
+            # Preserve metadata by wrapping normalized text back into Document
+            normalized_docs = [
+                Document(text=normalizer.normalize(doc.text), metadata=doc.metadata)
+                for doc in docs
+            ]
 
-        console.print("[yellow]Chunking...[/yellow]")
-        all_chunks = []
-        for norm_doc in normalized_docs:
-            all_chunks.extend(chunker.chunk(norm_doc))
-        console.print(f"[green]✓ Created {len(all_chunks)} chunks[/green]")
+            console.print("[yellow]Chunking...[/yellow]")
+            all_chunks: list[Chunk] = []
+            doc_id = uuid4()
+            ingested_at = int(datetime.now(UTC).timestamp())
+            for doc in normalized_docs:
+                # Call chunk_document with Document object, not string
+                chunk_docs = chunker.chunk_document(doc)
+                for i, chunk_doc in enumerate(chunk_docs):
+                    # Convert LlamaIndex Document to Pydantic Chunk
+                    chunk = Chunk(
+                        chunk_id=uuid4(),
+                        doc_id=doc_id,
+                        content=chunk_doc.text,
+                        section=None,
+                        position=i,
+                        token_count=len(chunk_doc.text.split()),
+                        source_url=doc.metadata.get("source_url", ""),
+                        source_type=SourceType.GMAIL,
+                        ingested_at=ingested_at,
+                        tags=None,
+                    )
+                    all_chunks.append(chunk)
 
-        console.print("[yellow]Generating embeddings...[/yellow]")
-        embeddings = embedder.embed_texts([chunk.text for chunk in all_chunks])
+            console.print(f"[green]✓ Created {len(all_chunks)} chunks[/green]")
 
-        console.print("[yellow]Writing to Qdrant...[/yellow]")
-        qdrant_writer.upsert_batch(chunks=all_chunks, embeddings=embeddings)
-        console.print(f"[green]✓ Gmail ingestion complete![/green]")
+            console.print("[yellow]Generating embeddings...[/yellow]")
+            embeddings = embedder.embed_texts([chunk.content for chunk in all_chunks])
 
-    except Exception as e:
-        logger.exception(f"Gmail ingestion failed: {e}")
-        console.print(f"[red]✗ Gmail ingestion failed: {e}[/red]")
-        raise typer.Exit(code=1)
+            console.print("[yellow]Writing to Qdrant...[/yellow]")
+            qdrant_writer.upsert_batch(chunks=all_chunks, embeddings=embeddings)
+            console.print("[green]✓ Gmail ingestion complete![/green]")
+
+        finally:
+            # Ensure resources are closed
+            embedder.close()
+            qdrant_writer.close()
+
+    except Exception as err:
+        logger.exception("Gmail ingestion failed")
+        console.print(f"[red]✗ Gmail ingestion failed: {err}[/red]")
+        raise typer.Exit(code=1) from err

@@ -18,6 +18,8 @@ import typer
 from rich.console import Console
 
 from packages.common.config import get_config
+from packages.common.db_schema import get_postgres_client
+from packages.common.postgres_document_store import PostgresDocumentStore
 from packages.core.use_cases.ingest_web import IngestWebUseCase
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
@@ -84,59 +86,71 @@ def ingest_web_command(
             collection_name=config.collection_name,
         )
 
-        # Create use case
-        use_case = IngestWebUseCase(
-            web_reader=web_reader,
-            normalizer=normalizer,
-            chunker=chunker,
-            embedder=embedder,
-            qdrant_writer=qdrant_writer,
-            collection_name=config.collection_name,
-        )
+        # Create document store
+        pg_conn = get_postgres_client()
+        document_store = PostgresDocumentStore(pg_conn)
 
-        # Track start time for duration calculation
-        start_time = datetime.now(UTC)
-
-        # Execute ingestion
-        logger.info(f"Executing web ingestion for {url}")
-        job = use_case.execute(url=url, limit=limit)
-
-        # Calculate duration
-        end_time = datetime.now(UTC)
-        duration_seconds = (end_time - start_time).total_seconds()
-
-        # Display results based on job state
-        if job.state == JobState.COMPLETED:
-            console.print(f"[green]✓ Job ID: {job.job_id}[/green]")
-            console.print(f"[green]✓ {job.pages_processed} pages crawled[/green]")
-            console.print(f"[green]✓ {job.chunks_created} chunks created[/green]")
-            console.print(f"[green]✓ Duration: {duration_seconds:.0f}s[/green]")
-            logger.info(
-                f"Ingestion completed: {job.pages_processed} pages, "
-                f"{job.chunks_created} chunks in {duration_seconds:.0f}s"
+        try:
+            # Create use case
+            use_case = IngestWebUseCase(
+                web_reader=web_reader,
+                normalizer=normalizer,
+                chunker=chunker,
+                embedder=embedder,
+                qdrant_writer=qdrant_writer,
+                document_store=document_store,
+                collection_name=config.collection_name,
             )
 
-        elif job.state == JobState.FAILED:
-            # Display failure message
-            console.print(f"[red]✗ Job ID: {job.job_id}[/red]")
-            console.print("[red]✗ Ingestion failed[/red]")
+            # Track start time for duration calculation
+            start_time = datetime.now(UTC)
 
-            # Display errors if available
-            if job.errors:
-                console.print("[red]Errors:[/red]")
-                for error_entry in job.errors:
-                    error_msg = error_entry.get("error", "Unknown error")
-                    console.print(f"  - {error_msg}")
+            # Execute ingestion
+            logger.info("Executing web ingestion for %s", url)
+            job = use_case.execute(url=url, limit=limit)
 
-            logger.error(f"Ingestion failed for {url}: {job.errors}")
-            raise typer.Exit(1)
+            # Calculate duration
+            end_time = datetime.now(UTC)
+            duration_seconds = (end_time - start_time).total_seconds()
 
-        else:
-            # Unexpected state
-            console.print(f"[yellow]⚠ Job ID: {job.job_id}[/yellow]")
-            console.print(f"[yellow]⚠ Unexpected job state: {job.state}[/yellow]")
-            logger.warning(f"Unexpected job state: {job.state}")
-            raise typer.Exit(1)
+            # Display results based on job state
+            if job.state == JobState.COMPLETED:
+                console.print(f"[green]✓ Job ID: {job.job_id}[/green]")
+                console.print(f"[green]✓ {job.pages_processed} pages crawled[/green]")
+                console.print(f"[green]✓ {job.chunks_created} chunks created[/green]")
+                console.print(f"[green]✓ Duration: {duration_seconds:.0f}s[/green]")
+                logger.info(
+                    "Ingestion completed: %s pages, %s chunks in %ss",
+                    job.pages_processed,
+                    job.chunks_created,
+                    f"{duration_seconds:.0f}",
+                )
+
+            elif job.state == JobState.FAILED:
+                # Display failure message
+                console.print(f"[red]✗ Job ID: {job.job_id}[/red]")
+                console.print("[red]✗ Ingestion failed[/red]")
+
+                # Display errors if available
+                if job.errors:
+                    console.print("[red]Errors:[/red]")
+                    for error_entry in job.errors:
+                        error_msg = error_entry.get("error", "Unknown error")
+                        console.print(f"  - {error_msg}")
+
+                logger.exception("Ingestion failed for %s", url)
+                raise typer.Exit(1)
+
+            else:
+                # Unexpected state
+                console.print(f"[yellow]⚠ Job ID: {job.job_id}[/yellow]")
+                console.print(f"[yellow]⚠ Unexpected job state: {job.state}[/yellow]")
+                logger.warning("Unexpected job state: %s", job.state)
+                raise typer.Exit(1)
+
+        finally:
+            # Clean up PostgreSQL connection
+            pg_conn.close()
 
     except typer.Exit:
         # Re-raise typer.Exit to preserve exit code
@@ -144,8 +158,8 @@ def ingest_web_command(
     except Exception as e:
         # Catch any other errors and report them
         console.print(f"[red]✗ Ingestion failed: {e}[/red]")
-        logger.error(f"Ingestion failed for {url}: {e}", exc_info=True)
-        raise typer.Exit(1) from None
+        logger.exception("Ingestion failed for %s", url)
+        raise typer.Exit(1) from e
 
 
 # Register docker-compose subcommand

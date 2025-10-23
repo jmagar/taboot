@@ -7,7 +7,6 @@ Required by FR-046: API MUST provide system status endpoints with health checks.
 """
 
 import logging
-import os
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
@@ -66,8 +65,8 @@ def get_status_use_case() -> GetStatusUseCase:
         )
 
     except Exception as e:
-        logger.error(f"Failed to initialize GetStatusUseCase: {e}", exc_info=True)
-        raise RuntimeError(f"Failed to initialize status dependencies: {e}") from e
+        logger.exception("Failed to initialize GetStatusUseCase")
+        raise RuntimeError(f"Failed to initialize status dependencies: {e!s}") from e
 
 
 @router.get("", response_model=SystemStatusResponse, status_code=status.HTTP_200_OK)
@@ -109,8 +108,8 @@ async def get_system_status() -> SystemStatusResponse:
         )
 
     except Exception as e:
-        logger.error(f"Status aggregation failed: {e}", exc_info=True)
+        logger.exception("Status aggregation failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Status aggregation failed: {str(e)}",
+            detail=f"Status aggregation failed: {e!s}",
         ) from e

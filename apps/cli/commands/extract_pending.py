@@ -75,7 +75,8 @@ class InMemoryDocumentStore:
             KeyError: If document not found.
         """
         if doc_id not in self._content:
-            raise KeyError(f"Document {doc_id} not found")
+            logger.error("Document not found in content store", extra={"doc_id": str(doc_id)})
+            raise KeyError(str(doc_id))
         return self._content[doc_id]
 
     def update_document(self, document: Document) -> None:
@@ -174,49 +175,60 @@ async def extract_pending_command(
         from packages.common.postgres_document_store import PostgresDocumentStore
 
         pg_conn = get_postgres_client()
-        document_store = PostgresDocumentStore(pg_conn)
+        try:
+            document_store = PostgresDocumentStore(pg_conn)
 
-        # Create use case
-        use_case = ExtractPendingUseCase(
-            orchestrator=orchestrator,
-            document_store=document_store,
-        )
+            # Create use case
+            use_case = ExtractPendingUseCase(
+                orchestrator=orchestrator,
+                document_store=document_store,
+            )
 
-        # Execute extraction
-        logger.info("Executing extraction for pending documents")
-        summary = await use_case.execute(limit=limit)
+            # Execute extraction
+            logger.info("Executing extraction for pending documents")
+            summary = await use_case.execute(limit=limit)
+
+            # Display results
+            console.print("\n[bold cyan]Extraction Pipeline[/bold cyan]")
+            console.print("─────────────────────")
+            console.print(
+                f"[green]Processed: {summary['processed']} documents[/green]"
+            )
+            console.print(
+                f"[green]Succeeded: {summary['succeeded']} documents[/green]"
+            )
+
+            if summary["failed"] > 0:
+                console.print(f"[red]Failed: {summary['failed']} documents[/red]")
+            else:
+                console.print(
+                    f"[green]Failed: {summary['failed']} documents[/green]"
+                )
+
+            logger.info(
+                "Extraction complete: processed=%d, succeeded=%d, failed=%d",
+                summary["processed"],
+                summary["succeeded"],
+                summary["failed"],
+            )
+        finally:
+            pg_conn.close()
 
         # Close Redis connection
         await redis_client.close()
-
-        # Display results
-        console.print("\n[bold cyan]Extraction Pipeline[/bold cyan]")
-        console.print("─────────────────────")
-        console.print(f"[green]Processed: {summary['processed']} documents[/green]")
-        console.print(f"[green]Succeeded: {summary['succeeded']} documents[/green]")
-
-        if summary['failed'] > 0:
-            console.print(f"[red]Failed: {summary['failed']} documents[/red]")
-        else:
-            console.print(f"[green]Failed: {summary['failed']} documents[/green]")
-
-        logger.info(
-            f"Extraction complete: processed={summary['processed']}, "
-            f"succeeded={summary['succeeded']}, failed={summary['failed']}"
-        )
 
     except typer.Exit:
         # Re-raise typer.Exit to preserve exit code
         raise
     except Exception as e:
         # Catch any other errors and report them
-        console.print(f"[red]✗ Extraction failed: {e}[/red]")
-        logger.error(f"Extraction failed: {e}", exc_info=True)
+        console.print(f"[red]✗ Extraction failed: {e!s}[/red]")
+        logger.exception("Extraction failed: %s", e)
         raise typer.Exit(1) from None
 
 
 # Export public API
 __all__ = [
-    "extract_pending_command",
     "InMemoryDocumentStore",
+    "extract_pending_command",
 ]

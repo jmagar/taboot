@@ -4,6 +4,7 @@ Provides common fixtures for mocking services, test configurations,
 and test data factories used across all test modules.
 """
 
+import os
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -23,6 +24,44 @@ from tests.utils.mocks import (
     create_mock_qdrant_client,
     create_mock_redis_client,
 )
+
+
+# ========== Test Environment Setup ==========
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_env():
+    """Set up test environment variables before any tests run.
+
+    This fixture ensures that get_config() can successfully load
+    configuration in the test environment without validation errors.
+    """
+    # Load .env file first if present (for integration tests)
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
+
+    # Set integer env vars that were causing validation errors
+    # Use direct assignment to override any shell/direnv interpolation syntax
+    os.environ["RERANKER_BATCH_SIZE"] = "16"
+    os.environ["OLLAMA_PORT"] = "11434"
+
+    # Set other required env vars with sensible test defaults
+    os.environ.setdefault("FIRECRAWL_API_URL", "http://localhost:3002")
+    os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
+    os.environ.setdefault("QDRANT_URL", "http://localhost:6333")
+    os.environ.setdefault("NEO4J_URI", "bolt://localhost:7687")
+    os.environ.setdefault("NEO4J_USER", "neo4j")
+    os.environ.setdefault("NEO4J_PASSWORD", "changeme")
+    os.environ.setdefault("TEI_EMBEDDING_URL", "http://localhost:80")
+    os.environ.setdefault("POSTGRES_USER", "taboot")
+    os.environ.setdefault("POSTGRES_PASSWORD", "test")
+    os.environ.setdefault("POSTGRES_DB", "taboot")
+    os.environ.setdefault("POSTGRES_PORT", "5432")
+
+    yield
 
 
 # ========== Configuration Fixtures ==========
@@ -225,6 +264,20 @@ def service_factory() -> Any:
 # ========== Docker Services Fixtures (for integration tests) ==========
 
 
+@pytest.fixture
+def postgres_conn():
+    """Create PostgreSQL connection for testing.
+
+    Returns:
+        psycopg2.connection: PostgreSQL connection object.
+    """
+    from packages.common.db_schema import get_postgres_client
+
+    conn = get_postgres_client()
+    yield conn
+    conn.close()
+
+
 @pytest.fixture(scope="session")
 def docker_services_ready() -> None:
     """Wait for Docker services to be ready before running integration tests.
@@ -240,8 +293,8 @@ def docker_services_ready() -> None:
         pytest.skip: If any required service is not available.
     """
     # Import here to avoid dependency for unit tests
-    import time
     import requests
+    from neo4j import GraphDatabase
 
     def is_responsive(url: str) -> bool:
         """Check if a service is responsive.
@@ -258,20 +311,47 @@ def docker_services_ready() -> None:
         except requests.RequestException:
             return False
 
+    def is_neo4j_ready() -> bool:
+        """Check if Neo4j bolt connection is ready.
+
+        Returns:
+            bool: True if Neo4j accepts connections.
+        """
+        try:
+            # Environment should already be loaded by setup_test_env fixture
+            neo4j_password = os.getenv("NEO4J_PASSWORD", "changeme")
+            driver = GraphDatabase.driver(
+                "bolt://localhost:7687",
+                auth=("neo4j", neo4j_password)
+            )
+            driver.verify_connectivity()
+            driver.close()
+            return True
+        except Exception as e:
+            # Print error for debugging
+            import sys
+            print(f"\nNeo4j connection failed: {e}", file=sys.stderr)
+            return False
+
     # Check for required services
     # Use ports from .env.example that map to host
-    services = [
+    http_services = [
         ("http://localhost:7000/", "Qdrant"),  # QDRANT_HTTP_PORT=7000
-        ("http://localhost:7474/", "Neo4j"),  # NEO4J_HTTP_PORT=7474
         ("http://localhost:8080/health", "TEI"),  # TEI_HTTP_PORT=8080
         ("http://localhost:3002/", "Firecrawl"),  # FIRECRAWL_PORT=3002
     ]
 
     # Quick check first (no retry)
     unavailable = []
-    for url, name in services:
+
+    # Check HTTP services
+    for url, name in http_services:
         if not is_responsive(url):
             unavailable.append(name)
+
+    # Check Neo4j bolt connection
+    if not is_neo4j_ready():
+        unavailable.append("Neo4j (bolt)")
 
     # If any service is unavailable, skip the test
     if unavailable:

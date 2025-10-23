@@ -37,3 +37,41 @@ def test_create_job(job_store):
     assert retrieved.job_id == job.job_id
     assert retrieved.source_type == SourceType.WEB
     assert retrieved.state == JobState.PENDING
+
+
+def test_update_job(job_store):
+    """Test updating job state and metrics."""
+    job = IngestionJob(
+        job_id=uuid4(),
+        source_type=SourceType.WEB,
+        source_target="https://example.com",
+        state=JobState.PENDING,
+        created_at=datetime.now(UTC),
+        started_at=None,
+        completed_at=None,
+        pages_processed=0,
+        chunks_created=0,
+        errors=None,
+    )
+
+    job_store.create(job)
+
+    # Update state
+    job.state = JobState.COMPLETED
+    job.started_at = datetime.now(UTC)
+    job.completed_at = datetime.now(UTC)
+    job.pages_processed = 10
+    job.chunks_created = 42
+
+    job_store.update(job)
+
+    retrieved = job_store.get_by_id(job.job_id)
+    assert retrieved.state == JobState.COMPLETED
+    assert retrieved.pages_processed == 10
+    assert retrieved.chunks_created == 42
+
+
+def test_get_by_id_not_found(job_store):
+    """Test getting nonexistent job returns None."""
+    result = job_store.get_by_id(uuid4())
+    assert result is None

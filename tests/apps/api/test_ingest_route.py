@@ -7,7 +7,7 @@ This test module covers:
 """
 
 from datetime import UTC, datetime
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -273,8 +273,10 @@ class TestGetIngestStatusEndpoint:
 
         Expected to FAIL initially (endpoint not implemented yet).
         """
-        with patch("apps.api.routes.ingest.get_job_by_id") as mock_get_job:
-            mock_get_job.return_value = completed_job
+        with patch("apps.api.routes.ingest.get_job_store") as mock_get_store:
+            mock_store = MagicMock()
+            mock_store.get_by_id.return_value = completed_job
+            mock_get_store.return_value = mock_store
 
             response = client.get(f"/ingest/{completed_job.job_id}")
 
@@ -299,8 +301,10 @@ class TestGetIngestStatusEndpoint:
 
         Expected to FAIL initially (endpoint not implemented yet).
         """
-        with patch("apps.api.routes.ingest.get_job_by_id") as mock_get_job:
-            mock_get_job.return_value = None
+        with patch("apps.api.routes.ingest.get_job_store") as mock_get_store:
+            mock_store = MagicMock()
+            mock_store.get_by_id.return_value = None
+            mock_get_store.return_value = mock_store
 
             job_id = uuid4()
             response = client.get(f"/ingest/{job_id}")
@@ -342,8 +346,10 @@ class TestGetIngestStatusEndpoint:
             }
         )
 
-        with patch("apps.api.routes.ingest.get_job_by_id") as mock_get_job:
-            mock_get_job.return_value = failed_job
+        with patch("apps.api.routes.ingest.get_job_store") as mock_get_store:
+            mock_store = MagicMock()
+            mock_store.get_by_id.return_value = failed_job
+            mock_get_store.return_value = mock_store
 
             response = client.get(f"/ingest/{failed_job.job_id}")
 
@@ -361,8 +367,10 @@ class TestGetIngestStatusEndpoint:
 
         Expected to FAIL initially (endpoint not implemented yet).
         """
-        with patch("apps.api.routes.ingest.get_job_by_id") as mock_get_job:
-            mock_get_job.return_value = sample_job
+        with patch("apps.api.routes.ingest.get_job_store") as mock_get_store:
+            mock_store = MagicMock()
+            mock_store.get_by_id.return_value = sample_job
+            mock_get_store.return_value = mock_store
 
             response = client.get(f"/ingest/{sample_job.job_id}")
 

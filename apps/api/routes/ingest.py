@@ -6,6 +6,7 @@ monitoring ingestion jobs.
 Required by FR-033: API MUST provide ingestion endpoints with job tracking.
 """
 
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -20,10 +21,9 @@ from packages.ingest.readers.web import WebReader
 from packages.schemas.models import IngestionJob, SourceType
 from packages.vector.writer import QdrantWriter
 
-router = APIRouter()
+logger = logging.getLogger(__name__)
 
-# In-memory job store for MVP (TODO: Replace with persistent storage)
-_job_store: dict[UUID, IngestionJob] = {}
+router = APIRouter()
 
 
 class IngestionRequest(BaseModel):
@@ -132,59 +132,54 @@ def get_ingest_use_case() -> IngestWebUseCase:
     )
 
 
-def get_job_by_id(job_id: UUID) -> IngestionJob | None:
-    """Retrieve job from job store by ID.
-
-    Args:
-        job_id: Job UUID to retrieve.
+def get_job_store() -> "PostgresJobStore":
+    """Dependency factory for PostgresJobStore.
 
     Returns:
-        IngestionJob if found, None otherwise.
+        PostgresJobStore: Configured job store instance.
     """
-    return _job_store.get(job_id)
+    from packages.common.db_schema import get_postgres_client
+    from packages.ingest.postgres_job_store import PostgresJobStore
+
+    pg_conn = get_postgres_client()
+    return PostgresJobStore(pg_conn)
 
 
 @router.post("/", response_model=IngestionJobResponse, status_code=status.HTTP_202_ACCEPTED)
-async def start_ingestion(request: IngestionRequest) -> IngestionJobResponse:
+async def start_ingestion(request_body: IngestionRequest) -> IngestionJobResponse:
     """Start an ingestion job.
 
     Creates and executes an ingestion job for the specified source.
     Currently only supports web source type.
 
     Args:
-        request: Ingestion request with source details.
+        request_body: Ingestion request with source details.
 
     Returns:
         IngestionJobResponse: Created job details.
 
     Raises:
         HTTPException: 400 if source_type is not supported.
-
-    Example:
-        >>> response = client.post("/ingest", json={
-        ...     "source_type": "web",
-        ...     "source_target": "https://example.com",
-        ...     "limit": 20
-        ... })
-        >>> assert response.status_code == 202
-        >>> assert response.json()["state"] == "pending"
     """
     # Validate source type
-    if request.source_type != SourceType.WEB:
+    if request_body.source_type != SourceType.WEB:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Source type '{request.source_type}' not yet supported. "
+                f"Source type '{request_body.source_type}' not yet supported. "
                 "Only 'web' is currently implemented."
             ),
         )
 
-    # Get use case and execute
+    # Get dependencies
     use_case = get_ingest_use_case()
-    job = use_case.execute(url=request.source_target, limit=request.limit)
+    job_store = get_job_store()
 
-    # Store job for retrieval
-    _job_store[job.job_id] = job
+    # Execute use case
+    job = use_case.execute(url=request_body.source_target, limit=request_body.limit)
+
+    # Persist job
+    job_store.create(job)
 
     # Return response
     return IngestionJobResponse(
@@ -210,15 +205,9 @@ async def get_ingestion_status(job_id: UUID) -> IngestionJobStatus:
 
     Raises:
         HTTPException: 404 if job not found.
-
-    Example:
-        >>> response = client.get(f"/ingest/{job_id}")
-        >>> assert response.status_code == 200
-        >>> data = response.json()
-        >>> assert "pages_processed" in data
-        >>> assert "chunks_created" in data
     """
-    job = get_job_by_id(job_id)
+    job_store = get_job_store()
+    job = job_store.get_by_id(job_id)
 
     if job is None:
         raise HTTPException(

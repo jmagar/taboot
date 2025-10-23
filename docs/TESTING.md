@@ -314,7 +314,7 @@ from packages.extraction.tier_c.llm_extractor import LLMExtractor
 def test_llm_extraction():
     """Requires Ollama service running"""
     extractor = LLMExtractor(
-        model="qwen2.5:4b-instruct-q4_0",
+        model="qwen3:4b",
         temperature=0.0
     )
 

@@ -24,7 +24,7 @@ class TestQdrantVectorClient:
             return QdrantVectorClient(
                 url="http://localhost:6333",
                 collection_name="test_collection",
-                embedding_dim=768,
+                embedding_dim=1024,
             )
 
     def test_init_creates_client(self, mock_qdrant_client: Mock) -> None:
@@ -33,10 +33,10 @@ class TestQdrantVectorClient:
             client = QdrantVectorClient(
                 url="http://localhost:6333",
                 collection_name="test_collection",
-                embedding_dim=768,
+                embedding_dim=1024,
             )
             assert client.collection_name == "test_collection"
-            assert client.embedding_dim == 768
+            assert client.embedding_dim == 1024
 
     def test_health_check_success(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
         """Test successful health check."""
@@ -97,7 +97,7 @@ class TestQdrantVectorClient:
         call_args = mock_qdrant_client.create_collection.call_args
         assert call_args[1]["collection_name"] == "test_collection"
         assert isinstance(call_args[1]["vectors_config"], models.VectorParams)
-        assert call_args[1]["vectors_config"].size == 768
+        assert call_args[1]["vectors_config"].size == 1024
         assert call_args[1]["vectors_config"].distance == models.Distance.COSINE
 
     def test_create_collection_already_exists(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:

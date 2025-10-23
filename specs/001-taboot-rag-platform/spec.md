@@ -78,7 +78,7 @@ As a developer, I want to initialize the database schemas, vector collections, a
 **Acceptance Scenarios**:
 
 1. **Given** a fresh deployment, **When** the user runs init command, **Then** Neo4j constraints are created (Service.name unique, Host.hostname unique, Endpoint composite index) and the system confirms constraint creation
-2. **Given** Neo4j initialized, **When** Qdrant initialization runs, **Then** vector collections are created with 768-dimensional vectors, HNSW indexing enabled, and metadata schema configured for filtering
+2. **Given** Neo4j initialized, **When** Qdrant initialization runs, **Then** vector collections are created with 1024-dimensional vectors, HNSW indexing enabled, and metadata schema configured for filtering
 3. **Given** all schemas initialized, **When** the system performs health checks, **Then** all services (Neo4j, Qdrant, Redis, TEI, Ollama, Firecrawl) report healthy status and the init command completes successfully
 4. **Given** an already-initialized system, **When** init runs again, **Then** the system detects existing schemas, skips redundant operations, and reports current configuration status
 
@@ -193,7 +193,7 @@ As a developer, I want to reprocess previously ingested documents when extractio
 - **FR-001**: System MUST crawl web pages using Firecrawl API, respecting robots.txt and rate limits
 - **FR-002**: System MUST normalize HTML to Markdown, removing navigation, ads, and boilerplate content
 - **FR-003**: System MUST chunk documents semantically (target: 256-512 tokens per chunk with 10% overlap)
-- **FR-004**: System MUST generate embeddings via TEI service using configured model (default: Qwen3-Embedding-0.6B, 768-dim)
+- **FR-004**: System MUST generate embeddings via TEI service using configured model (default: Qwen3-Embedding-0.6B, 1024-dim)
 - **FR-005**: System MUST store chunk vectors in Qdrant with metadata (source URL, doc_id, section, timestamp, source type)
 - **FR-006**: System MUST support ingestion from multiple sources: web, GitHub, Reddit, YouTube, Gmail, Elasticsearch, Docker Compose, SWAG, Tailscale, Unifi
 - **FR-007**: System MUST track ingestion jobs with states: pending, running, completed, failed
@@ -229,7 +229,7 @@ As a developer, I want to reprocess previously ingested documents when extractio
 #### System Initialization Requirements
 
 - **FR-030**: System MUST create Neo4j constraints on first init: Service.name (unique), Host.hostname (unique), Endpoint(service, method, path) composite index
-- **FR-031**: System MUST create Qdrant collections with configuration: 768-dim vectors, HNSW indexing, cosine similarity, metadata schema for filtering
+- **FR-031**: System MUST create Qdrant collections with configuration: 1024-dim vectors, HNSW indexing, cosine similarity, metadata schema for filtering
 - **FR-032**: System MUST verify health of all services (Neo4j, Qdrant, Redis, TEI, Ollama, Firecrawl, Playwright) before reporting init success
 - **FR-033**: System MUST detect existing schemas on repeat init and skip redundant operations, reporting current configuration
 - **FR-034**: System MUST download required models on first run: Qwen3-4B-Instruct (Ollama), Qwen3-Embedding-0.6B (TEI), Qwen3-Reranker-0.6B (SentenceTransformers), en_core_web_md (spaCy)
@@ -266,7 +266,7 @@ As a developer, I want to reprocess previously ingested documents when extractio
 
 - **Document (Doc)**: Represents an ingested document with attributes: doc_id (UUID), source_url, source_type (web, github, reddit, etc.), content_hash (SHA-256), ingested_at (timestamp), extraction_state (pending, completed, failed), metadata (JSON)
 
-- **Chunk**: Represents a semantic chunk of a document with attributes: chunk_id (UUID), doc_id (FK to Document), content (text), embedding (768-dim vector), section (heading/path), position (offset in document), token_count
+- **Chunk**: Represents a semantic chunk of a document with attributes: chunk_id (UUID), doc_id (FK to Document), content (text), embedding (1024-dim vector), section (heading/path), position (offset in document), token_count
 
 - **Service**: Represents a software service/application with attributes: name (unique), description, image (Docker image or binary path), version, metadata (JSON for arbitrary properties)
 

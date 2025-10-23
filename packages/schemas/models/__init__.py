@@ -225,6 +225,27 @@ class ExtractionWindow(BaseModel):
         default=None, max_length=64, description="Extractor version tag"
     )
 
+    @field_validator("processed_at")
+    @classmethod
+    def validate_processed_at_not_future(cls, v: datetime) -> datetime:
+        """Validate that processed_at is not in the future.
+
+        Args:
+            v: The processed_at timestamp.
+
+        Returns:
+            datetime: The validated timestamp.
+
+        Raises:
+            ValueError: If processed_at is in the future.
+        """
+        from datetime import timezone
+
+        now = datetime.now(timezone.utc)
+        if v > now:
+            raise ValueError("processed_at cannot be in the future")
+        return v
+
 
 class ExtractionJob(BaseModel):
     """Extraction job entity tracking extraction tasks.
@@ -244,6 +265,53 @@ class ExtractionJob(BaseModel):
     )
     retry_count: int = Field(..., ge=0, le=3, description="Retry attempts (max 3)")
     errors: dict[str, Any] | None = Field(default=None, description="Error log")
+
+    @field_validator("started_at")
+    @classmethod
+    def validate_started_at_not_future(cls, v: datetime | None) -> datetime | None:
+        """Validate that started_at is not in the future.
+
+        Args:
+            v: The started_at timestamp.
+
+        Returns:
+            datetime | None: The validated timestamp.
+
+        Raises:
+            ValueError: If started_at is in the future.
+        """
+        if v is None:
+            return v
+
+        from datetime import timezone
+
+        now = datetime.now(timezone.utc)
+        if v > now:
+            raise ValueError("started_at cannot be in the future")
+        return v
+
+    @field_validator("completed_at")
+    @classmethod
+    def validate_completed_at_after_started(cls, v: datetime | None, info) -> datetime | None:
+        """Validate that completed_at is after started_at.
+
+        Args:
+            v: The completed_at timestamp.
+            info: Validation context with other field values.
+
+        Returns:
+            datetime | None: The validated timestamp.
+
+        Raises:
+            ValueError: If completed_at is before started_at.
+        """
+        if v is None:
+            return v
+
+        started_at = info.data.get("started_at")
+        if started_at is not None and v < started_at:
+            raise ValueError("completed_at must be after or equal to started_at")
+        return v
 
 
 # ========== Graph Node Models ==========

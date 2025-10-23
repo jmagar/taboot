@@ -51,11 +51,11 @@ def load_collection_config() -> dict[str, Any]:
     Example:
         >>> config = load_collection_config()
         >>> assert config["collection_name"] == "documents"
-        >>> assert config["vectors"]["size"] == 768
+        >>> assert config["vectors"]["size"] == 1024
     """
-    # Path relative to project root
+    # Path relative to repository root to avoid reliance on current working directory
     contract_path = (
-        Path(__file__).parent.parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "specs"
         / "001-taboot-rag-platform"
         / "contracts"
@@ -82,7 +82,7 @@ def load_collection_config() -> dict[str, Any]:
         raise FileNotFoundError(f"Collection config not found: {contract_path}")
 
     try:
-        with open(contract_path) as f:
+        with contract_path.open(encoding="utf-8") as f:
             config: dict[str, Any] = json.load(f)
     except json.JSONDecodeError as e:
         logger.error(
@@ -115,6 +115,48 @@ def load_collection_config() -> dict[str, Any]:
         )
         raise ValueError(f"Collection config missing required fields: {missing_fields}")
 
+    vector_size = config["vectors"].get("size")
+    if not isinstance(vector_size, int) or vector_size <= 0:
+        logger.error(
+            "Invalid vector size in collection config",
+            extra={
+                "correlation_id": correlation_id,
+                "vector_size": vector_size,
+            },
+        )
+        raise ValueError(f"Invalid vector size: {vector_size}")
+
+    distance_value = config["vectors"].get("distance")
+    if not isinstance(distance_value, str):
+        raise ValueError("Vector distance must be provided as a string")
+
+    distance_name = distance_value.upper()
+    if distance_name not in models.Distance.__members__:
+        logger.error(
+            "Invalid distance metric in collection config",
+            extra={
+                "correlation_id": correlation_id,
+                "distance": distance_value,
+            },
+        )
+        raise ValueError(f"Invalid distance metric: {distance_value}")
+
+    # Normalise distance to uppercase enum name for downstream usage
+    config["vectors"]["distance"] = distance_name
+
+    hnsw_m = config["hnsw_config"].get("m")
+    if not isinstance(hnsw_m, int) or hnsw_m <= 0:
+        raise ValueError(f"Invalid HNSW 'm' parameter: {hnsw_m}")
+
+    if not 4 <= hnsw_m <= 64:
+        logger.warning(
+            "HNSW 'm' parameter outside recommended range",
+            extra={
+                "correlation_id": correlation_id,
+                "hnsw_m": hnsw_m,
+            },
+        )
+
     logger.info(
         "Collection configuration loaded successfully",
         extra={
@@ -130,7 +172,7 @@ def create_collection(client: QdrantClient, collection_name: str) -> None:
     """Create Qdrant collection with parameters from contract configuration.
 
     Loads configuration from qdrant-collection.json and creates collection with:
-    - 768-dimensional vectors (Qwen3-Embedding-0.6B)
+    - 1024-dimensional vectors (Qwen3-Embedding-0.6B)
     - Cosine distance metric
     - HNSW indexing (M=16, ef_construct=200)
     - Optimizers and WAL configuration
@@ -169,7 +211,7 @@ def create_collection(client: QdrantClient, collection_name: str) -> None:
     try:
         vectors_config = models.VectorParams(
             size=config["vectors"]["size"],
-            distance=models.Distance.COSINE,  # Always use Cosine per spec
+            distance=models.Distance[config["vectors"]["distance"]],
             on_disk=config["vectors"]["on_disk"],
         )
 

@@ -120,7 +120,7 @@ class TestInitEndToEnd:
         """Test that Qdrant collection is actually created during init.
 
         Acceptance Scenario 2: Given Neo4j initialized, When Qdrant initialization
-        runs, Then vector collections are created with 768-dimensional vectors,
+        runs, Then vector collections are created with 1024-dimensional vectors,
         HNSW indexing enabled, and metadata schema configured for filtering.
         """
         # This test will FAIL until init workflow is implemented
@@ -149,7 +149,7 @@ class TestInitEndToEnd:
                 # Named vectors configuration
                 raise AssertionError("Expected single vector config, got named vectors")
             assert vectors is not None, "Vector config should exist"
-            assert vectors.size == 768, "Vector dimension should be 768"
+            assert vectors.size == 1024, "Vector dimension should be 1024"
 
             # Assert HNSW indexing is enabled
             assert (

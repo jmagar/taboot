@@ -4,7 +4,40 @@ Loads environment variables using pydantic-settings for type-safe configuration.
 All service URLs, credentials, and tuning parameters are defined here.
 """
 
+import os
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _is_running_in_container() -> bool:
+    """Detect if code is running inside a Docker container.
+
+    Checks for common container indicators:
+    - /.dockerenv file (Docker)
+    - DOCKER_CONTAINER environment variable
+    - Container-specific cgroup entries
+
+    Returns:
+        bool: True if running in container, False if on host
+    """
+    # Check for /.dockerenv file
+    if Path("/.dockerenv").exists():
+        return True
+
+    # Check for DOCKER_CONTAINER env var
+    if os.getenv("DOCKER_CONTAINER"):
+        return True
+
+    # Check cgroup for docker/containerd
+    try:
+        with open("/proc/1/cgroup", "r") as f:
+            content = f.read()
+            return "docker" in content or "containerd" in content
+    except (FileNotFoundError, PermissionError):
+        pass
+
+    return False
 
 
 class TabootConfig(BaseSettings):
@@ -19,6 +52,7 @@ class TabootConfig(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        env_file_override=True,  # .env file takes precedence over environment
     )
 
     # ========== Service URLs ==========
@@ -43,7 +77,7 @@ class TabootConfig(BaseSettings):
     # ========== Vector & Embedding Config ==========
     collection_name: str = "documents"
     tei_embedding_model: str = "Qwen/Qwen3-Embedding-0.6B"
-    qdrant_embedding_dim: int = 768
+    qdrant_embedding_dim: int = 1024
 
     # ========== Reranker Config ==========
     reranker_model: str = "Qwen/Qwen3-Reranker-0.6B"
@@ -92,10 +126,29 @@ class TabootConfig(BaseSettings):
 
     # ========== Observability ==========
     log_level: str = "INFO"
+    health_check_timeout: float = 5.0
 
     # ========== API Service ==========
     taboot_http_port: int = 8000
     host: str = "0.0.0.0"
+
+    def model_post_init(self, __context: object) -> None:
+        """Post-initialization hook to rewrite URLs for host execution.
+
+        When running on host (not in container), rewrites container hostnames
+        to localhost with mapped ports from docker-compose.yaml.
+        """
+        super().model_post_init(__context)
+
+        if not _is_running_in_container():
+            # Rewrite URLs to use localhost with mapped ports
+            self.tei_embedding_url = "http://localhost:8080"
+            self.qdrant_url = "http://localhost:7000"
+            self.neo4j_uri = "bolt://localhost:7687"
+            self.redis_url = "redis://localhost:6379"
+            self.reranker_url = "http://localhost:8081"
+            self.firecrawl_api_url = "http://localhost:3002"
+            self.playwright_microservice_url = "http://localhost:3000/scrape"
 
     @property
     def neo4j_connection_string(self) -> str:

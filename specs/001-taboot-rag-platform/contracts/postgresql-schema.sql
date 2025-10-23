@@ -47,6 +47,15 @@ BEFORE UPDATE ON documents
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+-- Document content storage (separate from metadata for performance)
+CREATE TABLE IF NOT EXISTS document_content (
+    doc_id UUID PRIMARY KEY REFERENCES documents(doc_id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_document_content_doc_id ON document_content(doc_id);
+
 -- ExtractionWindow table (micro-windows processed by extractors)
 CREATE TABLE IF NOT EXISTS extraction_windows (
     window_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

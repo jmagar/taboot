@@ -6,12 +6,65 @@ A clean-slate, production-minded foundation for multi-source RAG with a **shared
 
 ---
 
-## Why v2
+## Key Features
 
-* **Strict layering:** business logic lives in `packages/core`; apps are I/O shells.
-* **Deterministic first:** parse configs/tables/links without LLMs; use LLM windows only when necessary.
-* **Replaceable adapters:** swap LlamaIndex, Neo4j, Qdrant, or the LLM without touching core use-cases.
-* **Reproducible & observable:** versioned extractors, caching, metrics, CI.
+* **11+ Ingestion Sources**: Web, GitHub, Reddit, YouTube, Gmail, Elasticsearch, Docker Compose, SWAG, Tailscale, Unifi, AI sessions
+* **Multi-Tier Extraction**: Tier A (regex/JSON), Tier B (spaCy NLP), Tier C (Qwen3-4B LLM)
+* **Hybrid Retrieval**: Vector search → Reranking → Graph traversal → LLM synthesis
+* **Strict Architecture**: `apps → adapters → core` with framework-agnostic business logic
+* **GPU Accelerated**: TEI embeddings, Qwen reranker, Ollama LLM on NVIDIA GPUs
+* **Source Attribution**: Every answer includes inline citations with source links
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Docker with Compose V2 + nvidia-container-toolkit
+- NVIDIA GPU (RTX 4070 or equivalent, 12GB+ VRAM)
+- Python 3.11+ (managed via `uv`)
+- 16GB+ RAM, 50GB+ disk space
+
+### Setup (5 minutes)
+
+```bash
+# 1. Clone and install dependencies
+git clone https://github.com/yourusername/taboot.git
+cd taboot
+uv sync
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env if needed (defaults work for local development)
+
+# 3. Start all services (Neo4j, Qdrant, Redis, TEI, Ollama, etc.)
+docker compose up -d
+
+# 4. Initialize database schemas
+uv run apps/cli init
+```
+
+### Example Workflow
+
+```bash
+# Ingest documentation
+uv run apps/cli ingest web https://docs.python.org --limit 20
+
+# Extract knowledge graph
+uv run apps/cli extract pending
+
+# Query with natural language
+uv run apps/cli query "What are Python decorators?"
+
+# List ingested documents
+uv run apps/cli list documents --limit 10
+
+# Check system status
+uv run apps/cli extract status
+```
+
+See [quickstart.md](specs/001-taboot-rag-platform/quickstart.md) for detailed workflows and troubleshooting.
 
 ---
 
@@ -308,7 +361,7 @@ Implementation details for the tiered extractor live in [packages/extraction/doc
 * **Tier B**: ≥200 sentences/sec (`md`), ≥40 (`trf`)
 * **Tier C**: median ≤250 ms/window, p95 ≤750 ms (quantized 4B), batch≈12
 * **Neo4j writes**: ≥20k edges/min with 2k-row `UNWIND`
-* **Qdrant upserts**: ≥5k vectors/sec (768-dim, HNSW)
+* **Qdrant upserts**: ≥5k vectors/sec (1024-dim, HNSW)
 
 Vector collection layout and tuning guidance are captured in [packages/vector/docs/VECTOR_SCHEMA.md](packages/vector/docs/VECTOR_SCHEMA.md).
 

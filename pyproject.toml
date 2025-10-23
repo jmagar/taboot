@@ -134,6 +134,7 @@ markers = [
   "gmail: Gmail-specific tests (requires credentials)",
   "github: GitHub-specific tests (requires token)",
   "reddit: Reddit-specific tests (requires credentials)",
+  "youtube: YouTube-specific tests",
   "elasticsearch: Elasticsearch-specific tests",
   "firecrawl: Firecrawl-specific tests",
 ]

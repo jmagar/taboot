@@ -121,7 +121,7 @@ def query_graph(question: str) -> dict[str, Any]:
     Execute a natural language query using the hybrid retrieval pipeline.
 
     The 6-stage retrieval process:
-        1. Query embedding (TEI) - Convert question to 768-dim vector
+        1. Query embedding (TEI) - Convert question to 1024-dim vector
         2. Metadata filtering - Apply source/date constraints
         3. Vector search (Qdrant) - Retrieve top-k similar chunks
         4. Reranking (Qwen/Qwen3-Reranker-0.6B) - Re-score by relevance

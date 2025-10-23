@@ -18,9 +18,6 @@ from packages.common.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Health check timeout (5 seconds per service as specified)
-HEALTH_CHECK_TIMEOUT = 5.0
-
 
 class SystemHealthStatus(TypedDict):
     """System health status dictionary.
@@ -45,10 +42,15 @@ async def check_neo4j_health() -> bool:
     config = get_config()
     driver = None
     try:
-        driver = GraphDatabase.driver(
-            config.neo4j_uri, auth=(config.neo4j_user, config.neo4j_password)
+        # Run synchronous Neo4j operations in executor to avoid blocking
+        loop = asyncio.get_event_loop()
+        driver = await loop.run_in_executor(
+            None,
+            lambda: GraphDatabase.driver(
+                config.neo4j_uri, auth=(config.neo4j_user, config.neo4j_password)
+            ),
         )
-        driver.verify_connectivity()
+        await loop.run_in_executor(None, driver.verify_connectivity)
         logger.debug("Neo4j health check: OK")
         return True
     except Exception as e:
@@ -56,21 +58,21 @@ async def check_neo4j_health() -> bool:
         return False
     finally:
         if driver:
-            driver.close()
+            await asyncio.get_event_loop().run_in_executor(None, driver.close)
 
 
 async def check_qdrant_health() -> bool:
     """Check Qdrant vector database health.
 
-    Queries the Qdrant /readiness endpoint with timeout.
+    Queries the Qdrant root endpoint for version info.
 
     Returns:
         bool: True if Qdrant is healthy and responsive, False otherwise.
     """
     config = get_config()
     try:
-        async with httpx.AsyncClient(timeout=HEALTH_CHECK_TIMEOUT) as client:
-            response = await client.get(f"{config.qdrant_url}/readiness")
+        async with httpx.AsyncClient(timeout=config.health_check_timeout) as client:
+            response = await client.get(config.qdrant_url)
             healthy = response.status_code == 200
             if healthy:
                 logger.debug("Qdrant health check: OK")
@@ -97,7 +99,9 @@ async def check_redis_health() -> bool:
     client = None
     try:
         client = redis.from_url(
-            config.redis_url, socket_timeout=HEALTH_CHECK_TIMEOUT, decode_responses=True
+            config.redis_url,
+            socket_timeout=config.health_check_timeout,
+            decode_responses=True,
         )
         await client.ping()
         logger.debug("Redis health check: OK")
@@ -120,7 +124,7 @@ async def check_tei_health() -> bool:
     """
     config = get_config()
     try:
-        async with httpx.AsyncClient(timeout=HEALTH_CHECK_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=config.health_check_timeout) as client:
             response = await client.get(f"{config.tei_embedding_url}/health")
             healthy = response.status_code == 200
             if healthy:
@@ -147,7 +151,7 @@ async def check_ollama_health() -> bool:
     config = get_config()
     try:
         ollama_url = f"http://localhost:{config.ollama_port}"
-        async with httpx.AsyncClient(timeout=HEALTH_CHECK_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=config.health_check_timeout) as client:
             response = await client.get(f"{ollama_url}/api/tags")
             healthy = response.status_code == 200
             if healthy:
@@ -173,7 +177,7 @@ async def check_firecrawl_health() -> bool:
     """
     config = get_config()
     try:
-        async with httpx.AsyncClient(timeout=HEALTH_CHECK_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=config.health_check_timeout) as client:
             response = await client.get(f"{config.firecrawl_api_url}/health")
             healthy = response.status_code == 200
             if healthy:
@@ -201,7 +205,7 @@ async def check_playwright_health() -> bool:
     try:
         # Extract base URL from playwright_microservice_url (remove /scrape path)
         playwright_base_url = config.playwright_microservice_url.rsplit("/", 1)[0]
-        async with httpx.AsyncClient(timeout=HEALTH_CHECK_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=config.health_check_timeout) as client:
             response = await client.get(f"{playwright_base_url}/health")
             healthy = response.status_code == 200
             if healthy:

@@ -344,7 +344,7 @@ gmail, github, reddit, elasticsearch, firecrawl  # Source-specific
 | Tier B extraction | ≥200 sentences/sec (md) or ≥40 (trf) |
 | Tier C LLM | ≤250ms median/window, p95 ≤750ms (batched 8–16) |
 | Neo4j writes | ≥20k edges/min (2k-row UNWIND) |
-| Qdrant upserts | ≥5k vectors/sec (768-dim) |
+| Qdrant upserts | ≥5k vectors/sec (1024-dim) |
 | Full retrieval | <3s p95 answer generation |
 | Extraction F1 | ≥0.80 (precision-first: ≥0.85 precision, ≥0.75 recall) |
 

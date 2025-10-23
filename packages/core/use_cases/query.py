@@ -1,0 +1,74 @@
+"""Query orchestration use-case coordinating retrieval and synthesis."""
+
+from typing import Optional, List, Dict, Any
+from datetime import datetime
+from packages.retrieval.query_engines.qa import QAQueryEngine
+
+
+def execute_query(
+    query: str,
+    qdrant_url: str,
+    neo4j_uri: str,
+    neo4j_username: str,
+    neo4j_password: str,
+    qdrant_collection: str = "documents",
+    ollama_base_url: str = "http://localhost:11434",
+    top_k: int = 20,
+    rerank_top_n: int = 5,
+    source_types: Optional[List[str]] = None,
+    after: Optional[datetime] = None,
+    dry_run: bool = False
+) -> Optional[Dict[str, Any]]:
+    """
+    Execute natural language query with hybrid retrieval.
+
+    Args:
+        query: User question
+        qdrant_url: Qdrant server URL
+        neo4j_uri: Neo4j connection URI
+        neo4j_username: Neo4j username
+        neo4j_password: Neo4j password
+        qdrant_collection: Qdrant collection name
+        ollama_base_url: Ollama API URL
+        top_k: Candidates from vector search
+        rerank_top_n: Chunks after reranking
+        source_types: Filter by source types
+        after: Filter by ingestion date
+        dry_run: If True, skip actual query execution
+
+    Returns:
+        Query result with answer, sources, and latency
+
+    Raises:
+        ValueError: If query is empty
+    """
+    # Validation
+    if not query or not query.strip():
+        raise ValueError("Query cannot be empty")
+
+    if dry_run:
+        return None
+
+    # Initialize query engine
+    engine = QAQueryEngine(
+        qdrant_url=qdrant_url,
+        qdrant_collection=qdrant_collection,
+        neo4j_uri=neo4j_uri,
+        neo4j_username=neo4j_username,
+        neo4j_password=neo4j_password,
+        ollama_base_url=ollama_base_url
+    )
+
+    try:
+        # Execute query
+        result = engine.query(
+            question=query,
+            top_k=top_k,
+            rerank_top_n=rerank_top_n,
+            source_types=source_types
+        )
+
+        return result
+
+    finally:
+        engine.close()

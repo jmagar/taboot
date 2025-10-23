@@ -18,6 +18,11 @@ from packages.schemas.models import (
     Service,
     Host,
 )
+from tests.utils.mocks import (
+    create_mock_neo4j_driver,
+    create_mock_qdrant_client,
+    create_mock_redis_client,
+)
 
 
 # ========== Configuration Fixtures ==========
@@ -59,10 +64,7 @@ def mock_neo4j_driver(mocker: Any) -> Any:
     Returns:
         Mock Neo4j driver instance.
     """
-    mock_driver = mocker.MagicMock()
-    mock_session = mocker.MagicMock()
-    mock_driver.session.return_value = mock_session
-    return mock_driver
+    return create_mock_neo4j_driver(mocker)
 
 
 @pytest.fixture
@@ -75,8 +77,7 @@ def mock_qdrant_client(mocker: Any) -> Any:
     Returns:
         Mock Qdrant client instance.
     """
-    mock_client = mocker.MagicMock()
-    return mock_client
+    return create_mock_qdrant_client(mocker)
 
 
 @pytest.fixture
@@ -89,8 +90,7 @@ def mock_redis_client(mocker: Any) -> Any:
     Returns:
         Mock Redis client instance.
     """
-    mock_client = mocker.MagicMock()
-    return mock_client
+    return create_mock_redis_client(mocker)
 
 
 # ========== Test Data Factories ==========
@@ -226,19 +226,18 @@ def service_factory() -> Any:
 
 
 @pytest.fixture(scope="session")
-def docker_services_ready(docker_ip: str, docker_services: Any) -> None:
+def docker_services_ready() -> None:
     """Wait for Docker services to be ready before running integration tests.
 
-    This fixture is used with pytest-docker to ensure all services
-    (Neo4j, Qdrant, Redis, etc.) are healthy before tests run.
-
-    Args:
-        docker_ip: IP address of Docker host.
-        docker_services: pytest-docker services fixture.
+    This fixture checks if all required Docker services are healthy.
+    Services must be started manually via `docker compose up -d` before running tests.
 
     Note:
         This fixture requires Docker Compose to be running with all services healthy.
         Tests marked with @pytest.mark.integration depend on this.
+
+    Raises:
+        pytest.skip: If any required service is not available.
     """
     # Import here to avoid dependency for unit tests
     import time
@@ -259,23 +258,30 @@ def docker_services_ready(docker_ip: str, docker_services: Any) -> None:
         except requests.RequestException:
             return False
 
-    # Wait for services to be ready (max 60 seconds)
+    # Check for required services
+    # Use ports from .env.example that map to host
     services = [
-        ("http://localhost:6333/readiness", "Qdrant"),
-        ("http://localhost:7474/", "Neo4j"),
-        ("http://localhost:8000/status", "API"),
+        ("http://localhost:7000/", "Qdrant"),  # QDRANT_HTTP_PORT=7000
+        ("http://localhost:7474/", "Neo4j"),  # NEO4J_HTTP_PORT=7474
+        ("http://localhost:8080/health", "TEI"),  # TEI_HTTP_PORT=8080
+        ("http://localhost:3002/", "Firecrawl"),  # FIRECRAWL_PORT=3002
     ]
 
+    # Quick check first (no retry)
+    unavailable = []
     for url, name in services:
-        timeout = 60
-        start = time.time()
-        while time.time() - start < timeout:
-            if is_responsive(url):
-                print(f"✓ {name} ready")
-                break
-            time.sleep(1)
-        else:
-            raise TimeoutError(f"{name} not ready after {timeout}s")
+        if not is_responsive(url):
+            unavailable.append(name)
+
+    # If any service is unavailable, skip the test
+    if unavailable:
+        pytest.skip(
+            f"Docker services not ready: {', '.join(unavailable)}. "
+            f"Start services with: docker compose up -d"
+        )
+
+    # All services available - log success
+    print("\n✓ All Docker services ready for integration tests")
 
 
 # ========== Pytest Configuration ==========

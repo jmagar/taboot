@@ -15,44 +15,23 @@ console = Console()
 logger = logging.getLogger(__name__)
 
 
-@app.command()
-def ingest(
-    source: str = typer.Argument(..., help="Source type (web, github, reddit, etc.)"),
-    target: str = typer.Argument(..., help="Target URL or identifier"),
-    limit: Optional[int] = typer.Option(None, help="Maximum items to ingest"),
-) -> None:
-    """
-    Ingest documents from various sources into the knowledge graph.
+# Import and register ingest subcommand
+from apps.cli.commands.ingest_web import app as ingest_app
 
-    Supported sources: web, github, reddit, youtube, gmail, elasticsearch,
-    docker-compose, swag, tailscale, unifi.
+app.add_typer(ingest_app, name="ingest")
 
-    Examples:
-        tabootingest web https://example.com --limit 20
-        tabootingest github owner/repo
-        tabootingest reddit r/python --limit 100
-    """
-    raise NotImplementedError(
-        f"Ingest command not yet implemented (source={source}, target={target}, limit={limit})"
-    )
+# Create extract subcommand group
+extract_app = typer.Typer(name="extract", help="Run extraction pipeline on documents")
 
 
-@app.command()
-def extract(
-    mode: str = typer.Argument(
-        ..., help="Extraction mode (pending, reprocess, status)"
-    ),
-    since: Optional[str] = typer.Option(
-        None, help="Time window for reprocessing (e.g., 7d, 2025-01-01)"
+@extract_app.command(name="pending")
+def extract_pending_sync(
+    limit: Optional[int] = typer.Option(
+        None, "--limit", "-l", help="Maximum number of documents to process"
     ),
 ) -> None:
     """
-    Run the multi-tier extraction pipeline on ingested documents.
-
-    Modes:
-        pending     - Process all documents awaiting extraction
-        reprocess   - Re-run extraction on documents from a time window
-        status      - Show extraction pipeline status and metrics
+    Process all documents awaiting extraction.
 
     The extraction pipeline runs three tiers:
         Tier A: Deterministic regex/JSON parsing (≥50 pages/sec)
@@ -60,13 +39,54 @@ def extract(
         Tier C: LLM-based structured extraction (≤250ms/window median)
 
     Examples:
-        tabootextract pending
-        tabootextract reprocess --since 7d
-        tabootextract status
+        taboot extract pending
+        taboot extract pending --limit 10
     """
-    raise NotImplementedError(
-        f"Extract command not yet implemented (mode={mode}, since={since})"
-    )
+    import asyncio
+    from apps.cli.commands.extract_pending import extract_pending_command
+
+    # Run async command in event loop
+    asyncio.run(extract_pending_command(limit=limit))
+
+
+@extract_app.command(name="status")
+def extract_status_sync() -> None:
+    """
+    Display system status including service health, queue depths, and metrics.
+
+    Shows:
+        - Service health (Neo4j, Qdrant, Redis, TEI, Ollama, Firecrawl, Playwright)
+        - Queue depths (ingestion, extraction)
+        - System metrics (documents, chunks, jobs, nodes)
+
+    Examples:
+        taboot extract status
+    """
+    import asyncio
+    from apps.cli.commands.extract_status import extract_status_command
+
+    # Run async command in event loop
+    asyncio.run(extract_status_command())
+
+
+@extract_app.command(name="reprocess")
+def extract_reprocess_sync(
+    since: str = typer.Option(..., "--since", help="Reprocess documents from period (e.g., '7d')")
+) -> None:
+    """
+    Reprocess documents with updated extractors.
+
+    Examples:
+        taboot extract reprocess --since 7d
+        taboot extract reprocess --since 30d
+    """
+    from apps.cli.commands.extract_reprocess import extract_reprocess_command
+
+    extract_reprocess_command(since=since)
+
+
+# Register extract subcommand group
+app.add_typer(extract_app, name="extract")
 
 
 @app.command()
@@ -94,10 +114,8 @@ def query(
         tabootquery "docker compose services" --sources docker-compose,swag
         tabootquery "recent updates" --after 2025-01-01 --top-k 20
     """
-    raise NotImplementedError(
-        f"Query command not yet implemented (question={question}, "
-        f"sources={sources}, after={after}, top_k={top_k})"
-    )
+    from apps.cli.commands.query import query_command
+    query_command(question=question, sources=sources, after=after, top_k=top_k)
 
 
 @app.command()
@@ -132,32 +150,41 @@ def status(
     )
 
 
-@app.command()
-def list(
-    resource: str = typer.Argument(
-        ..., help="Resource type (services, hosts, endpoints, docs)"
+# Create list subcommand group
+list_app = typer.Typer(name="list", help="List resources from the knowledge graph")
+
+
+@list_app.command(name="documents")
+def list_documents_sync(
+    limit: int = typer.Option(10, "--limit", "-l", help="Maximum documents to show"),
+    offset: int = typer.Option(0, "--offset", "-o", help="Pagination offset"),
+    source_type: Optional[str] = typer.Option(
+        None, "--source-type", "-s", help="Filter by source type"
     ),
-    limit: int = typer.Option(20, help="Maximum items to list"),
-    filter: Optional[str] = typer.Option(None, help="Filter expression"),
+    extraction_state: Optional[str] = typer.Option(
+        None, "--extraction-state", "-e", help="Filter by extraction state"
+    ),
 ) -> None:
     """
-    List resources from the knowledge graph.
-
-    Resources:
-        services  - Service nodes with dependencies
-        hosts     - Host nodes with IP addresses
-        endpoints - API endpoints with routes
-        docs      - Ingested documents with metadata
+    List ingested documents with filters and pagination.
 
     Examples:
-        tabootlist services --limit 50
-        tabootlist endpoints --filter "auth"
-        tabootlist docs --filter "source=github"
+        taboot list documents
+        taboot list documents --limit 20 --source-type web
+        taboot list documents --extraction-state pending
     """
-    raise NotImplementedError(
-        f"List command not yet implemented (resource={resource}, "
-        f"limit={limit}, filter={filter})"
+    from apps.cli.commands.list_documents import list_documents_command
+
+    list_documents_command(
+        limit=limit,
+        offset=offset,
+        source_type=source_type,
+        extraction_state=extraction_state,
     )
+
+
+# Register list subcommand group
+app.add_typer(list_app, name="list")
 
 
 @app.command()

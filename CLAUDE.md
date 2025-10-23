@@ -192,7 +192,7 @@ Per-source credentials (GitHub, Reddit, Gmail, Elasticsearch, Unifi, Tailscale) 
 - Tier B: ≥200 sentences/sec (md model) or ≥40 (transformer model)
 - Tier C: median ≤250ms/window, p95 ≤750ms (batched 8–16)
 - Neo4j: ≥20k edges/min with 2k-row UNWIND batches
-- Qdrant: ≥5k vectors/sec (768-dim, HNSW)
+- Qdrant: ≥5k vectors/sec (1024-dim, HNSW)
 
 ## Observability
 
@@ -207,7 +207,7 @@ Per-source credentials (GitHub, Reddit, Gmail, Elasticsearch, Unifi, Tailscale) 
 |-------|-------|
 | Services won't start | `docker compose ps` and `docker compose logs <service-name>` |
 | GPU not detected | NVIDIA driver + `nvidia-container-toolkit` installed |
-| Ollama model missing | First run auto-pulls Qwen3-4B; or `docker exec taboot-ollama ollama pull qwen2.5:4b-instruct-q4_0` |
+| Ollama model missing | First run auto-pulls Qwen3-4B; or `docker exec taboot-ollama ollama pull qwen3:4b` |
 | Neo4j connection refused | Wait for healthcheck: `docker compose ps taboot-graph` |
 | Tests fail | Ensure `docker compose ps` shows all services healthy before running integration tests |
 | spaCy model missing | First run auto-downloads `en_core_web_md`; or manually `python -m spacy download en_core_web_md` |

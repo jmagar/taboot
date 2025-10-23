@@ -5,11 +5,13 @@ schema, and verifying table existence. Used during initialization (taboot init).
 """
 
 from pathlib import Path
+from typing import Any
 
 import psycopg2
 from psycopg2.extensions import connection
+from psycopg2.extras import RealDictCursor
 
-from packages.common.config import TabootConfig
+from packages.common.config import TabootConfig, _is_running_in_container, get_config
 from packages.common.logging import get_logger
 from packages.common.tracing import TracingContext
 
@@ -91,8 +93,12 @@ def create_schema(config: TabootConfig) -> None:
         )
 
         # Load schema SQL
-        schema_path = Path(
-            "/home/jmagar/code/taboot/specs/001-taboot-rag-platform/contracts/postgresql-schema.sql"
+        schema_path = (
+            Path(__file__).resolve().parent.parent.parent
+            / "specs"
+            / "001-taboot-rag-platform"
+            / "contracts"
+            / "postgresql-schema.sql"
         )
         sql_content = load_schema_file(schema_path)
 
@@ -222,5 +228,48 @@ async def create_postgresql_schema() -> None:
     create_schema(config)
 
 
+def get_postgres_client() -> Any:
+    """Get PostgreSQL client connection.
+
+    Returns:
+        psycopg2.connection: PostgreSQL connection object with RealDictCursor factory.
+
+    Raises:
+        Exception: If connection fails.
+
+    Example:
+        >>> conn = get_postgres_client()
+        >>> cursor = conn.cursor()
+        >>> cursor.execute("SELECT * FROM documents LIMIT 1")
+        >>> conn.close()
+    """
+    config = get_config()
+
+    # Determine host based on runtime environment
+    host = "taboot-db" if _is_running_in_container() else "localhost"
+
+    # Create connection with RealDictCursor for dict-like results
+    try:
+        conn = psycopg2.connect(
+            host=host,
+            port=config.postgres_port,
+            user=config.postgres_user,
+            password=config.postgres_password,
+            database=config.postgres_db,
+            cursor_factory=RealDictCursor,
+        )
+        logger.info(f"PostgreSQL client connected (host={host})")
+        return conn
+    except psycopg2.Error as e:
+        logger.error(f"Failed to connect to PostgreSQL: {e}")
+        raise
+
+
 # Export public API
-__all__ = ["load_schema_file", "create_schema", "verify_schema", "create_postgresql_schema"]
+__all__ = [
+    "load_schema_file",
+    "create_schema",
+    "verify_schema",
+    "create_postgresql_schema",
+    "get_postgres_client",
+]

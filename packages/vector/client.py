@@ -9,6 +9,7 @@ Provides:
 All operations use JSON structured logging and correlation ID tracking.
 """
 
+from types import TracebackType
 from typing import Any
 
 from qdrant_client import QdrantClient
@@ -35,13 +36,13 @@ class QdrantVectorClient:
     Attributes:
         client: The underlying QdrantClient instance.
         collection_name: Name of the Qdrant collection.
-        embedding_dim: Dimension of embedding vectors (default 768 for Qwen3-Embedding-0.6B).
+        embedding_dim: Dimension of embedding vectors (default 1024 for Qwen3-Embedding-0.6B).
 
     Example:
         >>> client = QdrantVectorClient(
         ...     url="http://localhost:6333",
         ...     collection_name="documents",
-        ...     embedding_dim=768,
+        ...     embedding_dim=1024,
         ... )
         >>> if not client.collection_exists():
         ...     client.create_collection()
@@ -52,14 +53,14 @@ class QdrantVectorClient:
         self,
         url: str,
         collection_name: str,
-        embedding_dim: int = 768,
+        embedding_dim: int = 1024,
     ) -> None:
         """Initialize Qdrant client.
 
         Args:
             url: Qdrant server URL (e.g., "http://localhost:6333").
             collection_name: Name of the collection to manage.
-            embedding_dim: Dimension of embedding vectors (default 768).
+            embedding_dim: Dimension of embedding vectors (default 1024).
 
         Raises:
             QdrantConnectionError: If connection to Qdrant fails.
@@ -137,7 +138,7 @@ class QdrantVectorClient:
         """Create collection with HNSW indexing configuration.
 
         Creates collection with:
-        - 768-dimensional vectors (Qwen3-Embedding-0.6B)
+        - 1024-dimensional vectors (Qwen3-Embedding-0.6B)
         - Cosine distance metric
         - HNSW indexing (M=16, ef_construct=200)
 
@@ -327,6 +328,19 @@ class QdrantVectorClient:
             logger.debug("Qdrant client closed", extra={"collection_name": self.collection_name})
         except Exception as e:
             logger.warning("Error closing Qdrant client", extra={"error": str(e)})
+
+    def __enter__(self) -> "QdrantVectorClient":
+        """Enter context manager (client already initialised in __init__)."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Exit context manager and close the underlying client."""
+        self.close()
 
 
 # Export public API

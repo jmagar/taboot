@@ -17,23 +17,17 @@ from packages.vector.collections import (
 )
 
 
+@pytest.fixture
+def collection_config(collection_config_path: Path) -> dict[str, Any]:
+    """Load collection configuration from JSON file."""
+
+    with collection_config_path.open(encoding="utf-8") as f:
+        return json.load(f)
+
+
 @pytest.mark.unit
 class TestCollectionCreation:
     """Test suite for Qdrant collection creation functionality."""
-
-    @pytest.fixture
-    def collection_config_path(self) -> Path:
-        """Path to collection configuration JSON."""
-        return Path(
-            "/home/jmagar/code/taboot/specs/001-taboot-rag-platform/contracts/"
-            "qdrant-collection.json"
-        )
-
-    @pytest.fixture
-    def collection_config(self, collection_config_path: Path) -> dict[str, Any]:
-        """Load collection configuration from JSON file."""
-        with open(collection_config_path) as f:
-            return json.load(f)
 
     @pytest.fixture
     def mock_qdrant_client(self) -> Mock:
@@ -47,7 +41,7 @@ class TestCollectionCreation:
             return QdrantVectorClient(
                 url="http://localhost:6333",
                 collection_name="documents",
-                embedding_dim=768,
+                embedding_dim=1024,
             )
 
     def test_collection_config_loads_correctly(self, collection_config_path: Path) -> None:
@@ -55,12 +49,12 @@ class TestCollectionCreation:
         # This will fail if implementation doesn't exist yet (RED phase)
         assert collection_config_path.exists(), "Collection config JSON must exist"
 
-        with open(collection_config_path) as f:
+        with collection_config_path.open(encoding="utf-8") as f:
             config = json.load(f)
 
         # Verify structure matches spec
         assert config["collection_name"] == "documents"
-        assert config["vectors"]["size"] == 768
+        assert config["vectors"]["size"] == 1024
         assert config["vectors"]["distance"] == "Cosine"
         assert config["vectors"]["on_disk"] is False
         assert config["hnsw_config"]["m"] == 16
@@ -217,17 +211,9 @@ class TestCollectionCreation:
 class TestCollectionConfiguration:
     """Test suite for collection configuration validation."""
 
-    @pytest.fixture
-    def collection_config_path(self) -> Path:
-        """Path to collection configuration JSON."""
-        return Path(
-            "/home/jmagar/code/taboot/specs/001-taboot-rag-platform/contracts/"
-            "qdrant-collection.json"
-        )
-
     def test_config_has_required_fields(self, collection_config_path: Path) -> None:
         """Test that collection config has all required fields."""
-        with open(collection_config_path) as f:
+        with collection_config_path.open(encoding="utf-8") as f:
             config = json.load(f)
 
         # Required top-level fields
@@ -240,17 +226,17 @@ class TestCollectionConfiguration:
 
     def test_config_vectors_schema(self, collection_config_path: Path) -> None:
         """Test vectors configuration schema."""
-        with open(collection_config_path) as f:
+        with collection_config_path.open(encoding="utf-8") as f:
             config = json.load(f)
 
         vectors = config["vectors"]
-        assert vectors["size"] == 768, "Must use Qwen3-Embedding-0.6B (768-dim)"
+        assert vectors["size"] == 1024, "Must use Qwen3-Embedding-0.6B (1024-dim)"
         assert vectors["distance"] == "Cosine", "Must use cosine distance"
         assert isinstance(vectors["on_disk"], bool)
 
     def test_config_hnsw_schema(self, collection_config_path: Path) -> None:
         """Test HNSW configuration schema."""
-        with open(collection_config_path) as f:
+        with collection_config_path.open(encoding="utf-8") as f:
             config = json.load(f)
 
         hnsw = config["hnsw_config"]
@@ -261,7 +247,7 @@ class TestCollectionConfiguration:
 
     def test_config_payload_schema_has_required_fields(self, collection_config_path: Path) -> None:
         """Test payload schema has required metadata fields."""
-        with open(collection_config_path) as f:
+        with collection_config_path.open(encoding="utf-8") as f:
             config = json.load(f)
 
         payload = config["payload_schema"]
@@ -283,7 +269,7 @@ class TestCollectionConfiguration:
 
     def test_config_performance_targets(self, collection_config_path: Path) -> None:
         """Test that config includes performance targets."""
-        with open(collection_config_path) as f:
+        with collection_config_path.open(encoding="utf-8") as f:
             config = json.load(f)
 
         assert "expected_performance" in config
@@ -291,3 +277,9 @@ class TestCollectionConfiguration:
         assert "upsert_throughput" in perf
         assert "search_latency_p95" in perf
         assert "memory_usage" in perf
+
+    def test_loader_normalizes_distance_enum(self) -> None:
+        """load_collection_config normalises distance to an enum-friendly value."""
+
+        config = load_collection_config()
+        assert config["vectors"]["distance"] == "COSINE"

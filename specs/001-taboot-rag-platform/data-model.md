@@ -54,7 +54,7 @@ Represents a semantic chunk of a document with embedding vector.
 - `section`: str (heading/path context, e.g., `"Installation > Prerequisites"`, max 512 chars)
 - `position`: int (offset in document, 0-indexed)
 - `token_count`: int (number of tokens in chunk, for context window management)
-- `embedding`: float array (768-dim vector from Qwen3-Embedding-0.6B, stored separately in Qdrant)
+- `embedding`: float array (1024-dim vector from Qwen3-Embedding-0.6B, stored separately in Qdrant)
 
 **Qdrant Metadata** (for filtering):
 - `source_url`: str (copied from Document)
@@ -69,10 +69,10 @@ Represents a semantic chunk of a document with embedding vector.
 - `section`: Optional, max 512 chars
 - `position`: Required, ≥0
 - `token_count`: Required, ≥1, ≤512 (enforced by chunker)
-- `embedding`: Required, exactly 768 dimensions, normalized (cosine similarity)
+- `embedding`: Required, exactly 1024 dimensions, normalized (cosine similarity)
 
 **Qdrant Collection Config**:
-- Dimension: 768
+- Dimension: 1024
 - Distance: Cosine
 - HNSW: `M=16`, `ef_construct=200`
 - Quantization: Scalar (optional for memory savings)

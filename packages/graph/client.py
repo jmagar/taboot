@@ -11,6 +11,7 @@ Implements requirements from data-model.md and follows project standards:
 """
 
 from contextlib import contextmanager
+from types import TracebackType
 from typing import Generator
 
 from neo4j import Driver, GraphDatabase, Session
@@ -150,6 +151,20 @@ class Neo4jClient:
             self._driver.close()
             self._driver = None
 
+    def get_driver(self) -> Driver:
+        """Return the active Neo4j driver instance.
+
+        Raises:
+            Neo4jConnectionError: If the driver has not been connected.
+        """
+
+        if self._driver is None:
+            raise Neo4jConnectionError(
+                "Neo4j driver not connected. Call connect() before accessing the driver."
+            )
+
+        return self._driver
+
     def health_check(self) -> bool:
         """Check if Neo4j connection is healthy.
 
@@ -229,14 +244,13 @@ class Neo4jClient:
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
-        """Exit context manager and close connection.
-
-        Args:
-            exc_type: Exception type if an error occurred.
-            exc_val: Exception value if an error occurred.
-            exc_tb: Exception traceback if an error occurred.
-        """
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Exit context manager and close connection."""
         self.close()
 
 

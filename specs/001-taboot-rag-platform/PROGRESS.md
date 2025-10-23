@@ -197,21 +197,21 @@ Continue Phase 2: Neo4j client tests (T013-T014) and Qdrant client (T011, T015-T
    - 11 unit tests covering collection creation functionality
    - TestCollectionCreation class (6 tests):
      * test_collection_config_loads_correctly - Verifies JSON config loads
-     * test_create_collection_with_correct_parameters - Validates 768-dim, HNSW, cosine params
+     * test_create_collection_with_correct_parameters - Validates 1024-dim, HNSW, cosine params
      * test_create_collection_error_handling_on_failure - Tests 500 error handling
      * test_create_collection_error_handling_on_network_failure - Tests network errors
      * test_create_collection_is_idempotent - Verifies 409 conflict is safe
      * test_create_collection_multiple_times_is_safe - Tests repeated calls
    - TestCollectionConfiguration class (5 tests):
      * test_config_has_required_fields - Validates JSON structure
-     * test_config_vectors_schema - Tests 768-dim Qwen3-Embedding-0.6B config
+     * test_config_vectors_schema - Tests 1024-dim Qwen3-Embedding-0.6B config
      * test_config_hnsw_schema - Tests HNSW M=16, ef_construct=200
      * test_config_payload_schema_has_required_fields - Validates metadata fields
      * test_config_performance_targets - Checks performance expectations
 
 **Implementation Details**:
 - Tests verify collection creation matches specs/001-taboot-rag-platform/contracts/qdrant-collection.json
-- All configuration parameters validated: vectors (768-dim, Cosine), HNSW (M=16, ef_construct=200), optimizers, WAL
+- All configuration parameters validated: vectors (1024-dim, Cosine), HNSW (M=16, ef_construct=200), optimizers, WAL
 - Error handling tests for 500 errors and network failures
 - Idempotency tests ensure 409 conflicts are handled gracefully
 - Configuration validation tests ensure JSON has required fields and performance targets
@@ -256,7 +256,7 @@ Continue Phase 3 (US4): T022 (collections.py loader) or T019 (Neo4j constraint t
    - Orchestrates initialization workflow:
      1. Check system health (all 7 services must be healthy)
      2. Create Neo4j constraints (5 constraints + 7 indexes)
-     3. Create Qdrant collections (768-dim vectors, HNSW indexing)
+     3. Create Qdrant collections (1024-dim vectors, HNSW indexing)
      4. Create PostgreSQL schema
      5. Report success or failure with clear messaging
 
@@ -271,7 +271,7 @@ Continue Phase 3 (US4): T022 (collections.py loader) or T019 (Neo4j constraint t
 - Neo4j constraints match GRAPH_SCHEMA.md exactly:
   - Unique constraints: Host.hostname, Endpoint(scheme,fqdn,port,path), Network.cidr, Document.doc_id, IP.addr
   - Indexes: Host.ip, Container(compose_project,compose_service), Service.name, Service(protocol,port), User(provider,username), Document.url
-- Qdrant collection uses QdrantVectorClient with proper configuration (768-dim, Cosine, HNSW M=16)
+- Qdrant collection uses QdrantVectorClient with proper configuration (1024-dim, Cosine, HNSW M=16)
 - Full type hints (mypy strict mode compliant)
 - Line length ≤100 characters (ruff compliant)
 - Uses `raise ... from None` for exception chaining compliance

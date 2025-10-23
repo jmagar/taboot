@@ -49,7 +49,7 @@ uv run apps/cli init
 
 # Expected output:
 # ✓ Neo4j constraints created (4)
-# ✓ Qdrant collection 'documents' created (768-dim, HNSW)
+# ✓ Qdrant collection 'documents' created (1024-dim, HNSW)
 # ✓ PostgreSQL tables created (4)
 # ✓ All services healthy
 ```
@@ -413,7 +413,7 @@ docker compose logs -f taboot-ollama  # Ollama LLM
 
 ```bash
 # Ollama model download (Qwen3-4B-Instruct)
-docker exec taboot-ollama ollama pull qwen2.5:4b-instruct-q4_0
+docker exec taboot-ollama ollama pull qwen3:4b
 
 # spaCy model download
 uv run python -m spacy download en_core_web_md

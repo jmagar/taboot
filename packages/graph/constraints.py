@@ -40,10 +40,16 @@ def get_constraints_file_path() -> Path:
         >>> print(path)
         /home/user/taboot/specs/001-taboot-rag-platform/contracts/neo4j-constraints.cypher
     """
-    project_root = Path.cwd()
     constraints_file = (
-        project_root / "specs" / "001-taboot-rag-platform" / "contracts" / "neo4j-constraints.cypher"
+        Path(__file__).resolve().parent.parent.parent
+        / "specs"
+        / "001-taboot-rag-platform"
+        / "contracts"
+        / "neo4j-constraints.cypher"
     )
+
+    if not constraints_file.exists():
+        raise FileNotFoundError(f"Constraints file not found at {constraints_file}")
 
     return constraints_file.resolve()
 
@@ -199,7 +205,7 @@ async def create_neo4j_constraints() -> None:
     client = Neo4jClient()
     try:
         client.connect()
-        create_constraints(client._driver)
+        create_constraints(client.get_driver())
     finally:
         client.close()
 

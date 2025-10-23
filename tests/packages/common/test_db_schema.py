@@ -14,14 +14,12 @@ from packages.common.config import TabootConfig
 
 
 @pytest.mark.unit
-def test_load_schema_file_success() -> None:
+def test_load_schema_file_success(postgres_schema_path: Path) -> None:
     """Test that schema SQL file is loaded correctly."""
     # Import will fail until T024 implements the module
     from packages.common.db_schema import load_schema_file
 
-    schema_path = Path("/home/jmagar/code/taboot/specs/001-taboot-rag-platform/contracts/postgresql-schema.sql")
-
-    sql_content = load_schema_file(schema_path)
+    sql_content = load_schema_file(postgres_schema_path)
 
     # Verify SQL contains expected table definitions
     assert "CREATE TABLE IF NOT EXISTS documents" in sql_content
@@ -227,3 +225,40 @@ def test_verify_schema_query_structure(test_config: TabootConfig, mocker: Any) -
     execute_call = mock_cursor.execute.call_args[0][0]
     assert "information_schema.tables" in execute_call.lower()
     assert "table_schema = 'public'" in execute_call.lower()
+
+
+@pytest.mark.integration
+def test_document_content_table_exists():
+    """Test that document_content table is created in schema."""
+    from packages.common.db_schema import create_postgresql_schema, get_postgres_client
+
+    # Ensure schema is created
+    # This is async but we need to run it synchronously for this test
+    import asyncio
+    asyncio.run(create_postgresql_schema())
+
+    conn = get_postgres_client()
+    with conn.cursor() as cur:
+        # Check table exists
+        cur.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = 'document_content'
+            );
+        """)
+        result = cur.fetchone()
+        assert result[0] is True
+
+        # Check required columns exist
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'document_content'
+        """)
+        columns = {row[0] for row in cur.fetchall()}
+
+        assert 'doc_id' in columns
+        assert 'content' in columns
+        assert 'created_at' in columns
+
+    conn.close()

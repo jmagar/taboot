@@ -6,6 +6,44 @@ All notable changes to Taboot will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-10-23
+
+### Added
+- **List Documents Feature (T163-T168)**: Complete implementation with filtering and pagination
+  - Use case layer: `packages/core/use_cases/list_documents.py` with DocumentsClient protocol
+  - CLI command: `taboot list documents` with rich table output
+  - API endpoint: `GET /documents` with query parameter validation
+  - Filters: source_type, extraction_state, limit, offset
+  - Full test coverage (25 tests across use-case, CLI, and API layers)
+
+- **Background Extraction Worker (T169-T170)**: Async job processing
+  - Redis queue polling with configurable timeout
+  - Graceful shutdown signal handling (SIGINT, SIGTERM)
+  - Error handling with continuous operation on failures
+  - Worker main entry point in `apps/worker/main.py`
+
+- **Dead Letter Queue (DLQ) System (T171-T172)**: Retry policy with exponential backoff
+  - `packages/common/dlq.py` with DeadLetterQueue class
+  - Retry count tracking per job (max 3 retries by default)
+  - Exponential backoff calculation: `base_delay * (2 ^ (retry_count - 1))`
+  - Error metadata storage in Redis
+  - Job retry eligibility checks
+
+- **Performance Tuning Documentation (T173-T175)**: Comprehensive tuning guide
+  - `docs/PERFORMANCE_TUNING.md` with batch size optimization guidance
+  - Tier C LLM batching: 8-16 windows (configurable per GPU)
+  - Neo4j write batching: 2,000-4,000 rows (configurable per heap size)
+  - Qdrant upsert batching: 50-500 vectors (configurable per network latency)
+  - Hardware-specific recommendations (RTX 4070, 3090, 3060)
+  - Monitoring and benchmarking guidelines
+  - Troubleshooting common performance issues
+
+- **Enhanced Documentation (T176-T178)**: README and testing updates
+  - Updated README.md with comprehensive Quick Start section
+  - Example workflow with all major CLI commands
+  - Key features list with technical details
+  - Prerequisites and setup instructions (5-minute setup)
+
 ### Changed
 - Renamed project from LlamaCrawl to Taboot across all documentation and code
 - Standardized all health check endpoints to `/health` (previously mixed `/health` and `/healthz`)

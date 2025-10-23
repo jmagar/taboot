@@ -113,7 +113,7 @@ Maintain high confidence in core business logic through testing.
 
 **Database Operations**:
 - Neo4j: ≥20k edges/min with 2k-row UNWIND batches
-- Qdrant: ≥5k vectors/sec (768-dim HNSW indexing)
+- Qdrant: ≥5k vectors/sec (1024-dim HNSW indexing)
 
 ## Observability Requirements
 

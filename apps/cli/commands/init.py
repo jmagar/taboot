@@ -15,11 +15,15 @@ import typer
 from rich.console import Console
 
 from packages.common.config import get_config
+from packages.common.db_schema import create_schema as create_postgres_schema
 from packages.common.health import check_system_health
+from packages.common.logging import get_logger
 from packages.graph.client import Neo4jClient
+from packages.graph.constraints import create_constraints
 from packages.vector.client import QdrantVectorClient
 
 console = Console()
+logger = get_logger(__name__)
 
 
 def create_neo4j_constraints() -> None:
@@ -32,65 +36,15 @@ def create_neo4j_constraints() -> None:
     Raises:
         Exception: If constraint creation fails.
     """
-    client = Neo4jClient()
-
-    try:
-        client.connect()
-
-        # Define all constraints and indexes from GRAPH_SCHEMA.md
-        statements = [
-            # Constraints
-            (
-                "CREATE CONSTRAINT host_hostname IF NOT EXISTS "
-                "FOR (h:Host) REQUIRE h.hostname IS UNIQUE"
-            ),
-            (
-                "CREATE CONSTRAINT endpoint_uniq IF NOT EXISTS "
-                "FOR (e:Endpoint) REQUIRE (e.scheme, e.fqdn, e.port, e.path) IS UNIQUE"
-            ),
-            (
-                "CREATE CONSTRAINT network_cidr IF NOT EXISTS "
-                "FOR (n:Network) REQUIRE n.cidr IS UNIQUE"
-            ),
-            (
-                "CREATE CONSTRAINT doc_docid IF NOT EXISTS "
-                "FOR (d:Document) REQUIRE d.doc_id IS UNIQUE"
-            ),
-            (
-                "CREATE CONSTRAINT ip_addr IF NOT EXISTS "
-                "FOR (i:IP) REQUIRE i.addr IS UNIQUE"
-            ),
-            # Indexes
-            "CREATE INDEX host_ip IF NOT EXISTS FOR (h:Host) ON (h.ip)",
-            (
-                "CREATE INDEX container_compose IF NOT EXISTS "
-                "FOR (c:Container) ON (c.compose_project, c.compose_service)"
-            ),
-            "CREATE INDEX service_name IF NOT EXISTS FOR (s:Service) ON (s.name)",
-            (
-                "CREATE INDEX service_proto_port IF NOT EXISTS "
-                "FOR (s:Service) ON (s.protocol, s.port)"
-            ),
-            (
-                "CREATE INDEX user_provider_username IF NOT EXISTS "
-                "FOR (u:User) ON (u.provider, u.username)"
-            ),
-            "CREATE INDEX doc_url IF NOT EXISTS FOR (d:Document) ON (d.url)",
-        ]
-
-        # Execute each statement in a separate transaction
-        for statement in statements:
-            with client.session() as session:
-                session.run(statement)
-    finally:
-        client.close()
+    with Neo4jClient() as client:
+        create_constraints(client.get_driver())
 
 
 def create_qdrant_collections() -> None:
     """Create Qdrant collections with proper vector configuration.
 
     Creates collection with:
-    - 768-dimensional vectors (Qwen3-Embedding-0.6B)
+    - 1024-dimensional vectors (Qwen3-Embedding-0.6B)
     - Cosine distance metric
     - HNSW indexing (M=16, ef_construct=200)
 
@@ -98,16 +52,12 @@ def create_qdrant_collections() -> None:
         Exception: If collection creation fails.
     """
     config = get_config()
-    qdrant_client = QdrantVectorClient(
+    with QdrantVectorClient(
         url=config.qdrant_url,
         collection_name=config.collection_name,
-        embedding_dim=768,
-    )
-
-    try:
+        embedding_dim=1024,
+    ) as qdrant_client:
         qdrant_client.create_collection()
-    finally:
-        qdrant_client.close()
 
 
 def create_postgresql_schema() -> None:
@@ -121,10 +71,9 @@ def create_postgresql_schema() -> None:
     Raises:
         Exception: If schema creation fails.
     """
-    # PostgreSQL schema creation will be implemented when db_schema module exists
-    # For now, this is a placeholder that doesn't fail
-    # The tests mock this function, so it won't be called during testing
-    pass
+    config = get_config()
+    logger.info("Creating PostgreSQL schema", extra={"database": config.postgres_db})
+    create_postgres_schema(config)
 
 
 def init_command() -> None:

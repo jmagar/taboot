@@ -111,7 +111,7 @@ This document consolidates research findings for building a Doc-to-Graph RAG pla
 
 **Implementation Notes**:
 - `packages/vector/client.py`: Qdrant client with collection management
-- Collection config: 768-dim (Qwen3-Embedding-0.6B), HNSW (M=16, ef_construct=200), cosine similarity
+- Collection config: 1024-dim (Qwen3-Embedding-0.6B), HNSW (M=16, ef_construct=200), cosine similarity
 - Metadata schema: `source_url`, `doc_id`, `section`, `timestamp`, `source_type`, `tags`
 - `packages/vector/search.py`: Vector search with metadata filters
 - `packages/vector/reranker.py`: SentenceTransformers Qwen3-Reranker-0.6B integration (batch_size=16, GPU)
@@ -123,7 +123,7 @@ This document consolidates research findings for building a Doc-to-Graph RAG pla
 **Decision**: Use Text Embeddings Inference (TEI) with Qwen3-Embedding-0.6B model
 
 **Rationale**:
-- 768-dimensional embeddings fit Qdrant collection config
+- 1024-dimensional embeddings fit Qdrant collection config
 - Qwen3 models optimized for technical/code content (better than general-purpose OpenAI embeddings)
 - TEI service provides GPU acceleration, batched processing, HTTP API
 - Consistent embedding model across ingestion and query time (critical for retrieval quality)
@@ -135,7 +135,7 @@ This document consolidates research findings for building a Doc-to-Graph RAG pla
 
 **Implementation Notes**:
 - TEI container config in `docker-compose.yaml`: `ghcr.io/huggingface/text-embeddings-inference:latest`, GPU device 0
-- Environment: `QDRANT_EMBEDDING_DIM=768`, `TEI_EMBEDDING_URL=http://taboot-embed:80`
+- Environment: `QDRANT_EMBEDDING_DIM=1024`, `TEI_EMBEDDING_URL=http://taboot-embed:80`
 - `packages/ingest/embedder.py`: TEI client for batch embedding (chunk_size=32)
 
 ---
@@ -278,7 +278,7 @@ This document consolidates research findings for building a Doc-to-Graph RAG pla
 - **Total**: ~9.5GB, leaving 2.5GB headroom
 
 **Optimization**:
-- Quantize Ollama model if memory pressure: `qwen2.5:4b-instruct-q4_0` (4-bit, ~2.5GB)
+- Quantize Ollama model if memory pressure: `qwen3:4b` (4-bit, ~2.5GB)
 - Reduce Qdrant HNSW `M` parameter if needed (M=16 → M=8 saves ~30% memory, slight recall drop)
 
 ### Latency Optimization

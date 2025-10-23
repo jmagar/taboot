@@ -4,11 +4,9 @@ Implements persistent job storage and querying for ingestion pipeline.
 """
 
 import logging
-from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-import psycopg2
 from psycopg2.extras import Json, RealDictCursor
 
 from packages.schemas.models import IngestionJob, JobState, SourceType

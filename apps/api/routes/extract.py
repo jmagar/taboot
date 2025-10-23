@@ -10,9 +10,11 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from redis import asyncio as redis
+
+from apps.api.deps.auth import verify_api_key
 
 from packages.common.health import check_system_health
 from packages.core.use_cases.extract_pending import ExtractPendingUseCase
@@ -138,7 +140,12 @@ def get_extract_use_case() -> ExtractPendingUseCase:
         raise RuntimeError(f"Failed to initialize extraction dependencies: {e}") from e
 
 
-@router.post("/pending", response_model=ExtractionResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/pending",
+    response_model=ExtractionResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(verify_api_key)],
+)
 async def trigger_extraction(
     limit: int | None = Query(None, ge=1, description="Maximum documents to process"),
 ) -> ExtractionResponse:

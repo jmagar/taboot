@@ -10,8 +10,10 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+
+from apps.api.deps.auth import verify_api_key
 
 from packages.core.use_cases.ingest_web import IngestWebUseCase
 from packages.ingest.chunker import Chunker
@@ -145,7 +147,12 @@ def get_job_store() -> "PostgresJobStore":
     return PostgresJobStore(pg_conn)
 
 
-@router.post("/", response_model=IngestionJobResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/",
+    response_model=IngestionJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(verify_api_key)],
+)
 async def start_ingestion(request_body: IngestionRequest) -> IngestionJobResponse:
     """Start an ingestion job.
 

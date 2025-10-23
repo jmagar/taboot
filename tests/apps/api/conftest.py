@@ -1,8 +1,15 @@
 """Fixtures for API tests."""
 
+import hashlib
 import os
+from datetime import UTC, datetime
+
 import pytest
+import redis.asyncio as redis
 from fastapi.testclient import TestClient
+
+from packages.common.api_key_store import ApiKeyStore
+from packages.schemas.api_key import ApiKey
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -30,3 +37,34 @@ def client():
 
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture
+async def redis_client():
+    """Create Redis client for testing."""
+    client = await redis.from_url("redis://localhost:6379", decode_responses=True)
+    yield client
+    await client.flushdb()  # Clean up
+    await client.close()
+
+
+@pytest.fixture
+async def valid_api_key(redis_client):
+    """Create and store valid API key."""
+    raw_key = "sk_test_integration"
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+
+    api_key = ApiKey(
+        key_id="key_integration",
+        key_hash=key_hash,
+        name="Integration Test Key",
+        created_at=datetime.now(UTC),
+        last_used_at=None,
+        rate_limit_rpm=60,
+        is_active=True,
+    )
+
+    store = ApiKeyStore(redis_client)
+    await store.store(api_key)
+
+    return raw_key

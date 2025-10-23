@@ -3,8 +3,10 @@
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+
+from apps.api.deps.auth import verify_api_key
 
 from packages.core.use_cases.query import execute_query
 
@@ -41,7 +43,7 @@ class QueryResponse(BaseModel):
     graph_count: int
 
 
-@router.post("", response_model=QueryResponse)
+@router.post("", response_model=QueryResponse, dependencies=[Depends(verify_api_key)])
 async def query_knowledge_base(request: QueryRequest) -> QueryResponse:
     """Execute natural language query with hybrid retrieval.
 

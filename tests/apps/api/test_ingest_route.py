@@ -100,10 +100,15 @@ class TestPostIngestEndpoint:
         """
         with patch(
             "apps.api.routes.ingest.get_ingest_use_case"
-        ) as mock_get_use_case:
+        ) as mock_get_use_case, patch(
+            "apps.api.routes.ingest.get_job_store"
+        ) as mock_get_store:
             mock_use_case = Mock()
             mock_use_case.execute.return_value = sample_job
             mock_get_use_case.return_value = mock_use_case
+
+            mock_store = MagicMock()
+            mock_get_store.return_value = mock_store
 
             response = client.post(
                 "/ingest",
@@ -120,6 +125,9 @@ class TestPostIngestEndpoint:
             assert "state" in data
             assert "created_at" in data
             assert data["state"] == "pending"
+
+            # Verify job was persisted
+            mock_store.create.assert_called_once()
 
     def test_ingest_validates_source_type(self, client: TestClient) -> None:
         """Test that POST /ingest validates source_type enum.
@@ -163,10 +171,15 @@ class TestPostIngestEndpoint:
         """
         with patch(
             "apps.api.routes.ingest.get_ingest_use_case"
-        ) as mock_get_use_case:
+        ) as mock_get_use_case, patch(
+            "apps.api.routes.ingest.get_job_store"
+        ) as mock_get_store:
             mock_use_case = Mock()
             mock_use_case.execute.return_value = sample_job
             mock_get_use_case.return_value = mock_use_case
+
+            mock_store = MagicMock()
+            mock_get_store.return_value = mock_store
 
             # Should succeed without limit
             response = client.post(
@@ -183,6 +196,9 @@ class TestPostIngestEndpoint:
             call_kwargs = mock_use_case.execute.call_args.kwargs
             assert call_kwargs.get("limit") is None
 
+            # Verify job was persisted
+            mock_store.create.assert_called_once()
+
     def test_ingest_passes_limit_to_use_case(
         self, client: TestClient, sample_job: IngestionJob
     ) -> None:
@@ -192,10 +208,15 @@ class TestPostIngestEndpoint:
         """
         with patch(
             "apps.api.routes.ingest.get_ingest_use_case"
-        ) as mock_get_use_case:
+        ) as mock_get_use_case, patch(
+            "apps.api.routes.ingest.get_job_store"
+        ) as mock_get_store:
             mock_use_case = Mock()
             mock_use_case.execute.return_value = sample_job
             mock_get_use_case.return_value = mock_use_case
+
+            mock_store = MagicMock()
+            mock_get_store.return_value = mock_store
 
             response = client.post(
                 "/ingest",
@@ -211,6 +232,9 @@ class TestPostIngestEndpoint:
             call_kwargs = mock_use_case.execute.call_args.kwargs
             assert call_kwargs.get("limit") == 50
 
+            # Verify job was persisted
+            mock_store.create.assert_called_once()
+
     def test_ingest_response_includes_all_fields(
         self, client: TestClient, sample_job: IngestionJob
     ) -> None:
@@ -220,10 +244,15 @@ class TestPostIngestEndpoint:
         """
         with patch(
             "apps.api.routes.ingest.get_ingest_use_case"
-        ) as mock_get_use_case:
+        ) as mock_get_use_case, patch(
+            "apps.api.routes.ingest.get_job_store"
+        ) as mock_get_store:
             mock_use_case = Mock()
             mock_use_case.execute.return_value = sample_job
             mock_get_use_case.return_value = mock_use_case
+
+            mock_store = MagicMock()
+            mock_get_store.return_value = mock_store
 
             response = client.post(
                 "/ingest",
@@ -249,6 +278,9 @@ class TestPostIngestEndpoint:
             datetime.fromisoformat(
                 data["created_at"].replace("Z", "+00:00")
             )  # Valid ISO datetime
+
+            # Verify job was persisted
+            mock_store.create.assert_called_once()
 
 
 @pytest.mark.unit

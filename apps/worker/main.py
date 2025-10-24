@@ -9,11 +9,25 @@ import json
 import logging
 import os
 import signal
-from typing import Any, Callable, Optional
+from types import FrameType
+from typing import Protocol
+from uuid import UUID
 
 from redis import asyncio as redis
 
 logger = logging.getLogger(__name__)
+
+
+class SingleDocExtractor(Protocol):
+    """Protocol for single-document extraction."""
+
+    async def execute(self, doc_id: UUID) -> None:
+        """Execute extraction for a single document.
+
+        Args:
+            doc_id: Document ID to extract.
+        """
+        ...
 
 
 class ExtractionWorker:
@@ -26,7 +40,7 @@ class ExtractionWorker:
     def __init__(
         self,
         redis_client: redis.Redis,
-        extract_use_case: Optional[Any] = None,
+        extract_use_case: SingleDocExtractor | None = None,
         poll_timeout: int = 5,
     ) -> None:
         """Initialize ExtractionWorker.
@@ -41,7 +55,7 @@ class ExtractionWorker:
         self.poll_timeout = poll_timeout
         self._stop_flag = False
 
-        logger.info(f"Initialized ExtractionWorker (poll_timeout={poll_timeout}s)")
+        logger.info("Initialized ExtractionWorker (poll_timeout=%ss)", poll_timeout)
 
     def should_stop(self) -> bool:
         """Check if worker should stop.
@@ -75,7 +89,7 @@ class ExtractionWorker:
                 # No job available
                 return
 
-            queue_name, job_data = result
+            _queue_name, job_data = result
 
             # Parse job
             try:
@@ -83,26 +97,24 @@ class ExtractionWorker:
                 doc_id = job.get("doc_id")
 
                 if not doc_id:
-                    logger.error(f"Invalid job data: {job_data}")
+                    logger.error("Invalid job data: missing doc_id")
                     return
 
-                logger.info(f"Processing extraction job for doc_id={doc_id}")
+                logger.info("Processing extraction job for doc_id=%s", doc_id)
 
                 # Process job if use case provided
                 if self.extract_use_case:
-                    await self.extract_use_case.execute(doc_id=doc_id)
-                    logger.info(f"Completed extraction for doc_id={doc_id}")
+                    await self.extract_use_case.execute(UUID(doc_id))
+                    logger.info("Completed extraction for doc_id=%s", doc_id)
 
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse job data: {e}", exc_info=True)
-            except Exception as e:
-                logger.error(
-                    f"Extraction failed for job: {e}", exc_info=True
-                )
+            except json.JSONDecodeError:
+                logger.exception("Failed to parse job data")
+            except Exception:
+                logger.exception("Extraction failed for job")
                 # Job fails but worker continues
 
-        except Exception as e:
-            logger.error(f"Error in poll_once: {e}", exc_info=True)
+        except Exception:
+            logger.exception("Error in poll_once")
 
     async def run(self) -> None:
         """Run worker continuously until stopped.
@@ -117,8 +129,8 @@ class ExtractionWorker:
 
         except asyncio.CancelledError:
             logger.info("Worker cancelled")
-        except Exception as e:
-            logger.error(f"Worker error: {e}", exc_info=True)
+        except Exception:
+            logger.exception("Worker error")
         finally:
             logger.info("Worker stopped")
 
@@ -137,24 +149,19 @@ async def main() -> None:
     # Get Redis URL from environment
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
 
-    # Create Redis client
-    redis_client = redis.from_url(redis_url, decode_responses=False)
-
-    # Import extraction use case
-    from packages.core.use_cases.extract_pending import ExtractPendingUseCase
-
-    # Create use case (simplified - real implementation would need dependencies)
-    extract_use_case = None  # TODO: Initialize with real dependencies
+    # Create Redis client (decode to str for JSON parsing)
+    redis_client = redis.from_url(redis_url, decode_responses=True)
 
     # Create worker
+    # TODO: Wire a SingleDocExtractor use case here when available
     worker = ExtractionWorker(
         redis_client=redis_client,
-        extract_use_case=extract_use_case,
+        extract_use_case=None,
     )
 
     # Setup signal handlers for graceful shutdown
-    def handle_signal(sig: int, frame: Any) -> None:
-        logger.info(f"Received signal {sig}")
+    def handle_signal(sig: int, _frame: FrameType | None) -> None:
+        logger.info("Received signal %s", sig)
         worker.signal_stop()
 
     signal.signal(signal.SIGINT, handle_signal)
@@ -164,7 +171,7 @@ async def main() -> None:
     try:
         await worker.run()
     finally:
-        await redis_client.close()
+        await redis_client.aclose()
 
 
 if __name__ == "__main__":

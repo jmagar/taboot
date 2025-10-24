@@ -7,16 +7,16 @@
 ## Environment Context
 
 **Machine & OS:**
-- Hostname: STEAMY
+- Hostname: <redacted>
 - OS: Linux 5.15.167.4-microsoft-standard-WSL2 x86_64
 - Architecture: x86_64
 
 **Git Context:**
-- User: Jacob Magar (jmagar@gmail.com)
+- User: <redacted>
 - Branch: 001-taboot-rag-platform
 - Commit: 80d2d2c (fixed integration tests)
 
-**Working Directory:** /home/jmagar/code/taboot
+**Working Directory:** <repo-root>
 
 ## Overview
 
@@ -29,8 +29,8 @@ This session focused on transforming integration tests from using mock embedding
 **Type:** fix
 **Impact:** high
 **Files:**
-- `/home/jmagar/code/taboot/tests/packages/retrieval/indices/test_vector.py`
-- `/home/jmagar/code/taboot/tests/packages/retrieval/indices/test_graph.py`
+- `tests/packages/retrieval/indices/test_vector.py`
+- `tests/packages/retrieval/indices/test_graph.py`
 
 **Details:**
 
@@ -60,7 +60,7 @@ Both vector and graph index tests now create real 1024-dimensional embeddings an
 **Type:** improvement
 **Impact:** high
 **Files:**
-- `/home/jmagar/code/taboot/tests/packages/conftest.py`
+- `tests/packages/conftest.py`
 
 **Details:**
 
@@ -93,8 +93,8 @@ Both fixtures use `scope="session"` to minimize database overhead and ensure con
 **Type:** fix
 **Impact:** high
 **Files:**
-- `/home/jmagar/code/taboot/tests/packages/retrieval/retrievers/test_hybrid.py`
-- `/home/jmagar/code/taboot/tests/packages/retrieval/query_engines/test_qa.py`
+- `tests/packages/retrieval/retrievers/test_hybrid.py`
+- `tests/packages/retrieval/query_engines/test_qa.py`
 
 **Details:**
 
@@ -128,7 +128,7 @@ These changes ensure tests connect to actual services exposed on the host, not a
 **Type:** improvement
 **Impact:** medium
 **Files:**
-- `/home/jmagar/code/taboot/packages/retrieval/query_engines/qa.py`
+- `packages/retrieval/query_engines/qa.py`
 
 **Details:**
 
@@ -168,7 +168,7 @@ def __init__(
 **Type:** fix
 **Impact:** critical
 **Files:**
-- `/home/jmagar/code/taboot/packages/retrieval/query_engines/qa.py`
+- `packages/retrieval/query_engines/qa.py`
 
 **Details:**
 
@@ -229,10 +229,10 @@ self.llm = Ollama(
 **Type:** verification
 **Impact:** high
 **Files:**
-- `/home/jmagar/code/taboot/tests/packages/retrieval/indices/test_vector.py`
-- `/home/jmagar/code/taboot/tests/packages/retrieval/indices/test_graph.py`
-- `/home/jmagar/code/taboot/tests/packages/retrieval/retrievers/test_hybrid.py`
-- `/home/jmagar/code/taboot/tests/packages/retrieval/query_engines/test_qa.py`
+- `tests/packages/retrieval/indices/test_vector.py`
+- `tests/packages/retrieval/indices/test_graph.py`
+- `tests/packages/retrieval/retrievers/test_hybrid.py`
+- `tests/packages/retrieval/query_engines/test_qa.py`
 
 **Details:**
 
@@ -473,7 +473,7 @@ Result:              Successfully loads and executes inference
 ### 1. Run All Integration Tests
 
 ```bash
-cd /home/jmagar/code/taboot
+cd <repo-root>
 uv run pytest tests/packages/retrieval/ -v --tb=line
 ```
 
@@ -611,12 +611,12 @@ Neo4j: [count of nodes in database]
 ## Session Metadata
 
 **Files Modified:** 6
-- `/home/jmagar/code/taboot/tests/packages/retrieval/indices/test_vector.py` - Added TEI service configuration
-- `/home/jmagar/code/taboot/tests/packages/retrieval/indices/test_graph.py` - Added TEI service configuration
-- `/home/jmagar/code/taboot/tests/packages/retrieval/retrievers/test_hybrid.py` - Fixed Qdrant port mapping
-- `/home/jmagar/code/taboot/tests/packages/retrieval/query_engines/test_qa.py` - Fixed port mappings, added TEI URL
-- `/home/jmagar/code/taboot/tests/packages/conftest.py` - Added database client fixtures
-- `/home/jmagar/code/taboot/packages/retrieval/query_engines/qa.py` - Added tei_embedding_url parameter, context_window limit
+- `tests/packages/retrieval/indices/test_vector.py` - Added TEI service configuration
+- `tests/packages/retrieval/indices/test_graph.py` - Added TEI service configuration
+- `tests/packages/retrieval/retrievers/test_hybrid.py` - Fixed Qdrant port mapping
+- `tests/packages/retrieval/query_engines/test_qa.py` - Fixed port mappings, added TEI URL
+- `tests/packages/conftest.py` - Added database client fixtures
+- `packages/retrieval/query_engines/qa.py` - Added tei_embedding_url parameter, context_window limit
 
 **Lines Changed:** 87 lines (avg 14 lines per file)
 
@@ -662,9 +662,9 @@ uv add llama-index-embeddings-text-embeddings-inference
 
 ## Related Documentation
 
-- `/home/jmagar/code/taboot/CLAUDE.md` - Project architecture and conventions
-- `/home/jmagar/code/taboot/docker-compose.yaml` - Service definitions and port mappings
-- `/home/jmagar/code/taboot/docs/TECH_STACK_SUMMARY.md` - Technology stack overview
-- `/home/jmagar/code/taboot/specs/001-taboot-rag-platform/data-model.md` - Neo4j data model
-- `/home/jmagar/code/taboot/specs/001-taboot-rag-platform/contracts/qdrant-collection.json` - Qdrant collection schema
+- `CLAUDE.md` - Project architecture and conventions
+- `docker-compose.yaml` - Service definitions and port mappings
+- `docs/TECH_STACK_SUMMARY.md` - Technology stack overview
+- `specs/001-taboot-rag-platform/data-model.md` - Neo4j data model
+- `specs/001-taboot-rag-platform/contracts/qdrant-collection.json` - Qdrant collection schema
 

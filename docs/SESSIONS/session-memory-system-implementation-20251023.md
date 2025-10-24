@@ -7,16 +7,16 @@
 ## Environment Context
 
 **Machine & OS:**
-- Hostname: STEAMY
+- Hostname: <redacted>
 - OS: Linux (5.15.167.4-microsoft-standard-WSL2)
 - Architecture: x86_64
 
 **Git Context:**
-- User: Jacob Magar (jmagar@gmail.com)
+- User: <redacted>
 - Branch: 001-taboot-rag-platform
 - Commit: 80d2d2c
 
-**Working Directory:** /home/jmagar/code/taboot
+**Working Directory:** <repo-root>
 
 ## Overview
 
@@ -237,7 +237,13 @@ set -euo pipefail
 : "${CLAUDE_ENV_FILE:=$HOME/.claude/.env}"
 [[ -f "$CLAUDE_ENV_FILE" ]] && source "$CLAUDE_ENV_FILE"
 
-query_string=$(cat)  # Read search query from stdin
+# Read input - handle both JSON and raw string formats
+input=$(cat)
+query_string=$(echo "$input" | jq -r '.query // empty' 2>/dev/null || echo "$input")
+if [[ -z "$query_string" ]]; then
+  echo "Error: missing query (expected raw string or JSON with .query field)" >&2
+  exit 1
+fi
 threshold="${CLAUDE_SIMILARITY_THRESHOLD:-0.7}"
 
 # Search Redis for recent memories
@@ -1126,7 +1132,7 @@ Centralized configuration of all 5 hooks in settings.local.json to enable the me
       "on_failure": "continue",
       "enabled": true
     },
-    "PostIngest": {
+    "PostIngestLog": {
       "script": "~/.claude/hooks/log_memory_ops.sh",
       "timeout": 5,
       "required": false,
@@ -1330,28 +1336,47 @@ max_tokens: 4000
 timeout_seconds: 30
 ```
 
-### UUID to Qdrant Point ID Conversion
-```python
-import hashlib
-from typing import Union
+### Qdrant Point ID Support
 
-def uuid_to_qdrant_id(uuid_string: str) -> int:
-    """
-    Convert UUID string to valid Qdrant point ID.
-    Qdrant requires unsigned 64-bit integers for point IDs.
-    """
-    # Use MD5 hash of UUID to get deterministic numeric ID
+**Important:** Qdrant supports both string (UUID) and numeric point IDs. The UUID can be passed directly as a string without conversion. See [Qdrant Point IDs documentation](https://qdrant.tech/documentation/concepts/points/).
+
+#### Option 1: Use UUID Strings Directly (Recommended)
+```python
+# Qdrant accepts UUID strings directly
+def store_point_with_uuid(point_id: str, vector: list, payload: dict):
+    """Store point using UUID string as ID."""
+    qdrant_client.upsert(
+        collection_name="memories",
+        points=[
+            PointStruct(
+                id=point_id,  # Pass UUID string directly
+                vector=vector,
+                payload=payload
+            )
+        ]
+    )
+```
+
+#### Option 2: Convert UUID to Numeric ID (Legacy)
+If numeric IDs are required for compatibility with older systems:
+
+```python
+
+import hashlib
+
+def uuid_to_qdrant_numeric_id(uuid_string: str) -> int:
+    """Convert UUID string to numeric Qdrant point ID."""
     hash_digest = hashlib.md5(uuid_string.encode()).hexdigest()
-    # Take first 16 hex chars (64 bits)
     numeric_id = int(hash_digest[:16], 16)
-    # Ensure within unsigned 64-bit range (0 to 2^64-1)
     return numeric_id & ((1 << 64) - 1)
 
-# Example usage:
+# Example:
 uuid_string = "550e8400-e29b-41d4-a716-446655440000"
-point_id = uuid_to_qdrant_id(uuid_string)
+point_id = uuid_to_qdrant_numeric_id(uuid_string)
 # point_id: 5791753739748201476
 ```
+
+
 
 ### Bash Helper Functions for Hooks
 ```bash

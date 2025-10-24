@@ -9,6 +9,8 @@ Implements the system status display using GetStatusUseCase:
 This command is thin - all business logic is in packages/core/use_cases/get_status.py.
 """
 
+from __future__ import annotations
+
 import logging
 
 import redis.asyncio

@@ -9,6 +9,8 @@ Implements the initialization workflow that:
 This command must be run after starting Docker services for the first time.
 """
 
+from __future__ import annotations
+
 import asyncio
 
 import typer

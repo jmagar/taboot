@@ -34,6 +34,8 @@ def ingest_gmail_command(
 ) -> None:
     """Ingest Gmail messages into the knowledge graph.
 
+from __future__ import annotations
+
     Example:
         uv run apps/cli ingest gmail "is:unread" --limit 50
     """
@@ -50,7 +52,12 @@ def ingest_gmail_command(
         gmail_reader = GmailReader(credentials_path=gmail_creds)
         normalizer = Normalizer()
         chunker = Chunker()
-        embedder = Embedder(tei_url=config.tei_embedding_url)
+        tei_settings = config.tei_config
+        embedder = Embedder(
+            tei_url=str(tei_settings.url),
+            batch_size=tei_settings.batch_size,
+            timeout=float(tei_settings.timeout),
+        )
         qdrant_writer = QdrantWriter(
             url=config.qdrant_url,
             collection_name=config.collection_name,

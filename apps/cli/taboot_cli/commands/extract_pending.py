@@ -10,6 +10,8 @@ Implements the extraction workflow using ExtractPendingUseCase:
 This command is thin - all business logic is in packages/core/use_cases/extract_pending.py.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Annotated
 from uuid import UUID

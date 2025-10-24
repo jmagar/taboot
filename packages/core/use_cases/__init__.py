@@ -3,6 +3,8 @@
 Use cases orchestrate workflows across adapters without containing framework-specific code.
 """
 
+from __future__ import annotations
+
 from packages.core.use_cases.extract_pending import DocumentStore, ExtractPendingUseCase
 from packages.core.use_cases.get_status import (
     GetStatusUseCase,

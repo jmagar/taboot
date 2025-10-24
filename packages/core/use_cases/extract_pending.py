@@ -6,6 +6,8 @@ DocumentStore → ExtractionOrchestratorPort → DocumentStore (update state)
 With per-document error handling and batch summary statistics.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Protocol
 from uuid import UUID

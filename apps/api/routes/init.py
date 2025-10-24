@@ -6,6 +6,8 @@ and PostgreSQL schema. Verifies system health before and after initialization.
 Required by FR-032: System MUST provide /init endpoint with health verification.
 """
 
+from __future__ import annotations
+
 import logging
 from collections.abc import Mapping
 from typing import TypedDict
@@ -60,7 +62,7 @@ async def initialize_system() -> dict[str, object]:
     4. Check system health after init
 
     Returns:
-        dict: Envelope with initialized payload and post-init health status.
+        ResponseEnvelope[dict]: Envelope with initialized payload and post-init health status.
 
     Raises:
         HTTPException: 500 if any initialization step fails.
@@ -71,6 +73,8 @@ async def initialize_system() -> dict[str, object]:
         >>> data = response.json()
         >>> assert data["data"]["status"] == "initialized"
     """
+    from apps.api.schemas.envelope import ResponseEnvelope
+
     logger.info("System initialization started")
 
     try:
@@ -99,10 +103,10 @@ async def initialize_system() -> dict[str, object]:
 
         logger.info("System initialization completed successfully")
 
-        return {
-            "data": response_data,
-            "error": None,
-        }
+        return ResponseEnvelope(
+            data=response_data,
+            error=None,
+        ).model_dump()
 
     except Exception as e:
         # Log initialization failure with context

@@ -1,66 +1,15 @@
-"""ListDocumentsUseCase - List and filter documents with pagination.
+"""ListDocumentsUseCase - List and filter documents with pagination."""
 
-Supports filtering by:
-- source_type: Filter by ingestion source (web, github, etc.)
-- extraction_state: Filter by extraction pipeline state
-
-Implements pagination via limit/offset parameters.
-"""
+from __future__ import annotations
 
 import logging
-from typing import Protocol
 
 from pydantic import BaseModel, Field
 
+from packages.core.ports.repositories import DocumentRepository
 from packages.schemas.models import Document, ExtractionState, SourceType
 
 logger = logging.getLogger(__name__)
-
-
-# ========== Protocols ==========
-
-
-class DocumentsClient(Protocol):
-    """Protocol for database client supporting document queries.
-
-    Defines the interface that database adapters must implement.
-    """
-
-    async def fetch_documents(
-        self,
-        limit: int,
-        offset: int,
-        source_type: SourceType | None = None,
-        extraction_state: ExtractionState | None = None,
-    ) -> list[Document]:
-        """Fetch documents with filters and pagination.
-
-        Args:
-            limit: Maximum number of documents to return.
-            offset: Number of documents to skip.
-            source_type: Optional filter by source type.
-            extraction_state: Optional filter by extraction state.
-
-        Returns:
-            List of Document instances.
-        """
-        ...
-
-    async def count_documents(
-        self,
-        source_type: SourceType | None = None,
-        extraction_state: ExtractionState | None = None,
-    ) -> int:
-        """Count total documents matching filters.
-
-        Args:
-            source_type: Optional filter by source type.
-            extraction_state: Optional filter by extraction state.
-
-        Returns:
-            Total count of matching documents.
-        """
-        ...
 
 
 # ========== Models ==========
@@ -94,13 +43,10 @@ class ListDocumentsUseCase:
     - Filtering by extraction_state (pending, completed, etc.)
     """
 
-    def __init__(self, db_client: DocumentsClient) -> None:
-        """Initialize ListDocumentsUseCase with database client.
+    def __init__(self, document_repository: DocumentRepository) -> None:
+        """Initialize ListDocumentsUseCase with document repository."""
 
-        Args:
-            db_client: Client implementing DocumentsClient protocol.
-        """
-        self.db_client = db_client
+        self.repository = document_repository
         logger.info("Initialized ListDocumentsUseCase")
 
     async def execute(
@@ -135,7 +81,7 @@ class ListDocumentsUseCase:
         )
 
         # Fetch documents with filters
-        documents = await self.db_client.fetch_documents(
+        documents = await self.repository.list_documents(
             limit=limit,
             offset=offset,
             source_type=source_type,
@@ -143,7 +89,7 @@ class ListDocumentsUseCase:
         )
 
         # Get total count for pagination
-        total = await self.db_client.count_documents(
+        total = await self.repository.count_documents(
             source_type=source_type,
             extraction_state=extraction_state,
         )
@@ -162,5 +108,4 @@ class ListDocumentsUseCase:
 __all__ = [
     "ListDocumentsUseCase",
     "DocumentListResponse",
-    "DocumentsClient",
 ]

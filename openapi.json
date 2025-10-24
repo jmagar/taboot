@@ -1,0 +1,1107 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Taboot API",
+    "description": "Doc-to-Graph RAG Platform",
+    "version": "0.4.0"
+  },
+  "paths": {
+    "/init": {
+      "post": {
+        "summary": "Initialize System",
+        "description": "Initialize system schemas and collections.\n\nPerforms the following initialization steps:\n1. Create Neo4j constraints\n2. Create Qdrant collections\n3. Create PostgreSQL schema\n4. Check system health after init\n\nReturns:\n    ResponseEnvelope[dict]: Envelope with initialized payload and post-init health status.\n\nRaises:\n    HTTPException: 500 if any initialization step fails.\n\nExample:\n    >>> response = client.post(\"/init\")\n    >>> assert response.status_code == 200\n    >>> data = response.json()\n    >>> assert data[\"data\"][\"status\"] == \"initialized\"",
+        "operationId": "initialize_system_init_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Initialize System Init Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ingest/": {
+      "post": {
+        "tags": [
+          "ingestion"
+        ],
+        "summary": "Start Ingestion",
+        "description": "Start an ingestion job.\n\nCreates a PENDING job and queues it for background processing.\nReturns immediately with HTTP 202 Accepted.\n\nArgs:\n    request_body: Ingestion request with source details.\n    background_tasks: FastAPI background tasks.\n\nReturns:\n    ResponseEnvelope[IngestionJobResponse]: Job details in PENDING state.\n\nRaises:\n    HTTPException: 400 if source_type is not supported or URL is invalid.",
+        "operationId": "start_ingestion_ingest__post",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "API key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API key for authentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Start Ingestion Ingest  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ingest/{job_id}": {
+      "get": {
+        "tags": [
+          "ingestion"
+        ],
+        "summary": "Get Ingestion Status",
+        "description": "Get ingestion job status.\n\nRetrieves current status and progress of an ingestion job.\n\nArgs:\n    job_id: Job UUID to retrieve.\n\nReturns:\n    ResponseEnvelope[IngestionJobStatus]: Complete job status with progress.\n\nRaises:\n    HTTPException: 404 if job not found.",
+        "operationId": "get_ingestion_status_ingest__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Ingestion Status Ingest  Job Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/extract/pending": {
+      "post": {
+        "tags": [
+          "extraction"
+        ],
+        "summary": "Trigger Extraction",
+        "description": "Trigger extraction for pending documents.\n\nProcesses documents in PENDING extraction state through the multi-tier\nextraction pipeline (Tier A \u2192 B \u2192 C).\n\nArgs:\n    limit: Optional maximum number of documents to process.\n\nReturns:\n    ExtractionResponse: Summary statistics with processed/succeeded/failed counts.\n\nRaises:\n    HTTPException: 500 if extraction pipeline fails.\n\nExample:\n    >>> response = client.post(\"/extract/pending?limit=10\")\n    >>> assert response.status_code == 200\n    >>> data = response.json()\n    >>> assert \"processed\" in data\n    >>> assert \"succeeded\" in data\n    >>> assert \"failed\" in data",
+        "operationId": "trigger_extraction_extract_pending_post",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum documents to process",
+              "title": "Limit"
+            },
+            "description": "Maximum documents to process"
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "API key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API key for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEnvelope_ExtractionResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/extract/status": {
+      "get": {
+        "tags": [
+          "extraction"
+        ],
+        "summary": "Get Extraction Status",
+        "description": "Get extraction system status.\n\nReturns current extraction system status including:\n- Overall health (all services)\n- Per-service health status\n- Queue depths (ingestion, extraction)\n- System metrics snapshot\n\nReturns:\n    SystemStatusResponse: Complete system status.\n\nRaises:\n    HTTPException: 500 if status aggregation fails.\n\nExample:\n    >>> response = client.get(\"/extract/status\")\n    >>> assert response.status_code == 200\n    >>> data = response.json()\n    >>> assert \"overall_healthy\" in data\n    >>> assert \"services\" in data\n    >>> assert \"queue_depth\" in data\n    >>> assert \"metrics\" in data",
+        "operationId": "get_extraction_status_extract_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEnvelope_SystemStatusResponse_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/query": {
+      "post": {
+        "tags": [
+          "query",
+          "query"
+        ],
+        "summary": "Query Knowledge Base",
+        "description": "Execute natural language query with hybrid retrieval.\n\nArgs:\n    request: Query request with question and filters\n\nReturns:\n    ResponseEnvelope[QueryResponse]: Query response with answer, sources, and latency\n\nRaises:\n    HTTPException: If query fails",
+        "operationId": "query_knowledge_base_query_post",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "API key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API key for authentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Query Knowledge Base Query Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "tags": [
+          "status"
+        ],
+        "summary": "Get System Status",
+        "description": "Get overall system status.\n\nReturns current system status including:\n- Overall health (all services)\n- Per-service health status\n- Queue depths (ingestion, extraction)\n- System metrics snapshot\n\nReturns:\n    ResponseEnvelope[SystemStatusResponse]: System status data or error.\n\nRaises:\n    HTTPException: 500 if status aggregation fails.\n\nExample:\n    >>> response = client.get(\"/status\", headers={\"X-API-Key\": \"test-key\"})\n    >>> assert response.status_code == 200\n    >>> envelope = response.json()\n    >>> assert \"data\" in envelope\n    >>> assert \"error\" in envelope\n    >>> data = envelope[\"data\"]\n    >>> assert \"overall_healthy\" in data\n    >>> assert \"services\" in data\n    >>> assert \"queue_depth\" in data\n    >>> assert \"metrics\" in data",
+        "operationId": "get_system_status_status_get",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "API key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API key for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get System Status Status Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents": {
+      "get": {
+        "tags": [
+          "documents",
+          "documents"
+        ],
+        "summary": "List Documents",
+        "description": "List ingested documents with optional filters and pagination.\n\nQuery parameters:\n    - limit: Maximum documents to return (1-100, default: 10)\n    - offset: Number of documents to skip for pagination (default: 0)\n    - source_type: Filter by source type (web, github, reddit, youtube, gmail,\n                  elasticsearch, docker_compose, swag, tailscale, unifi, ai_session)\n    - extraction_state: Filter by extraction state (pending, tier_a_done,\n                       tier_b_done, tier_c_done, completed, failed)\n\nReturns:\n    DocumentListResponse with documents array, total count, limit, and offset\n\nRaises:\n    HTTPException 400: Invalid filter values\n    HTTPException 500: Database or internal errors",
+        "operationId": "list_documents_documents_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum documents to return",
+              "default": 10,
+              "title": "Limit"
+            },
+            "description": "Maximum documents to return"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of documents to skip (pagination)",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of documents to skip (pagination)"
+          },
+          {
+            "name": "source_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by source type (web, github, etc.)",
+              "title": "Source Type"
+            },
+            "description": "Filter by source type (web, github, etc.)"
+          },
+          {
+            "name": "extraction_state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by extraction state (pending, completed, etc.)",
+              "title": "Extraction State"
+            },
+            "description": "Filter by extraction state (pending, completed, etc.)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEnvelope_DocumentListResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "observability"
+        ],
+        "summary": "Prometheus Metrics",
+        "description": "Prometheus metrics endpoint.\n\nReturns metrics in Prometheus text exposition format.\nThis endpoint is scraped by Prometheus for monitoring and alerting.\n\nReturns:\n    Response: Prometheus metrics in text/plain format.\n\nExample:\n    $ curl http://localhost:8000/metrics\n    # HELP http_requests_total Total HTTP requests\n    # TYPE http_requests_total counter\n    http_requests_total{method=\"GET\",path=\"/health\",status=\"200\"} 42.0\n    ...",
+        "operationId": "prometheus_metrics_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "description": "Health check endpoint with service validation.\n\nChecks connectivity to all critical services:\n- Neo4j (graph database)\n- Qdrant (vector database)\n- Redis (cache and queues)\n- TEI (embeddings)\n- Ollama (LLM)\n- Firecrawl (web crawler)\n- Playwright (browser automation)\n\nReturns:\n    ResponseEnvelope[dict]: Health status with overall status and per-service status.\n        - 200 if all services healthy\n        - 503 if any service unhealthy",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "Root endpoint.\n\nReturns:\n    ResponseEnvelope[dict]: API info with version and docs link.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "object",
+                  "title": "Response Root  Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Document": {
+        "properties": {
+          "doc_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Doc Id",
+            "description": "Document UUID (primary key)"
+          },
+          "source_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Source Url",
+            "description": "Original source URL or identifier"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/SourceType",
+            "description": "Source type enum"
+          },
+          "content_hash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Content Hash",
+            "description": "SHA-256 hex digest of content"
+          },
+          "ingested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ingested At",
+            "description": "UTC timestamp of ingestion"
+          },
+          "extraction_state": {
+            "$ref": "#/components/schemas/ExtractionState",
+            "description": "Current extraction state"
+          },
+          "extraction_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Version",
+            "description": "Extractor version tag (semver)"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "UTC timestamp of last update"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Arbitrary key-value pairs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doc_id",
+          "source_url",
+          "source_type",
+          "content_hash",
+          "ingested_at",
+          "extraction_state",
+          "updated_at"
+        ],
+        "title": "Document",
+        "description": "Document entity representing an ingested document.\n\nPer data-model.md: Represents an ingested document from any source.\nStored in PostgreSQL with extraction state tracking."
+      },
+      "DocumentListResponse-Input": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            },
+            "type": "array",
+            "title": "Documents",
+            "description": "List of documents"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "description": "Total documents matching filters"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "Page size limit"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Offset",
+            "description": "Pagination offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "DocumentListResponse",
+        "description": "Response model for list documents query.\n\nAttributes:\n    documents: List of Document instances.\n    total: Total count of documents matching filters (for pagination).\n    limit: Page size limit.\n    offset: Pagination offset."
+      },
+      "DocumentListResponse-Output": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            },
+            "type": "array",
+            "title": "Documents",
+            "description": "List of documents"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "description": "Total documents matching filters"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "Page size limit"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Offset",
+            "description": "Pagination offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "DocumentListResponse",
+        "description": "Response model for list documents query.\n\nAttributes:\n    documents: List of Document instances.\n    total: Total count of documents matching filters (for pagination).\n    limit: Page size limit.\n    offset: Pagination offset."
+      },
+      "ExtractionResponse": {
+        "properties": {
+          "processed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Processed",
+            "description": "Total documents processed"
+          },
+          "succeeded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Succeeded",
+            "description": "Documents successfully extracted"
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Failed",
+            "description": "Documents that failed extraction"
+          }
+        },
+        "type": "object",
+        "required": [
+          "processed",
+          "succeeded",
+          "failed"
+        ],
+        "title": "ExtractionResponse",
+        "description": "Response model for POST /extract/pending endpoint.\n\nAttributes:\n    processed: Total documents attempted.\n    succeeded: Documents successfully extracted.\n    failed: Documents that failed extraction."
+      },
+      "ExtractionState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "tier_a_done",
+          "tier_b_done",
+          "tier_c_done",
+          "completed",
+          "failed"
+        ],
+        "title": "ExtractionState",
+        "description": "Extraction states for documents and jobs."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "IngestionRequest": {
+        "properties": {
+          "source_type": {
+            "$ref": "#/components/schemas/SourceType",
+            "description": "Source type for ingestion"
+          },
+          "source_target": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Target",
+            "description": "URL or source identifier"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit",
+            "description": "Maximum pages to ingest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_type",
+          "source_target"
+        ],
+        "title": "IngestionRequest",
+        "description": "Request model for POST /ingest endpoint.\n\nAttributes:\n    source_type: Source type enum (web, github, etc.).\n    source_target: URL, repo name, or other source identifier.\n    limit: Optional maximum pages/items to ingest."
+      },
+      "MetricsSnapshot": {
+        "properties": {
+          "documents_ingested": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Documents Ingested",
+            "description": "Total documents ingested"
+          },
+          "chunks_indexed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Chunks Indexed",
+            "description": "Total chunks indexed"
+          },
+          "extraction_jobs_completed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Extraction Jobs Completed",
+            "description": "Extraction jobs completed"
+          },
+          "graph_nodes_created": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Graph Nodes Created",
+            "description": "Graph nodes created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents_ingested",
+          "chunks_indexed",
+          "extraction_jobs_completed",
+          "graph_nodes_created"
+        ],
+        "title": "MetricsSnapshot",
+        "description": "System metrics snapshot.\n\nAttributes:\n    documents_ingested: Total documents ingested.\n    chunks_indexed: Total chunks in vector store.\n    extraction_jobs_completed: Total extraction jobs completed.\n    graph_nodes_created: Total nodes in graph database."
+      },
+      "QueryRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Question",
+            "description": "Question to answer"
+          },
+          "top_k": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "description": "Number of candidates from vector search",
+            "default": 20
+          },
+          "rerank_top_n": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Rerank Top N",
+            "description": "Number of chunks after reranking",
+            "default": 5
+          },
+          "source_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Types",
+            "description": "Filter by source types"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After",
+            "description": "Filter by ingestion date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "QueryRequest",
+        "description": "Query request schema."
+      },
+      "QueueDepth": {
+        "properties": {
+          "ingestion": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ingestion",
+            "description": "Ingestion queue depth"
+          },
+          "extraction": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Extraction",
+            "description": "Extraction queue depth"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ingestion",
+          "extraction"
+        ],
+        "title": "QueueDepth",
+        "description": "Queue depth statistics.\n\nAttributes:\n    ingestion: Number of items in ingestion queue.\n    extraction: Number of items in extraction queue."
+      },
+      "ResponseEnvelope_DocumentListResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentListResponse-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ResponseEnvelope[DocumentListResponse]"
+      },
+      "ResponseEnvelope_ExtractionResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExtractionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ResponseEnvelope[ExtractionResponse]"
+      },
+      "ResponseEnvelope_SystemStatusResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemStatusResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ResponseEnvelope[SystemStatusResponse]"
+      },
+      "ServiceHealth": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Service name"
+          },
+          "healthy": {
+            "type": "boolean",
+            "title": "Healthy",
+            "description": "Health status"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Status or error message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "healthy"
+        ],
+        "title": "ServiceHealth",
+        "description": "Health status for a single service.\n\nAttributes:\n    name: Service name (neo4j, qdrant, redis, etc).\n    healthy: True if service is healthy and responsive.\n    message: Optional status message or error description."
+      },
+      "SourceType": {
+        "type": "string",
+        "enum": [
+          "web",
+          "github",
+          "reddit",
+          "youtube",
+          "gmail",
+          "elasticsearch",
+          "docker_compose",
+          "swag",
+          "tailscale",
+          "unifi",
+          "ai_session"
+        ],
+        "title": "SourceType",
+        "description": "Source types for document ingestion."
+      },
+      "SystemStatusResponse": {
+        "properties": {
+          "overall_healthy": {
+            "type": "boolean",
+            "title": "Overall Healthy",
+            "description": "Overall system health"
+          },
+          "services": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ServiceHealth"
+            },
+            "type": "object",
+            "title": "Services",
+            "description": "Per-service health status"
+          },
+          "queue_depth": {
+            "$ref": "#/components/schemas/QueueDepth",
+            "description": "Queue depth statistics"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/MetricsSnapshot",
+            "description": "System metrics snapshot"
+          }
+        },
+        "type": "object",
+        "required": [
+          "overall_healthy",
+          "services",
+          "queue_depth",
+          "metrics"
+        ],
+        "title": "SystemStatusResponse",
+        "description": "Response model for GET /extract/status endpoint.\n\nAttributes:\n    overall_healthy: True if all services are healthy.\n    services: Dictionary mapping service names to health status.\n    queue_depth: Queue depth statistics.\n    metrics: System metrics snapshot."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

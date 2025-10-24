@@ -9,10 +9,11 @@ Required by FR-033: API MUST provide ingestion endpoints with job tracking.
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
@@ -27,12 +28,50 @@ from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
 from packages.ingest.normalizer import Normalizer
 from packages.ingest.readers.web import WebReader
-from packages.schemas.models import IngestionJob, JobState, SourceType
+from packages.schemas.models import (
+    Document as DocumentModel,
+)
+from packages.schemas.models import (
+    IngestionJob,
+    JobState,
+    SourceType,
+)
 from packages.vector.writer import QdrantWriter
+
+try:
+    from redis import asyncio as redis_async
+except ModuleNotFoundError:  # pragma: no cover - redis optional in some test suites
+    redis_async = None
+
+from packages.ingest.adapters.redis_streams_publisher import RedisDocumentEventPublisher
+from packages.ingest.services.document_events import DocumentEventDispatcher
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@lru_cache(maxsize=1)
+def _get_event_dispatcher() -> DocumentEventDispatcher | None:
+    """Lazily construct a document event dispatcher when enabled."""
+
+    if redis_async is None:
+        return None
+
+    from packages.common.config import get_config
+
+    config = get_config()
+
+    if not config.enable_ingest_events:
+        return None
+
+    redis_client = redis_async.from_url(config.redis_url)
+    publisher = RedisDocumentEventPublisher(
+        redis_client=redis_client,
+        stream_name=config.ingest_events_stream,
+    )
+
+    return DocumentEventDispatcher(publisher, enabled=True)
 
 
 class IngestionRequest(BaseModel):
@@ -114,7 +153,12 @@ def get_ingest_use_case() -> IngestWebUseCase:
     )
     normalizer = Normalizer()
     chunker = Chunker()
-    embedder = Embedder(tei_url=config.tei_embedding_url)
+    tei_settings = config.tei_config
+    embedder = Embedder(
+        tei_url=str(tei_settings.url),
+        batch_size=tei_settings.batch_size,
+        timeout=float(tei_settings.timeout),
+    )
     qdrant_writer = QdrantWriter(
         url=config.qdrant_url,
         collection_name=config.collection_name,
@@ -124,6 +168,15 @@ def get_ingest_use_case() -> IngestWebUseCase:
     pg_conn = get_postgres_client()
     document_store = PostgresDocumentStore(pg_conn)
 
+    dispatcher = _get_event_dispatcher()
+    document_callback = None
+    if dispatcher is not None:
+
+        def _dispatch(document: DocumentModel, chunk_count: int) -> None:
+            dispatcher.dispatch_document_ingested(document, chunk_count=chunk_count)
+
+        document_callback = _dispatch
+
     return IngestWebUseCase(
         web_reader=web_reader,
         normalizer=normalizer,
@@ -132,6 +185,8 @@ def get_ingest_use_case() -> IngestWebUseCase:
         qdrant_writer=qdrant_writer,
         document_store=document_store,
         collection_name=config.collection_name,
+        flush_threshold=config.ingest_flush_threshold,
+        document_ingested_callback=document_callback,
     )
 
 
@@ -155,7 +210,7 @@ async def _execute_ingestion_job(
     use_case: IngestWebUseCase,
     job_store: PostgresJobStore,
 ) -> None:
-    """Background task to execute ingestion and update job store.
+    """Background task to execute ingestion and update job store asynchronously.
 
     Args:
         job_id: Pre-generated job UUID.
@@ -166,8 +221,8 @@ async def _execute_ingestion_job(
     """
     try:
         logger.info(f"Starting background ingestion for job {job_id}")
-        # Execute use case with pre-generated job_id
-        completed_job = use_case.execute(url=url, limit=limit, job_id=job_id)
+        # Execute use case asynchronously with pre-generated job_id
+        completed_job = await use_case.execute(url=url, limit=limit, job_id=job_id)
         # Update job store with final state
         job_store.update(completed_job)
         logger.info(f"Completed background ingestion for job {job_id}")
@@ -179,29 +234,40 @@ async def _execute_ingestion_job(
 
 @router.post(
     "/",
-    response_model=IngestionJobResponse,
+    response_model=dict[str, Any],
     status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(verify_api_key)],
 )
 async def start_ingestion(
+    request: Request,
     request_body: IngestionRequest,
     background_tasks: BackgroundTasks,
-) -> IngestionJobResponse:
+) -> dict[str, Any]:
     """Start an ingestion job.
 
     Creates a PENDING job and queues it for background processing.
     Returns immediately with HTTP 202 Accepted.
 
+    Rate limited to 10 requests per minute.
+
     Args:
+        request: FastAPI request (for rate limiting).
         request_body: Ingestion request with source details.
         background_tasks: FastAPI background tasks.
 
     Returns:
-        IngestionJobResponse: Job details in PENDING state.
+        ResponseEnvelope[IngestionJobResponse]: Job details in PENDING state.
 
     Raises:
         HTTPException: 400 if source_type is not supported or URL is invalid.
+        RateLimitExceeded: If rate limit exceeded (10/minute).
     """
+    from apps.api.schemas.envelope import ResponseEnvelope
+
+    # Apply rate limiting
+    limiter = request.app.state.limiter
+    await limiter.limit("10/minute")(request)
+
     # Validate source type
     if request_body.source_type != SourceType.WEB:
         raise HTTPException(
@@ -251,17 +317,18 @@ async def start_ingestion(
     logger.info(f"Queued ingestion job {job_id} for {request_body.source_target}")
 
     # Return 202 ACCEPTED with PENDING job
-    return IngestionJobResponse(
+    response_data = IngestionJobResponse(
         job_id=str(job.job_id),
         state=job.state.value,
         source_type=job.source_type.value,
         source_target=job.source_target,
         created_at=job.created_at.isoformat(),
     )
+    return ResponseEnvelope(data=response_data, error=None).model_dump()
 
 
-@router.get("/{job_id}", response_model=IngestionJobStatus, status_code=status.HTTP_200_OK)
-async def get_ingestion_status(job_id: UUID) -> IngestionJobStatus:
+@router.get("/{job_id}", response_model=dict[str, Any], status_code=status.HTTP_200_OK)
+async def get_ingestion_status(job_id: UUID) -> dict[str, Any]:
     """Get ingestion job status.
 
     Retrieves current status and progress of an ingestion job.
@@ -270,11 +337,13 @@ async def get_ingestion_status(job_id: UUID) -> IngestionJobStatus:
         job_id: Job UUID to retrieve.
 
     Returns:
-        IngestionJobStatus: Complete job status with progress.
+        ResponseEnvelope[IngestionJobStatus]: Complete job status with progress.
 
     Raises:
         HTTPException: 404 if job not found.
     """
+    from apps.api.schemas.envelope import ResponseEnvelope
+
     job_store = get_job_store()
     job = job_store.get_by_id(job_id)
 
@@ -284,7 +353,7 @@ async def get_ingestion_status(job_id: UUID) -> IngestionJobStatus:
             detail=f"Job {job_id} not found",
         )
 
-    return IngestionJobStatus(
+    status_data = IngestionJobStatus(
         job_id=str(job.job_id),
         state=job.state.value,
         source_type=job.source_type.value,
@@ -296,3 +365,4 @@ async def get_ingestion_status(job_id: UUID) -> IngestionJobStatus:
         chunks_created=job.chunks_created,
         errors=job.errors,
     )
+    return ResponseEnvelope(data=status_data, error=None).model_dump()

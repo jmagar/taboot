@@ -1,10 +1,12 @@
 """API query endpoint implementation."""
 
+from __future__ import annotations
+
 import logging
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
@@ -43,19 +45,28 @@ class QueryResponse(BaseModel):
 
 
 @router.post("", response_model=dict[str, Any], dependencies=[Depends(verify_api_key)])
-async def query_knowledge_base(request: QueryRequest) -> dict[str, Any]:
+async def query_knowledge_base(http_request: Request, request: QueryRequest) -> dict[str, Any]:
     """Execute natural language query with hybrid retrieval.
 
+    Rate limited to 60 requests per minute.
+
     Args:
+        http_request: FastAPI request (for rate limiting).
         request: Query request with question and filters
 
     Returns:
-        Query response with answer, sources, and latency
+        ResponseEnvelope[QueryResponse]: Query response with answer, sources, and latency
 
     Raises:
         HTTPException: If query fails
+        RateLimitExceeded: If rate limit exceeded (60/minute).
     """
+    from apps.api.schemas.envelope import ResponseEnvelope
     from packages.common.config import get_config
+
+    # Apply rate limiting
+    limiter = http_request.app.state.limiter
+    await limiter.limit("60/minute")(http_request)
 
     config = get_config()
 
@@ -103,7 +114,7 @@ async def query_knowledge_base(request: QueryRequest) -> dict[str, Any]:
             extra={"result_sources": len(result.get("sources", []))},
         )
 
-        return {"data": QueryResponse(**result), "error": None}
+        return ResponseEnvelope(data=QueryResponse(**result), error=None).model_dump()
 
     except ValueError as e:
         logger.warning("Query validation failed", extra={"error": str(e)})

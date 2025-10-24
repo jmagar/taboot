@@ -1,5 +1,7 @@
 """Tier A entity pattern matching using Aho-Corasick automaton."""
 
+from __future__ import annotations
+
 import re
 from typing import Any
 

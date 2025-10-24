@@ -3,6 +3,8 @@
 Implements `taboot list documents` with filtering and pagination.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Annotated
 
@@ -80,11 +82,11 @@ def list_documents_command(
         db_conn = None
         try:
             db_conn = get_postgres_client()
-            db_client = PostgresDocumentsClient(db_conn)
+            document_repository = PostgresDocumentsClient(db_conn)
 
             # Execute use case
             async def _execute() -> DocumentListResponse:
-                use_case = ListDocumentsUseCase(db_client=db_client)
+                use_case = ListDocumentsUseCase(document_repository=document_repository)
                 return await use_case.execute(
                     limit=limit,
                     offset=offset,

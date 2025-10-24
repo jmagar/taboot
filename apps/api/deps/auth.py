@@ -1,17 +1,19 @@
 """Authentication dependencies for FastAPI."""
 
+from __future__ import annotations
+
 import logging
 from typing import Annotated
 
-import redis.asyncio as redis
 from fastapi import Depends, Header, HTTPException, Request, status
+from redis.asyncio import Redis
 
 from packages.common.api_key_store import ApiKeyStore
 
 logger = logging.getLogger(__name__)
 
 
-async def get_redis_client(request: Request) -> "redis.Redis[bytes]":
+async def get_redis_client(request: Request) -> Redis:
     """Get Redis client from app state via Request.
 
     Args:
@@ -22,11 +24,11 @@ async def get_redis_client(request: Request) -> "redis.Redis[bytes]":
     """
     from typing import cast
 
-    return cast("redis.Redis[bytes]", request.app.state.redis)
+    return cast(Redis, request.app.state.redis)
 
 
 async def verify_api_key(
-    redis_client: Annotated["redis.Redis[bytes]", Depends(get_redis_client)],  # noqa: B008
+    redis_client: Annotated[Redis, Depends(get_redis_client)],  # noqa: B008
     x_api_key: Annotated[str | None, Header(description="API key for authentication")] = None,
 ) -> bool:
     """Verify API key from X-API-Key header.

@@ -3,6 +3,8 @@
 Implements document reprocessing workflow.
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
@@ -65,20 +67,15 @@ def extract_reprocess_command(
     try:
         console.print(f"[yellow]Reprocessing documents since {since_date.isoformat()}...[/yellow]")
 
-        # Import and use ReprocessUseCase
-        from packages.clients.postgres_document_store import PostgresDocumentStore
-        from packages.common.db_schema import get_postgres_client
-        from packages.core.use_cases.reprocess import ReprocessUseCase
+        from packages.common.factories import make_reprocess_use_case
 
-        conn = get_postgres_client()
+        use_case, cleanup = make_reprocess_use_case()
         try:
-            document_store = PostgresDocumentStore(conn)
-            use_case = ReprocessUseCase(document_store=document_store)
             result = use_case.execute(since_date=since_date)
             count = result["documents_queued"]
             console.print(f"[green]✓ Queued {count} documents for reprocessing[/green]")
         finally:
-            conn.close()
+            cleanup()
 
     except Exception as err:
         logger.exception("Reprocessing failed")

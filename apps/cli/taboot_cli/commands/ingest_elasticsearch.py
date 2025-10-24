@@ -34,6 +34,8 @@ def ingest_elasticsearch_command(
 ) -> None:
     """Ingest Elasticsearch documents into the knowledge graph.
 
+from __future__ import annotations
+
     Example:
         uv run apps/cli ingest elasticsearch my-index --limit 100
         uv run apps/cli ingest elasticsearch logs --query '{"match": {"status": "error"}}'
@@ -65,7 +67,12 @@ def ingest_elasticsearch_command(
         )
         normalizer = Normalizer()
         chunker = Chunker()
-        embedder = Embedder(tei_url=config.tei_embedding_url)
+        tei_settings = config.tei_config
+        embedder = Embedder(
+            tei_url=str(tei_settings.url),
+            batch_size=tei_settings.batch_size,
+            timeout=float(tei_settings.timeout),
+        )
         qdrant_writer = QdrantWriter(
             url=config.qdrant_url,
             collection_name=config.collection_name,

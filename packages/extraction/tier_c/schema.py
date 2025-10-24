@@ -1,5 +1,7 @@
 """Tier C Pydantic schemas for triple validation."""
 
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
 
 

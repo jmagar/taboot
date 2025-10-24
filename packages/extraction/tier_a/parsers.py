@@ -1,5 +1,7 @@
 """Tier A deterministic parsers for code blocks, tables, and structured data."""
 
+from __future__ import annotations
+
 import json
 import re
 from typing import Any
@@ -93,13 +95,13 @@ def parse_yaml_json(content: str, format_type: str) -> dict[str, Any] | list[Any
         if format_type == "yaml":
             result = yaml.safe_load(content)
             # yaml.safe_load can return various types; validate return type
-            if isinstance(result, (dict, list)):
+            if isinstance(result, dict | list):
                 return result
             return None
         elif format_type == "json":
             result = json.loads(content)
             # json.loads can return various types; validate return type
-            if isinstance(result, (dict, list)):
+            if isinstance(result, dict | list):
                 return result
             return None
         else:

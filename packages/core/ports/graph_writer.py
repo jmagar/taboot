@@ -8,6 +8,8 @@ This port allows core use-cases to orchestrate graph writes without
 importing framework-specific adapters directly.
 """
 
+from __future__ import annotations
+
 from typing import Any, Protocol
 
 from packages.schemas.models import Proxy

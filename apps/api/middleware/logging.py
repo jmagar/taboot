@@ -10,6 +10,8 @@ Provides structured JSON logging for all HTTP requests with:
 Conforms to observability requirements in docs/OBSERVABILITY.md.
 """
 
+from __future__ import annotations
+
 import logging
 import time
 from collections.abc import Awaitable, Callable
@@ -60,7 +62,24 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         try:
             # Execute request
             response = await call_next(request)
+        except Exception:
+            # Calculate elapsed time
+            elapsed_ms = (time.perf_counter_ns() - start_ns) // 1_000_000
 
+            # Log failed request
+            logger.exception(
+                "Request failed",
+                extra={
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "elapsed_ms": elapsed_ms,
+                },
+            )
+
+            # Re-raise to allow FastAPI error handlers to process
+            raise
+        else:
             # Calculate elapsed time
             elapsed_ms = (time.perf_counter_ns() - start_ns) // 1_000_000
 
@@ -79,21 +98,3 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             # Add request_id to response headers for client correlation
             response.headers["X-Request-ID"] = request_id
             return response
-
-        except Exception:
-            # Calculate elapsed time
-            elapsed_ms = (time.perf_counter_ns() - start_ns) // 1_000_000
-
-            # Log failed request
-            logger.exception(
-                "Request failed",
-                extra={
-                    "request_id": request_id,
-                    "method": request.method,
-                    "path": request.url.path,
-                    "elapsed_ms": elapsed_ms,
-                },
-            )
-
-            # Re-raise to allow FastAPI error handlers to process
-            raise

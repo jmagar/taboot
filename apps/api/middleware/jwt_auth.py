@@ -17,6 +17,8 @@ Usage in routes:
         return {"user_id": user_id}
 """
 
+from __future__ import annotations
+
 import logging
 import os
 from functools import lru_cache
@@ -87,7 +89,7 @@ def _token_log_metadata(token: str, exc: Exception) -> dict[str, object | None]:
         extra["iss"] = iss
 
     aud = claims.get("aud")
-    if isinstance(aud, (str, list)):
+    if isinstance(aud, str | list):
         extra["aud"] = aud
 
     return extra

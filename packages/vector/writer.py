@@ -247,6 +247,165 @@ class QdrantWriter:
             },
         )
 
+    async def upsert_batch_async(
+        self,
+        chunks: Sequence[Chunk],
+        embeddings: Sequence[list[float]],
+    ) -> None:
+        """Upsert a batch of points with metadata asynchronously.
+
+        Automatically splits large batches into smaller ones based on batch_size.
+
+        Args:
+            chunks: Sequence of Chunk objects.
+            embeddings: Sequence of embedding vectors (1024-dimensional each).
+
+        Raises:
+            ValueError: If chunks and embeddings have different lengths.
+            ValueError: If embeddings have wrong dimensions.
+            QdrantWriteError: If upsert operation fails.
+        """
+        # Handle empty batch
+        if len(chunks) == 0:
+            logger.debug("Empty batch, skipping upsert")
+            return
+
+        # Validate inputs
+        if len(chunks) != len(embeddings):
+            raise ValueError("chunks and embeddings must have the same length")
+
+        # Validate embedding dimensions (1024 for Qwen3-Embedding-0.6B)
+        for i, emb in enumerate(embeddings):
+            if len(emb) != 1024:
+                raise ValueError(
+                    f"All embeddings must be 1024-dimensional, got {len(emb)} at index {i}"
+                )
+
+        correlation_id = str(uuid.uuid4())
+        total_chunks = len(chunks)
+
+        logger.info(
+            "Starting async batch upsert",
+            extra={
+                "correlation_id": correlation_id,
+                "total_chunks": total_chunks,
+                "batch_size": self.batch_size,
+                "collection_name": self.collection_name,
+            },
+        )
+
+        # Split into batches
+        num_batches = (total_chunks + self.batch_size - 1) // self.batch_size
+
+        for batch_idx in range(num_batches):
+            start_idx = batch_idx * self.batch_size
+            end_idx = min(start_idx + self.batch_size, total_chunks)
+
+            batch_chunks = chunks[start_idx:end_idx]
+            batch_embeddings = embeddings[start_idx:end_idx]
+
+            await self._upsert_batch_internal_async(
+                batch_chunks,
+                batch_embeddings,
+                correlation_id,
+                batch_idx,
+                num_batches,
+            )
+
+        logger.info(
+            "Async batch upsert completed",
+            extra={
+                "correlation_id": correlation_id,
+                "total_chunks": total_chunks,
+                "num_batches": num_batches,
+            },
+        )
+
+    async def _upsert_batch_internal_async(
+        self,
+        chunks: Sequence[Chunk],
+        embeddings: Sequence[list[float]],
+        correlation_id: str,
+        batch_idx: int,
+        num_batches: int,
+    ) -> None:
+        """Internal method to upsert a single batch asynchronously.
+
+        Args:
+            chunks: Sequence of Chunk objects.
+            embeddings: Sequence of embedding vectors.
+            correlation_id: Correlation ID for logging.
+            batch_idx: Current batch index (0-based).
+            num_batches: Total number of batches.
+
+        Raises:
+            QdrantWriteError: If upsert operation fails.
+        """
+        # Build points
+        points = []
+        for chunk, embedding in zip(chunks, embeddings, strict=True):
+            point = models.PointStruct(
+                id=str(chunk.chunk_id),
+                vector=embedding,
+                payload={
+                    "doc_id": str(chunk.doc_id),
+                    "content": chunk.content,
+                    "section": chunk.section,
+                    "position": chunk.position,
+                    "token_count": chunk.token_count,
+                    "source_url": chunk.source_url,
+                    "source_type": chunk.source_type.value,
+                    "ingested_at": chunk.ingested_at,
+                    "tags": chunk.tags,
+                },
+            )
+            points.append(point)
+
+        logger.debug(
+            "Upserting batch asynchronously",
+            extra={
+                "correlation_id": correlation_id,
+                "batch_idx": batch_idx + 1,
+                "num_batches": num_batches,
+                "batch_size": len(points),
+            },
+        )
+
+        try:
+            # Note: Qdrant client's upsert is synchronous, but we wrap it in async context
+            # For true async, we'd need AsyncQdrantClient, but that requires more refactoring
+            # This is acceptable as the network I/O is still non-blocking via httpx
+            import asyncio
+
+            await asyncio.to_thread(
+                self.client.upsert,
+                collection_name=self.collection_name,
+                points=points,
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to upsert batch asynchronously",
+                extra={
+                    "correlation_id": correlation_id,
+                    "batch_idx": batch_idx + 1,
+                    "batch_size": len(points),
+                    "error": str(e),
+                },
+            )
+            raise QdrantWriteError(
+                f"Failed to upsert points to collection '{self.collection_name}': {e}"
+            ) from e
+
+        logger.debug(
+            "Batch upserted successfully (async)",
+            extra={
+                "correlation_id": correlation_id,
+                "batch_idx": batch_idx + 1,
+                "num_batches": num_batches,
+                "batch_size": len(points),
+            },
+        )
+
     def close(self) -> None:
         """Close Qdrant client connection.
 

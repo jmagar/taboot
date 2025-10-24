@@ -10,19 +10,22 @@ import logging
 import signal
 from types import FrameType
 from typing import Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import psycopg2
 from redis import asyncio as redis
+from redis.exceptions import ResponseError
 
 from packages.clients.postgres_document_store import PostgresDocumentStore
 from packages.common.config import get_config
+from packages.core.events import DocumentIngestedEvent
 from packages.core.use_cases.extract_pending import ExtractPendingUseCase
 from packages.extraction.orchestrator import ExtractionOrchestrator
 from packages.extraction.tier_a import parsers
 from packages.extraction.tier_a.patterns import EntityPatternMatcher
 from packages.extraction.tier_b.window_selector import WindowSelector
 from packages.extraction.tier_c.llm_client import TierCLLMClient
+from packages.ingest.adapters.redis_streams_consumer import RedisDocumentEventConsumer
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +151,7 @@ class ExtractionWorker:
         redis_client: "redis.Redis[str]",
         extract_use_case: SingleDocExtractor | None = None,
         poll_timeout: int = 5,
+        event_consumer: RedisDocumentEventConsumer | None = None,
     ) -> None:
         """Initialize ExtractionWorker.
 
@@ -159,6 +163,7 @@ class ExtractionWorker:
         self.redis_client = redis_client
         self.extract_use_case = extract_use_case
         self.poll_timeout = poll_timeout
+        self.event_consumer = event_consumer
         self._stop_flag = False
 
         logger.info("Initialized ExtractionWorker (poll_timeout=%ss)", poll_timeout)
@@ -186,6 +191,16 @@ class ExtractionWorker:
             Does not raise - handles errors internally.
         """
         try:
+            if self.event_consumer is not None:
+                events = await self.event_consumer.read(
+                    count=1,
+                    block_ms=self.poll_timeout * 1000,
+                )
+
+                if events:
+                    await self._process_stream_events(events)
+                    return
+
             # Poll queue with timeout
             result = await self.redis_client.blpop(QUEUE_EXTRACTION, timeout=self.poll_timeout)
 
@@ -227,6 +242,32 @@ class ExtractionWorker:
         except Exception:
             logger.exception("Error in poll_once")
 
+    async def _process_stream_events(
+        self, events: list[tuple[str, DocumentIngestedEvent]]
+    ) -> None:
+        """Handle events read from Redis Streams."""
+
+        ack_ids: list[str] = []
+
+        for message_id, event in events:
+            ack_ids.append(message_id)
+
+            logger.info(
+                "Processing stream event doc_id=%s chunks=%s", event.doc_id, event.chunk_count
+            )
+
+            if self.extract_use_case is None:
+                continue
+
+            try:
+                await self.extract_use_case.execute(event.doc_id)
+                logger.info("Completed extraction for doc_id=%s", event.doc_id)
+            except Exception:
+                logger.exception("Extraction failed for stream event doc_id=%s", event.doc_id)
+
+        if self.event_consumer is not None:
+            await self.event_consumer.ack(ack_ids)
+
     async def run(self) -> None:
         """Run worker continuously until stopped.
 
@@ -266,6 +307,30 @@ async def main() -> None:
     # Create Redis client (decode to str for JSON parsing)
     logger.info(f"Connecting to Redis at {config.redis_url}")
     redis_client = redis.from_url(config.redis_url, decode_responses=True)
+
+    event_consumer: RedisDocumentEventConsumer | None = None
+    if config.enable_ingest_events:
+        stream_name = config.ingest_events_stream
+        group_name = config.ingest_events_group
+        consumer_name = f"{config.ingest_events_consumer_prefix}-{uuid4().hex[:8]}"
+
+        try:
+            await redis_client.xgroup_create(
+                name=stream_name,
+                groupname=group_name,
+                id="0-0",
+                mkstream=True,
+            )
+        except ResponseError as exc:
+            if "BUSYGROUP" not in str(exc):
+                raise
+
+        event_consumer = RedisDocumentEventConsumer(
+            redis_client=redis_client,
+            stream_name=stream_name,
+            group_name=group_name,
+            consumer_name=consumer_name,
+        )
 
     # Create PostgreSQL connection
     logger.info(f"Connecting to PostgreSQL at {config.postgres_host}:{config.postgres_port}")
@@ -326,6 +391,7 @@ async def main() -> None:
     worker = ExtractionWorker(
         redis_client=redis_client,
         extract_use_case=single_doc_extractor,
+        event_consumer=event_consumer,
     )
 
     # Setup signal handlers for graceful shutdown

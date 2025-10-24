@@ -1,5 +1,7 @@
 """Shared type definitions for the extraction package."""
 
+from __future__ import annotations
+
 from typing import TypedDict
 
 

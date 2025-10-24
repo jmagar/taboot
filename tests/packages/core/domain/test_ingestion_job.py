@@ -54,6 +54,7 @@ class TestIngestionJobStateTransitions:
 
         assert running_job.state == JobState.RUNNING
         assert running_job.started_at == started_at
+        assert running_job.started_at is not None
         assert running_job.started_at >= created_at
         assert running_job.completed_at is None
 
@@ -80,6 +81,7 @@ class TestIngestionJobStateTransitions:
 
         assert completed_job.state == JobState.COMPLETED
         assert completed_job.completed_at == completed_at
+        assert completed_job.started_at is not None
         assert completed_job.completed_at >= completed_job.started_at
         assert completed_job.pages_processed == 5
         assert completed_job.chunks_created == 42
@@ -109,6 +111,7 @@ class TestIngestionJobStateTransitions:
         assert failed_job.state == JobState.FAILED
         assert failed_job.completed_at == completed_at
         assert failed_job.errors == errors
+        assert failed_job.errors is not None
         assert len(failed_job.errors) == 1
 
     def test_track_pages_processed_increment(self) -> None:
@@ -173,6 +176,7 @@ class TestIngestionJobStateTransitions:
         # Add first error
         error1 = {"error": "Rate limit exceeded", "url": "https://example.com/page1"}
         job_with_error1 = job.model_copy(update={"errors": [error1]})
+        assert job_with_error1.errors is not None
         assert len(job_with_error1.errors) == 1
 
         # Add second error
@@ -180,6 +184,7 @@ class TestIngestionJobStateTransitions:
         job_with_errors = job_with_error1.model_copy(
             update={"errors": job_with_error1.errors + [error2]}
         )
+        assert job_with_errors.errors is not None
         assert len(job_with_errors.errors) == 2
         assert job_with_errors.errors[0] == error1
         assert job_with_errors.errors[1] == error2

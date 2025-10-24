@@ -8,6 +8,8 @@ Aggregates system health status from multiple sources:
 Returns partial data on failures (fail-fast within each component, but continue).
 """
 
+from __future__ import annotations
+
 import logging
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
@@ -99,7 +101,7 @@ class GetStatusUseCase:
 
     def __init__(
         self,
-        redis_client: "Redis[bytes]",
+        redis_client: Redis[bytes],
         health_checker: Callable[[], Awaitable[SystemHealthStatus]],
     ) -> None:
         """Initialize GetStatusUseCase with dependencies.

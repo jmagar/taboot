@@ -6,10 +6,12 @@ and monitoring extraction jobs.
 Required by FR-045: API MUST provide extraction endpoints with job tracking.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
 from apps.api.deps import get_extract_use_case, get_status_use_case, verify_api_key
@@ -65,6 +67,7 @@ class SystemStatusResponse(BaseModel):
     dependencies=[Depends(verify_api_key)],
 )
 async def trigger_extraction(
+    request: Request,
     limit: int | None = Query(None, ge=1, description="Maximum documents to process"),
     *,
     use_case: Annotated[ExtractPendingUseCase, Depends(get_extract_use_case)],
@@ -74,7 +77,10 @@ async def trigger_extraction(
     Processes documents in PENDING extraction state through the multi-tier
     extraction pipeline (Tier A → B → C).
 
+    Rate limited to 30 requests per minute.
+
     Args:
+        request: FastAPI request (for rate limiting).
         limit: Optional maximum number of documents to process.
 
     Returns:
@@ -82,6 +88,7 @@ async def trigger_extraction(
 
     Raises:
         HTTPException: 500 if extraction pipeline fails.
+        RateLimitExceeded: If rate limit exceeded (30/minute).
 
     Example:
         >>> response = client.post("/extract/pending?limit=10")
@@ -91,6 +98,9 @@ async def trigger_extraction(
         >>> assert "succeeded" in data
         >>> assert "failed" in data
     """
+    # Apply rate limiting
+    limiter = request.app.state.limiter
+    await limiter.limit("30/minute")(request)
     try:
         result = await use_case.execute(limit=limit)
     except (ConnectionError, TimeoutError) as e:

@@ -11,6 +11,8 @@ Implements Docker Compose YAML ingestion workflow:
 This command is thin - parsing logic is in packages/ingest/readers/docker_compose.py.
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import UTC, datetime
 from typing import Annotated

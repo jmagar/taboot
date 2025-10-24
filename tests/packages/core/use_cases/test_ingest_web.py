@@ -5,12 +5,14 @@ WebReader → Normalizer → Chunker → Embedder → QdrantWriter
 With job state tracking and error handling.
 """
 
-from unittest.mock import Mock
+from typing import cast
+from unittest.mock import MagicMock, Mock
 from uuid import UUID
 
 import pytest
 from llama_index.core import Document as LlamaDocument
 
+from packages.clients.postgres_document_store import PostgresDocumentStore
 from packages.schemas.models import Chunk, IngestionJob, JobState, SourceType
 
 
@@ -74,6 +76,12 @@ class TestIngestWebUseCase:
         writer.upsert_batch.return_value = None
         return writer
 
+    @pytest.fixture
+    def mock_document_store(self) -> PostgresDocumentStore:
+        """Create mock PostgresDocumentStore."""
+        store = MagicMock(spec=PostgresDocumentStore)
+        return cast(PostgresDocumentStore, store)
+
     def test_execute_orchestrates_full_pipeline(
         self,
         mock_web_reader: Mock,
@@ -81,6 +89,7 @@ class TestIngestWebUseCase:
         mock_chunker: Mock,
         mock_embedder: Mock,
         mock_qdrant_writer: Mock,
+        mock_document_store: PostgresDocumentStore,
     ) -> None:
         """Test that execute orchestrates the full ingestion pipeline."""
         # Import here to avoid circular dependency in fixture setup
@@ -92,6 +101,7 @@ class TestIngestWebUseCase:
             chunker=mock_chunker,
             embedder=mock_embedder,
             qdrant_writer=mock_qdrant_writer,
+            document_store=mock_document_store,
             collection_name="test_collection",
         )
 
@@ -126,6 +136,7 @@ class TestIngestWebUseCase:
         mock_chunker: Mock,
         mock_embedder: Mock,
         mock_qdrant_writer: Mock,
+        mock_document_store: PostgresDocumentStore,
     ) -> None:
         """Test that execute creates a job in PENDING state initially."""
         from packages.core.use_cases.ingest_web import IngestWebUseCase
@@ -136,6 +147,7 @@ class TestIngestWebUseCase:
             chunker=mock_chunker,
             embedder=mock_embedder,
             qdrant_writer=mock_qdrant_writer,
+            document_store=mock_document_store,
             collection_name="test_collection",
         )
 
@@ -152,6 +164,7 @@ class TestIngestWebUseCase:
         mock_chunker: Mock,
         mock_embedder: Mock,
         mock_qdrant_writer: Mock,
+        mock_document_store: PostgresDocumentStore,
     ) -> None:
         """Test that job transitions from PENDING to RUNNING."""
         from packages.core.use_cases.ingest_web import IngestWebUseCase
@@ -162,6 +175,7 @@ class TestIngestWebUseCase:
             chunker=mock_chunker,
             embedder=mock_embedder,
             qdrant_writer=mock_qdrant_writer,
+            document_store=mock_document_store,
             collection_name="test_collection",
         )
 
@@ -177,6 +191,7 @@ class TestIngestWebUseCase:
         mock_chunker: Mock,
         mock_embedder: Mock,
         mock_qdrant_writer: Mock,
+        mock_document_store: PostgresDocumentStore,
     ) -> None:
         """Test that pages_processed is updated for each document."""
         from packages.core.use_cases.ingest_web import IngestWebUseCase
@@ -194,6 +209,7 @@ class TestIngestWebUseCase:
             chunker=mock_chunker,
             embedder=mock_embedder,
             qdrant_writer=mock_qdrant_writer,
+            document_store=mock_document_store,
             collection_name="test_collection",
         )
 
@@ -208,6 +224,7 @@ class TestIngestWebUseCase:
         mock_chunker: Mock,
         mock_embedder: Mock,
         mock_qdrant_writer: Mock,
+        mock_document_store: PostgresDocumentStore,
     ) -> None:
         """Test that chunks_created is updated for each batch."""
         from packages.core.use_cases.ingest_web import IngestWebUseCase
@@ -218,6 +235,7 @@ class TestIngestWebUseCase:
             chunker=mock_chunker,
             embedder=mock_embedder,
             qdrant_writer=mock_qdrant_writer,
+            document_store=mock_document_store,
             collection_name="test_collection",
         )
 
@@ -233,6 +251,7 @@ class TestIngestWebUseCase:
         mock_chunker: Mock,
         mock_embedder: Mock,
         mock_qdrant_writer: Mock,
+        mock_document_store: PostgresDocumentStore,
     ) -> None:
         """Test that execute handles empty document list gracefully."""
         from packages.core.use_cases.ingest_web import IngestWebUseCase
@@ -246,6 +265,7 @@ class TestIngestWebUseCase:
             chunker=mock_chunker,
             embedder=mock_embedder,
             qdrant_writer=mock_qdrant_writer,
+            document_store=mock_document_store,
             collection_name="test_collection",
         )
 
@@ -266,6 +286,7 @@ class TestIngestWebUseCase:
         mock_chunker: Mock,
         mock_embedder: Mock,
         mock_qdrant_writer: Mock,
+        mock_document_store: PostgresDocumentStore,
     ) -> None:
         """Test that execute handles WebReader errors and marks job as FAILED."""
         from packages.core.use_cases.ingest_web import IngestWebUseCase
@@ -279,6 +300,7 @@ class TestIngestWebUseCase:
             chunker=mock_chunker,
             embedder=mock_embedder,
             qdrant_writer=mock_qdrant_writer,
+            document_store=mock_document_store,
             collection_name="test_collection",
         )
 

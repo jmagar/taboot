@@ -12,6 +12,7 @@ This command is thin - all business logic is in packages/core/use_cases/ingest_w
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import ExitStack
 from datetime import UTC, datetime
@@ -24,17 +25,25 @@ from packages.clients.postgres_document_store import PostgresDocumentStore
 from packages.common.config import get_config
 from packages.common.db_schema import get_postgres_client
 from packages.core.use_cases.ingest_web import IngestWebUseCase
+
+try:
+    from redis import asyncio as redis_async
+except ModuleNotFoundError:  # pragma: no cover - redis optional in some test suites
+    redis_async = None
+
+from apps.cli.taboot_cli.commands import ingest_app as app
+from packages.ingest.adapters.redis_streams_publisher import RedisDocumentEventPublisher
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
 from packages.ingest.normalizer import Normalizer
 from packages.ingest.readers.web import WebReader
+from packages.ingest.services.document_events import DocumentEventDispatcher
+from packages.schemas.models import Document as DocumentModel
 from packages.schemas.models import JobState
 from packages.vector.writer import QdrantWriter
 
 console = Console()
 logger = logging.getLogger(__name__)
-
-app = typer.Typer(name="ingest", help="Ingest documents from various sources")
 
 
 @app.command(name="web")
@@ -83,10 +92,15 @@ def ingest_web_command(
         )
         normalizer = Normalizer()
         chunker = Chunker()
+        tei_settings = config.tei_config
 
         # Initialize resources with ExitStack to ensure cleanup
         with ExitStack() as stack:
-            embedder = Embedder(tei_url=config.tei_embedding_url)
+            embedder = Embedder(
+                tei_url=str(tei_settings.url),
+                batch_size=tei_settings.batch_size,
+                timeout=float(tei_settings.timeout),
+            )
             stack.callback(embedder.close)
 
             qdrant_writer = QdrantWriter(
@@ -99,7 +113,29 @@ def ingest_web_command(
             stack.callback(pg_conn.close)
 
             document_store = PostgresDocumentStore(pg_conn)
-            stack.callback(document_store.close)
+
+            document_callback = None
+            redis_client = None
+            if config.enable_ingest_events and redis_async is not None:
+                redis_client = redis_async.from_url(config.redis_url)
+
+                def _close_redis() -> None:
+                    asyncio.run(redis_client.close())
+
+                stack.callback(_close_redis)
+
+                dispatcher = DocumentEventDispatcher(
+                    RedisDocumentEventPublisher(
+                        redis_client=redis_client,
+                        stream_name=config.ingest_events_stream,
+                    ),
+                    enabled=True,
+                )
+
+                def _dispatch(document: DocumentModel, chunk_count: int) -> None:
+                    dispatcher.dispatch_document_ingested(document, chunk_count=chunk_count)
+
+                document_callback = _dispatch
 
             # Create use case
             use_case = IngestWebUseCase(
@@ -110,6 +146,7 @@ def ingest_web_command(
                 qdrant_writer=qdrant_writer,
                 document_store=document_store,
                 collection_name=config.collection_name,
+                document_ingested_callback=document_callback,
             )
 
             # Track start time for duration calculation
@@ -117,7 +154,7 @@ def ingest_web_command(
 
             # Execute ingestion
             logger.info("Executing web ingestion for %s", url)
-            job = use_case.execute(url=url, limit=limit)
+            job = asyncio.run(use_case.execute(url=url, limit=limit))
 
             # Calculate duration
             end_time = datetime.now(UTC)
@@ -171,20 +208,20 @@ def ingest_web_command(
 def _register_subcommands() -> None:
     """Register subcommands dynamically to avoid circular imports."""
     # Register docker-compose subcommand
-    from taboot_cli.commands.ingest_docker_compose import (
+    from apps.cli.taboot_cli.commands.ingest_docker_compose import (
         ingest_docker_compose_command,
     )
 
     app.command(name="docker-compose")(ingest_docker_compose_command)
 
     # Register external API subcommands
-    from taboot_cli.commands.ingest_elasticsearch import (
+    from apps.cli.taboot_cli.commands.ingest_elasticsearch import (
         ingest_elasticsearch_command,
     )
-    from taboot_cli.commands.ingest_github import ingest_github_command
-    from taboot_cli.commands.ingest_gmail import ingest_gmail_command
-    from taboot_cli.commands.ingest_reddit import ingest_reddit_command
-    from taboot_cli.commands.ingest_youtube import ingest_youtube_command
+    from apps.cli.taboot_cli.commands.ingest_github import ingest_github_command
+    from apps.cli.taboot_cli.commands.ingest_gmail import ingest_gmail_command
+    from apps.cli.taboot_cli.commands.ingest_reddit import ingest_reddit_command
+    from apps.cli.taboot_cli.commands.ingest_youtube import ingest_youtube_command
 
     app.command(name="github")(ingest_github_command)
     app.command(name="reddit")(ingest_reddit_command)

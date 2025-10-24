@@ -1,5 +1,7 @@
 """Tier B window selector for Tier C LLM processing."""
 
+from __future__ import annotations
+
 import re
 
 from packages.extraction.types import ExtractionWindow
@@ -21,16 +23,17 @@ class WindowSelector:
         self.max_tokens = max_tokens
 
     def _estimate_tokens(self, text: str) -> int:
-        """Estimate token count (rough approximation: ~1.3 tokens per word).
+        """Count tokens using tiktoken.
 
         Args:
             text: Input text.
 
         Returns:
-            int: Estimated token count.
+            int: Exact token count.
         """
-        words = len(text.split())
-        return int(words * 1.3)
+        from packages.common.token_utils import count_tokens
+
+        return count_tokens(text)
 
     def _split_into_sentences(self, text: str) -> list[str]:
         """Split text into sentences.

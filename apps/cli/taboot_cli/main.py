@@ -1,13 +1,22 @@
 """Taboot CLI - Typer command-line interface for orchestrating RAG workflows."""
 
+from __future__ import annotations
+
 import logging
 from typing import Literal
 
 import typer
 from rich.console import Console
 
-# Import command modules at top
-from taboot_cli.commands.ingest_web import app as ingest_app
+from apps.cli.taboot_cli.commands import (
+    extract_app,
+    graph_app,
+    ingest_app,
+    list_app,
+    migrate_app,
+)
+from apps.cli.taboot_cli.utils import async_command
+from packages.schemas.models import ExtractionState, SourceType
 
 app = typer.Typer(
     name="taboot",
@@ -21,12 +30,11 @@ logger = logging.getLogger(__name__)
 # Register ingest subcommand
 app.add_typer(ingest_app, name="ingest")
 
-# Create extract subcommand group
-extract_app = typer.Typer(name="extract", help="Run extraction pipeline on documents")
 
-
+# Register extract subcommand group with commands
 @extract_app.command(name="pending")
-def extract_pending_sync(
+@async_command
+async def extract_pending(
     limit: int | None = typer.Option(
         None, "--limit", "-l", help="Maximum number of documents to process"
     ),
@@ -43,16 +51,14 @@ def extract_pending_sync(
         taboot extract pending
         taboot extract pending --limit 10
     """
-    import asyncio
+    from apps.cli.taboot_cli.commands.extract_pending import extract_pending_command
 
-    from taboot_cli.commands.extract_pending import extract_pending_command
-
-    # Run async command in event loop
-    asyncio.run(extract_pending_command(limit=limit))
+    await extract_pending_command(limit=limit)
 
 
 @extract_app.command(name="status")
-def extract_status_sync() -> None:
+@async_command
+async def extract_status() -> None:
     """
     Display system status including service health, queue depths, and metrics.
 
@@ -64,16 +70,13 @@ def extract_status_sync() -> None:
     Examples:
         taboot extract status
     """
-    import asyncio
+    from apps.cli.taboot_cli.commands.extract_status import extract_status_command
 
-    from taboot_cli.commands.extract_status import extract_status_command
-
-    # Run async command in event loop
-    asyncio.run(extract_status_command())
+    await extract_status_command()
 
 
 @extract_app.command(name="reprocess")
-def extract_reprocess_sync(
+def extract_reprocess(
     since: str = typer.Option(..., "--since", help="Reprocess documents from period (e.g., '7d')"),
 ) -> None:
     """
@@ -83,12 +86,11 @@ def extract_reprocess_sync(
         taboot extract reprocess --since 7d
         taboot extract reprocess --since 30d
     """
-    from taboot_cli.commands.extract_reprocess import extract_reprocess_command
+    from apps.cli.taboot_cli.commands.extract_reprocess import extract_reprocess_command
 
     extract_reprocess_command(since=since)
 
 
-# Register extract subcommand group
 app.add_typer(extract_app, name="extract")
 
 
@@ -115,13 +117,14 @@ def query(
         taboot query "docker compose services" --sources docker-compose,swag
         taboot query "recent updates" --after 2025-01-01 --top-k 20
     """
-    from taboot_cli.commands.query import query_command
+    from apps.cli.taboot_cli.commands.query import query_command
 
     query_command(question=question, sources=sources, after=after, top_k=top_k)
 
 
 @app.command()
-def status(
+@async_command
+async def status(
     *,
     component: str | None = typer.Option(
         default=None,
@@ -146,20 +149,14 @@ def status(
         taboot status --component neo4j --verbose
         taboot status --component qdrant
     """
-    import asyncio
+    from apps.cli.taboot_cli.commands.status import status_command
 
-    from taboot_cli.commands.status import status_command
-
-    # Run async command in event loop
-    asyncio.run(status_command(component=component, verbose=verbose))
+    await status_command(component=component, verbose=verbose)
 
 
-# Create list subcommand group
-list_app = typer.Typer(name="list", help="List resources from the knowledge graph")
-
-
+# Register list subcommand group with commands
 @list_app.command(name="documents")
-def list_documents_sync(
+def list_documents(
     limit: int = typer.Option(10, "--limit", "-l", help="Maximum documents to show"),
     offset: int = typer.Option(0, "--offset", "-o", help="Pagination offset"),
     source_type: str | None = typer.Option(
@@ -177,26 +174,27 @@ def list_documents_sync(
         taboot list documents --limit 20 --source-type web
         taboot list documents --extraction-state pending
     """
-    from taboot_cli.commands.list_documents import list_documents_command
+    from apps.cli.taboot_cli.commands.list_documents import list_documents_command
+
+    source_type_enum = SourceType(source_type) if source_type is not None else None
+    extraction_state_enum = (
+        ExtractionState(extraction_state) if extraction_state is not None else None
+    )
 
     list_documents_command(
         limit=limit,
         offset=offset,
-        source_type=source_type,
-        extraction_state=extraction_state,
+        source_type=source_type_enum,
+        extraction_state=extraction_state_enum,
     )
 
 
-# Register list subcommand group
 app.add_typer(list_app, name="list")
 
 
-# Create graph subcommand group
-graph_app = typer.Typer(name="graph", help="Execute Cypher queries against Neo4j")
-
-
+# Register graph subcommand group with commands
 @graph_app.command(name="query")
-def graph_query_sync(
+def graph_query(
     cypher: str = typer.Argument(..., help="Cypher query to execute"),
     output_format: Literal["table", "json"] = typer.Option(
         "table", "--format", "-f", help="Output format (table or json)"
@@ -212,13 +210,64 @@ def graph_query_sync(
         taboot graph query "MATCH (s:Service)-[r]->(h:Host) RETURN s.name, type(r), h.hostname"
         taboot graph query "MATCH (n) RETURN count(n) as total_nodes" --format json
     """
-    from taboot_cli.commands.graph import query_command
+    from apps.cli.taboot_cli.commands.graph import query_command
 
     query_command(cypher=cypher, output_format=output_format)
 
 
-# Register graph subcommand group
 app.add_typer(graph_app, name="graph")
+
+
+# Register migrate subcommand group with commands
+@migrate_app.command(name="postgres")
+def migrate_postgres() -> None:
+    """
+    Apply PostgreSQL Alembic migrations.
+
+    Runs alembic upgrade head to apply all pending migrations.
+
+    Examples:
+        taboot migrate postgres
+    """
+    from apps.cli.taboot_cli.commands.migrate import migrate_postgres as run_postgres
+
+    run_postgres()
+
+
+@migrate_app.command(name="neo4j")
+def migrate_neo4j() -> None:
+    """
+    Apply Neo4j Cypher migrations.
+
+    Applies versioned Cypher migrations from packages/graph/migrations.
+    Tracks applied versions in PostgreSQL schema_versions table.
+
+    Examples:
+        taboot migrate neo4j
+    """
+    from apps.cli.taboot_cli.commands.migrate import migrate_neo4j as run_neo4j
+
+    run_neo4j()
+
+
+@migrate_app.command(name="all")
+def migrate_all() -> None:
+    """
+    Apply all database migrations in dependency order.
+
+    Applies:
+        1. PostgreSQL migrations (creates schema_versions table)
+        2. Neo4j migrations (uses schema_versions for tracking)
+
+    Examples:
+        taboot migrate all
+    """
+    from apps.cli.taboot_cli.commands.migrate import migrate_all as run_all
+
+    run_all()
+
+
+app.add_typer(migrate_app, name="migrate")
 
 
 @app.command()
@@ -237,7 +286,7 @@ def init() -> None:
     Example:
         taboot init
     """
-    from taboot_cli.commands.init import init_command
+    from apps.cli.taboot_cli.commands.init import init_command
 
     init_command()
 

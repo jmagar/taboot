@@ -4,6 +4,8 @@ Implements the GitHub repository ingestion workflow.
 This command is thin - business logic is in the ingestion pipeline.
 """
 
+from __future__ import annotations
+
 import hashlib
 import logging
 from contextlib import ExitStack
@@ -99,10 +101,15 @@ def ingest_github_command(
         )
         normalizer = Normalizer()
         chunker = Chunker()
+        tei_settings = config.tei_config
 
         # Initialize resources with ExitStack to ensure cleanup
         with ExitStack() as stack:
-            embedder = Embedder(tei_url=config.tei_embedding_url)
+            embedder = Embedder(
+                tei_url=str(tei_settings.url),
+                batch_size=tei_settings.batch_size,
+                timeout=float(tei_settings.timeout),
+            )
             stack.callback(embedder.close)
             qdrant_writer = QdrantWriter(
                 url=config.qdrant_url,

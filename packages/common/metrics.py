@@ -329,7 +329,7 @@ class MetricsCollector:
             # Member format: "timestamp:duration_ms:count"
             # Handle bytes from Redis client
             member_str: str
-            if isinstance(member, (bytes, bytearray)):
+            if isinstance(member, bytes | bytearray):
                 member_str = member.decode("utf-8", errors="ignore")
             else:
                 member_str = str(member)

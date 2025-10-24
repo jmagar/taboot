@@ -3,6 +3,8 @@
 Top-level system status display showing health of all services.
 """
 
+from __future__ import annotations
+
 import typer
 from rich.console import Console
 from rich.table import Table

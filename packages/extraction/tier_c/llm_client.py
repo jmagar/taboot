@@ -1,16 +1,26 @@
 """Tier C LLM client with Ollama, batching, and Redis caching."""
 
+from __future__ import annotations
+
 import hashlib
 import json
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ollama import AsyncClient as AsyncClientType
+else:
+    AsyncClientType = Any
+
+AsyncClientFactory: type[AsyncClientType] | None
 
 try:
-    import ollama
-    from ollama import AsyncClient
+    from ollama import AsyncClient as _AsyncClientImported
 except ImportError:
-    ollama = None  # type: ignore
-    AsyncClient = None  # type: ignore
+    AsyncClientFactory = None
+else:
+    AsyncClientFactory = _AsyncClientImported
 
+from packages.common.resilience import resilient_async_call
 from packages.extraction.tier_c.schema import ExtractionResult
 
 
@@ -43,10 +53,11 @@ class TierCLLMClient:
         self.redis_client = redis_client
         self.batch_size = batch_size
         self.temperature = temperature
+        self.ollama_client: AsyncClientType | None
 
         # Initialize async Ollama client
-        if AsyncClient is not None:
-            self.ollama_client = AsyncClient()
+        if AsyncClientFactory is not None:
+            self.ollama_client = AsyncClientFactory()
         else:
             self.ollama_client = None
 
@@ -93,14 +104,20 @@ class TierCLLMClient:
         data = result.model_dump_json()
         await self.redis_client.set(cache_key, data)
 
+    @resilient_async_call(max_attempts=3, min_wait=2, max_wait=15)
     async def _call_ollama(self, window: str) -> ExtractionResult:
-        """Call Ollama LLM to extract triples.
+        """Call Ollama LLM to extract triples with retry logic.
+
+        Retries up to 3 times with exponential backoff (2-15 seconds).
 
         Args:
             window: Input window text.
 
         Returns:
             ExtractionResult: Extracted triples.
+
+        Raises:
+            Exception: If Ollama API call fails after retries.
         """
         if self.ollama_client is None:
             # Fallback if ollama not installed - return empty result

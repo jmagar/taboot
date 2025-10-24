@@ -13,6 +13,8 @@ and orchestration is in packages/core/use_cases/ingest_swag.py.
 Per CLAUDE.md architecture: Apps are thin I/O layers calling core use-cases.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 from typing import Annotated
@@ -20,6 +22,7 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
+from apps.cli.taboot_cli.commands import ingest_app as app
 from packages.core.use_cases.ingest_swag import IngestSwagError, IngestSwagUseCase
 from packages.graph.client import Neo4jClient, Neo4jConnectionError
 from packages.graph.writers.swag_writer import SwagGraphWriter
@@ -27,8 +30,6 @@ from packages.ingest.readers.swag import SwagReader, SwagReaderError
 
 console = Console()
 logger = logging.getLogger(__name__)
-
-app = typer.Typer(name="ingest", help="Ingest documents from various sources")
 
 
 @app.command(name="swag")

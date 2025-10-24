@@ -85,7 +85,7 @@ class SwagReader:
         if not config_path:
             raise ValueError("config_path cannot be empty")
 
-        if not isinstance(config_path, (str, Path)):
+        if not isinstance(config_path, str | Path):
             raise ValueError(f"config_path must be str or Path, got {type(config_path)}")
 
         try:

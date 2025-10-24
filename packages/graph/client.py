@@ -19,6 +19,7 @@ from neo4j.exceptions import Neo4jError, ServiceUnavailable
 
 from packages.common.config import get_config
 from packages.common.logging import get_logger
+from packages.common.resilience import resilient_external_call
 from packages.common.tracing import get_correlation_id
 
 logger = get_logger(__name__)
@@ -76,11 +77,14 @@ class Neo4jClient:
             },
         )
 
+    @resilient_external_call(max_attempts=2, min_wait=1, max_wait=5)
     def connect(self) -> None:
         """Create and verify Neo4j driver connection.
 
         Creates a connection-pooled Neo4j driver and verifies connectivity.
         Throws Neo4jConnectionError early if connection fails.
+
+        Retries up to 2 times with exponential backoff (1-5 seconds).
 
         Raises:
             Neo4jConnectionError: If connection to Neo4j fails.
@@ -105,6 +109,9 @@ class Neo4jClient:
                     self._config.neo4j_user,
                     self._config.neo4j_password.get_secret_value(),
                 ),
+                max_connection_pool_size=self._config.neo4j_max_pool_size,
+                connection_timeout=self._config.neo4j_connection_timeout,
+                max_transaction_retry_time=30.0,
             )
 
             # Verify connectivity and target database immediately (fail early)

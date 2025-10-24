@@ -1,5 +1,7 @@
 """Tier B spaCy entity ruler for Service, Host, IP, Port extraction."""
 
+from __future__ import annotations
+
 import re
 from typing import Any
 

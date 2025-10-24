@@ -1,6 +1,5 @@
 import os
 from functools import lru_cache
-from typing import cast
 
 import torch
 from fastapi import FastAPI, HTTPException
@@ -35,14 +34,11 @@ def load_model() -> CrossEncoder:
     preferred_device = os.getenv("RERANKER_DEVICE", "auto").lower()
     device = _resolve_device("cuda" if preferred_device == "auto" else preferred_device)
     max_length = int(os.getenv("MAX_LENGTH", "512"))
-    model = cast(
-        CrossEncoder,
-        CrossEncoder(
-            model_id,
-            device=device,
-            max_length=max_length,
-            default_activation_function=None,
-        ),
+    model = CrossEncoder(
+        model_id,
+        device=device,
+        max_length=max_length,
+        default_activation_function=None,
     )
     return model
 

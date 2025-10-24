@@ -131,6 +131,7 @@ services:
         result = parse_yaml_json(yaml_content, format_type="yaml")
 
         assert result is not None
+        assert isinstance(result, dict)
         assert "services" in result
         assert "api" in result["services"]
         assert "db" in result["services"]
@@ -149,6 +150,7 @@ services:
         result = parse_yaml_json(json_content, format_type="json")
 
         assert result is not None
+        assert isinstance(result, dict)
         assert result["service"] == "api"
         assert result["port"] == 8080
         assert result["dependencies"] == ["db", "cache"]

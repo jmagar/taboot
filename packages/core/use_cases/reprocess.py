@@ -3,6 +3,8 @@
 Queues documents for re-extraction based on date filtering.
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import UTC, datetime
 from typing import Protocol

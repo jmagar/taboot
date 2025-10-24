@@ -129,6 +129,8 @@ See [quickstart.md](specs/001-taboot-rag-platform/quickstart.md) for detailed wo
 - [packages/vector/docs/VECTOR_SCHEMA.md](packages/vector/docs/VECTOR_SCHEMA.md) — Qdrant payload schema and tuning knobs.
 - [packages/graph/docs/GRAPH_SCHEMA.md](packages/graph/docs/GRAPH_SCHEMA.md) — Node labels and Cypher upsert patterns.
 - [docs/MAKEFILE_REFERENCES.md](docs/MAKEFILE_REFERENCES.md) — Automation targets for local tooling.
+- [docs/adrs](docs/adrs) — Architecture decision records (Neo4j, Qwen3 models, tiered extraction).
+- [BENCHMARKS.md](BENCHMARKS.md) — Current performance versus targets.
 
 ---
 

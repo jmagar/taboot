@@ -3,7 +3,7 @@
 import hashlib
 import json
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
@@ -87,7 +87,7 @@ class ApiKeyStore:
         if not value:
             return None
 
-        return ApiKey.model_validate_json(value.decode("utf-8"))
+        return cast(ApiKey, ApiKey.model_validate_json(value.decode("utf-8")))
 
 
 __all__ = ["ApiKeyStore"]

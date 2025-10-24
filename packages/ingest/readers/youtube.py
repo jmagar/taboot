@@ -5,6 +5,7 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 """
 
 import logging
+from typing import cast
 
 from llama_index.core import Document
 from llama_index.readers.youtube_transcript import YoutubeTranscriptReader as LlamaYoutubeReader
@@ -64,7 +65,7 @@ class YoutubeReader:
         for attempt in range(self.max_retries):
             try:
                 # Load transcripts
-                docs = reader.load_data(ytlinks=video_urls)
+                docs = cast(list[Document], reader.load_data(ytlinks=video_urls))
 
                 # Add metadata
                 for i, doc in enumerate(docs):

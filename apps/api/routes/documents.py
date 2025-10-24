@@ -3,6 +3,8 @@
 Implements GET /documents with filtering and pagination.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Annotated
 
@@ -23,23 +25,21 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 def list_documents(
     limit: Annotated[
         int,
-        Query(default=10, ge=1, le=100, description="Maximum documents to return"),
-    ],
+        Query(ge=1, le=100, description="Maximum documents to return"),
+    ] = 10,
     offset: Annotated[
         int,
-        Query(default=0, ge=0, description="Number of documents to skip (pagination)"),
-    ],
+        Query(ge=0, description="Number of documents to skip (pagination)"),
+    ] = 0,
     source_type: Annotated[
         str | None,
         Query(
-            default=None,
             description="Filter by source type (web, github, etc.)",
         ),
     ] = None,
     extraction_state: Annotated[
         str | None,
         Query(
-            default=None,
             description="Filter by extraction state (pending, completed, etc.)",
         ),
     ] = None,

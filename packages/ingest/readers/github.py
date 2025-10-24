@@ -5,6 +5,7 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 """
 
 import logging
+from typing import cast
 
 from llama_index.core import Document
 from llama_index.readers.github import GithubClient, GithubRepositoryReader
@@ -98,7 +99,7 @@ class GithubReader:
             for branch_name in branches_to_try:
                 try:
                     # Load data from repository
-                    docs = reader.load_data(branch=branch_name)
+                    docs = cast(list[Document], reader.load_data(branch=branch_name))
                     logger.info(f"Successfully loaded from branch '{branch_name}'")
 
                     # Apply limit if specified

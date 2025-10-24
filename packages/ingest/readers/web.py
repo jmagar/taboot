@@ -6,9 +6,12 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 
 import logging
 import time
+from typing import cast
 
 from llama_index.core import Document
 from llama_index.readers.web import FireCrawlWebReader
+
+from packages.common.resilience import resilient_external_call
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +74,38 @@ class WebReader:
             time.sleep(sleep_time)
         self._last_request_time = time.time()
 
+    @resilient_external_call(max_attempts=3, min_wait=1, max_wait=10)
+    def _fetch_with_firecrawl(self, url: str, params: dict[str, object]) -> list[Document]:
+        """Fetch documents from Firecrawl with retry logic.
+
+        Args:
+            url: URL to crawl.
+            params: Firecrawl API parameters.
+
+        Returns:
+            list[Document]: List of LlamaIndex Document objects.
+
+        Raises:
+            Exception: If Firecrawl API call fails after retries.
+        """
+        # Create reader with crawl mode
+        reader = FireCrawlWebReader(
+            api_key=self.firecrawl_api_key,
+            api_url=self.firecrawl_url,
+            mode="crawl",
+            params=params,
+        )
+
+        docs = cast(list[Document], reader.load_data(url=url))
+
+        # Add source_url to metadata
+        for doc in docs:
+            if not doc.metadata:
+                doc.metadata = {}
+            doc.metadata["source_url"] = url
+
+        return docs
+
     def load_data(self, url: str, limit: int | None = None) -> list[Document]:
         """Load documents from URL with optional limit.
 
@@ -102,42 +137,10 @@ class WebReader:
         if limit is not None:
             params["limit"] = limit
 
-        # Create reader with crawl mode
-        reader = FireCrawlWebReader(
-            api_key=self.firecrawl_api_key,
-            api_url=self.firecrawl_url,
-            mode="crawl",
-            params=params,
-        )
-
-        # Retry logic with exponential backoff
-        last_error: Exception | None = None
-        for attempt in range(self.max_retries):
-            try:
-                docs = reader.load_data(url=url)
-
-                # Add source_url to metadata
-                for doc in docs:
-                    if not doc.metadata:
-                        doc.metadata = {}
-                    doc.metadata["source_url"] = url
-
-                logger.info(f"Loaded {len(docs)} documents from {url}")
-                return docs
-
-            except Exception as e:
-                last_error = e
-                if attempt < self.max_retries - 1:
-                    backoff = 2**attempt
-                    logger.warning(
-                        f"Attempt {attempt + 1}/{self.max_retries} failed for {url}: {e}. "
-                        f"Retrying in {backoff}s..."
-                    )
-                    time.sleep(backoff)
-                else:
-                    logger.error(f"All {self.max_retries} attempts failed for {url}: {e}")
-
-        # All retries exhausted
-        raise WebReaderError(
-            f"Failed to load {url} after {self.max_retries} attempts"
-        ) from last_error
+        try:
+            docs = self._fetch_with_firecrawl(url, params)
+            logger.info(f"Loaded {len(docs)} documents from {url}")
+            return docs
+        except Exception as e:
+            logger.error(f"Failed to load {url}: {e}")
+            raise WebReaderError(f"Failed to load {url}") from e

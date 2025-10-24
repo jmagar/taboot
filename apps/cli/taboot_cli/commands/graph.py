@@ -4,6 +4,8 @@ Provides direct Cypher query execution against Neo4j for debugging
 and exploration of the knowledge graph.
 """
 
+from __future__ import annotations
+
 import json
 import sys
 from typing import Any, Literal
@@ -91,7 +93,7 @@ def _display_table(records: list[dict[str, Any]]) -> None:
             elif isinstance(value, dict):
                 # Neo4j node/relationship - show properties
                 row.append(json.dumps(value, default=str))
-            elif isinstance(value, (list, tuple)):
+            elif isinstance(value, list | tuple):
                 row.append(", ".join(str(v) for v in value))
             else:
                 row.append(str(value))

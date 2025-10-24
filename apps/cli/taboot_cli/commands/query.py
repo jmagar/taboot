@@ -25,6 +25,8 @@ def query_command(
     neo4j_uri: str | None = typer.Option(None, help="Neo4j URI (default from env)"),
 ) -> None:
     """
+
+from __future__ import annotations
     Query the knowledge base with natural language.
 
     Example:

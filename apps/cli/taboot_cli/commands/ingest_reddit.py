@@ -49,6 +49,9 @@ def ingest_reddit_command(
         if missing_creds:
             raise ValueError(f"Missing required Reddit credentials: {', '.join(missing_creds)}")
 
+        assert config.reddit_client_id is not None
+        assert config.reddit_client_secret is not None
+
         reddit_reader = RedditReader(
             client_id=config.reddit_client_id,
             client_secret=config.reddit_client_secret.get_secret_value(),
@@ -56,7 +59,12 @@ def ingest_reddit_command(
         )
         normalizer = Normalizer()
         chunker = Chunker()
-        embedder = Embedder(tei_url=config.tei_embedding_url)
+        tei_settings = config.tei_config
+        embedder = Embedder(
+            tei_url=str(tei_settings.url),
+            batch_size=tei_settings.batch_size,
+            timeout=float(tei_settings.timeout),
+        )
         qdrant_writer = QdrantWriter(
             url=config.qdrant_url,
             collection_name=config.collection_name,

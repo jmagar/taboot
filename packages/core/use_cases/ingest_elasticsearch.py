@@ -6,6 +6,8 @@ ElasticsearchReader → Normalizer → Chunker → Embedder → QdrantWriter
 With document tracking and error handling per data-model.md.
 """
 
+from __future__ import annotations
+
 import hashlib
 import logging
 from datetime import UTC, datetime
@@ -14,6 +16,7 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 from llama_index.core import Document as LlamaDocument
 
 from packages.clients.postgres_document_store import PostgresDocumentStore
+from packages.common.token_utils import count_tokens
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
 from packages.ingest.normalizer import Normalizer
@@ -192,7 +195,8 @@ class IngestElasticsearchUseCase:
 
         for chunk_doc in chunk_docs:
             chunk_index = chunk_doc.metadata.get("chunk_index", 0)
-            token_count = max(1, min(len(chunk_doc.text.split()), 512))
+            token_count = count_tokens(chunk_doc.text)
+            token_count = max(1, min(token_count, 512))
 
             chunk = Chunk(
                 chunk_id=uuid4(),

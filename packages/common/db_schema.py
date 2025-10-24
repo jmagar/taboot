@@ -5,6 +5,7 @@ schema, and verifying table existence. Used during initialization (taboot init).
 """
 
 from pathlib import Path
+from typing import cast
 
 import psycopg2
 from psycopg2.extensions import connection
@@ -61,7 +62,7 @@ def _get_connection(config: TabootConfig) -> connection:
     """
     try:
         conn = psycopg2.connect(config.postgres_connection_string)
-        return conn
+        return cast(connection, conn)
     except psycopg2.Error as e:
         raise ConnectionError(f"Failed to connect to PostgreSQL: {e}") from e
 
@@ -265,7 +266,7 @@ def get_postgres_client() -> connection:
             cursor_factory=RealDictCursor,
         )
         logger.info("PostgreSQL client connected", extra={"host": host})
-        return conn
+        return cast(connection, conn)
     except psycopg2.Error as e:
         logger.exception("Failed to connect to PostgreSQL")
         raise ConnectionError("Failed to connect to PostgreSQL") from e

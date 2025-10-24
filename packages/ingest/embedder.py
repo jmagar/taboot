@@ -163,6 +163,108 @@ class Embedder:
             logger.error(f"Unexpected error during embedding: {e}")
             raise EmbedderError(f"Unexpected error during embedding: {e}") from e
 
+    async def embed_texts_async(self, texts: list[str]) -> list[list[float]]:
+        """Embed a list of texts asynchronously using TEI service.
+
+        Args:
+            texts: List of text strings to embed.
+
+        Returns:
+            list[list[float]]: List of embedding vectors (each of length expected_dim).
+
+        Raises:
+            EmbedderError: If TEI service returns an error or invalid response.
+        """
+        if not texts:
+            logger.debug("Empty text list, returning empty result")
+            return []
+
+        logger.debug(f"Embedding {len(texts)} texts asynchronously")
+
+        all_embeddings: list[list[float]] = []
+
+        # Process in batches asynchronously
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            for i in range(0, len(texts), self.batch_size):
+                batch = texts[i : i + self.batch_size]
+                batch_embeddings = await self._embed_batch_async(client, batch)
+                all_embeddings.extend(batch_embeddings)
+
+        logger.info(f"Embedded {len(all_embeddings)} texts asynchronously")
+
+        return all_embeddings
+
+    async def _embed_batch_async(
+        self, client: httpx.AsyncClient, batch: list[str]
+    ) -> list[list[float]]:
+        """Embed a single batch of texts asynchronously.
+
+        Args:
+            client: AsyncClient instance for HTTP requests.
+            batch: List of text strings (size <= batch_size).
+
+        Returns:
+            list[list[float]]: List of embedding vectors.
+
+        Raises:
+            EmbedderError: If TEI service returns an error or invalid response.
+        """
+        logger.debug(f"Embedding batch of {len(batch)} texts asynchronously")
+
+        try:
+            # TEI expects JSON payload with "inputs" field
+            payload = {"inputs": batch}
+
+            response = await client.post(
+                f"{self.tei_url}/embed",
+                json=payload,
+            )
+
+            response.raise_for_status()
+
+            embeddings = response.json()
+
+            # Validate response format
+            if not isinstance(embeddings, list):
+                raise EmbedderError(
+                    f"Invalid response format: expected list, got {type(embeddings)}"
+                )
+
+            if len(embeddings) != len(batch):
+                raise EmbedderError(
+                    f"Response length mismatch: expected {len(batch)}, got {len(embeddings)}"
+                )
+
+            # Validate dimensions
+            for i, embedding in enumerate(embeddings):
+                if not isinstance(embedding, list):
+                    raise EmbedderError(
+                        f"Invalid embedding format at index {i}: "
+                        f"expected list, got {type(embedding)}"
+                    )
+
+                if len(embedding) != self.expected_dim:
+                    raise EmbedderError(
+                        f"Invalid embedding dimension at index {i}: "
+                        f"Expected {self.expected_dim} dimensions, got {len(embedding)}"
+                    )
+
+            logger.debug(f"Successfully embedded batch of {len(batch)} texts asynchronously")
+
+            return embeddings
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"TEI service HTTP error: {e}")
+            raise EmbedderError(f"TEI service HTTP error: {e}") from e
+
+        except httpx.RequestError as e:
+            logger.error(f"TEI service request error: {e}")
+            raise EmbedderError(f"TEI service request error: {e}") from e
+
+        except Exception as e:
+            logger.error(f"Unexpected error during embedding: {e}")
+            raise EmbedderError(f"Unexpected error during embedding: {e}") from e
+
     def close(self) -> None:
         """Close the HTTP client."""
         logger.debug("Closing HTTP client")

@@ -6,6 +6,8 @@ queue depths, and metrics.
 Required by FR-046: API MUST provide system status endpoints with health checks.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 
@@ -87,7 +89,7 @@ async def get_system_status() -> dict[str, Any]:
     - System metrics snapshot
 
     Returns:
-        Response envelope with system status data or error.
+        ResponseEnvelope[SystemStatusResponse]: System status data or error.
 
     Raises:
         HTTPException: 500 if status aggregation fails.
@@ -104,6 +106,8 @@ async def get_system_status() -> dict[str, Any]:
         >>> assert "queue_depth" in data
         >>> assert "metrics" in data
     """
+    from apps.api.schemas.envelope import ResponseEnvelope
+
     try:
         # Get use case and execute
         use_case = get_status_use_case()
@@ -118,7 +122,7 @@ async def get_system_status() -> dict[str, Any]:
         )
 
         # Return success envelope
-        return {"data": status_data.model_dump(), "error": None}
+        return ResponseEnvelope(data=status_data, error=None).model_dump()
 
     except Exception as e:
         logger.exception("Status aggregation failed")

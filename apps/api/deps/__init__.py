@@ -1,5 +1,7 @@
 """Dependency injection helpers for the API layer."""
 
+from __future__ import annotations
+
 from .auth import get_redis_client, verify_api_key
 from .extraction import (
     get_document_store,

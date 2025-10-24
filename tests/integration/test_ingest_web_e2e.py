@@ -12,10 +12,13 @@ Markers:
 """
 
 import time
+from typing import cast
+from unittest.mock import MagicMock
 
 import pytest
 from qdrant_client import QdrantClient
 
+from packages.clients.postgres_document_store import PostgresDocumentStore
 from packages.common.config import get_config
 from packages.core.use_cases.ingest_web import IngestWebUseCase
 from packages.ingest.chunker import Chunker
@@ -57,6 +60,7 @@ class TestIngestWebEndToEnd:
         # Create all dependencies
         web_reader = WebReader(
             firecrawl_url=config.firecrawl_api_url,
+            firecrawl_api_key=config.firecrawl_api_key.get_secret_value(),
             rate_limit_delay=0.1,  # Fast for testing
             max_retries=3,
         )
@@ -73,6 +77,7 @@ class TestIngestWebEndToEnd:
             collection_name=collection_name,
             batch_size=100,
         )
+        document_store = cast(PostgresDocumentStore, MagicMock(spec=PostgresDocumentStore))
 
         try:
             # Initialize IngestWebUseCase
@@ -82,6 +87,7 @@ class TestIngestWebEndToEnd:
                 chunker=chunker,
                 embedder=embedder,
                 qdrant_writer=qdrant_writer,
+                document_store=document_store,
                 collection_name=collection_name,
             )
 
@@ -173,6 +179,7 @@ class TestIngestWebEndToEnd:
         # Create dependencies with minimal setup
         web_reader = WebReader(
             firecrawl_url=config.firecrawl_api_url,
+            firecrawl_api_key=config.firecrawl_api_key.get_secret_value(),
             rate_limit_delay=0.1,
             max_retries=1,  # Fail fast
         )
@@ -186,6 +193,7 @@ class TestIngestWebEndToEnd:
             url=config.qdrant_url,
             collection_name="taboot_documents",
         )
+        document_store = cast(PostgresDocumentStore, MagicMock(spec=PostgresDocumentStore))
 
         try:
             use_case = IngestWebUseCase(
@@ -194,6 +202,7 @@ class TestIngestWebEndToEnd:
                 chunker=chunker,
                 embedder=embedder,
                 qdrant_writer=qdrant_writer,
+                document_store=document_store,
                 collection_name="taboot_documents",
             )
 
@@ -238,6 +247,7 @@ class TestIngestWebEndToEnd:
         # Create dependencies
         web_reader = WebReader(
             firecrawl_url=config.firecrawl_api_url,
+            firecrawl_api_key=config.firecrawl_api_key.get_secret_value(),
             rate_limit_delay=0.1,
             max_retries=1,
         )
@@ -251,6 +261,7 @@ class TestIngestWebEndToEnd:
             url=config.qdrant_url,
             collection_name="taboot_documents",
         )
+        document_store = cast(PostgresDocumentStore, MagicMock(spec=PostgresDocumentStore))
 
         try:
             use_case = IngestWebUseCase(
@@ -259,6 +270,7 @@ class TestIngestWebEndToEnd:
                 chunker=chunker,
                 embedder=embedder,
                 qdrant_writer=qdrant_writer,
+                document_store=document_store,
                 collection_name="taboot_documents",
             )
 
@@ -305,6 +317,7 @@ class TestWebIngestionPerformance:
 
         web_reader = WebReader(
             firecrawl_url=config.firecrawl_api_url,
+            firecrawl_api_key=config.firecrawl_api_key.get_secret_value(),
             rate_limit_delay=0.1,
             max_retries=3,
         )
@@ -321,6 +334,7 @@ class TestWebIngestionPerformance:
             collection_name="taboot_documents",
             batch_size=100,
         )
+        document_store = cast(PostgresDocumentStore, MagicMock(spec=PostgresDocumentStore))
 
         try:
             use_case = IngestWebUseCase(
@@ -329,6 +343,7 @@ class TestWebIngestionPerformance:
                 chunker=chunker,
                 embedder=embedder,
                 qdrant_writer=qdrant_writer,
+                document_store=document_store,
                 collection_name="taboot_documents",
             )
 

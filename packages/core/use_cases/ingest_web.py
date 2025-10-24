@@ -6,14 +6,18 @@ WebReader → Normalizer → Chunker → Embedder → QdrantWriter
 With job state tracking and error handling per data-model.md.
 """
 
+from __future__ import annotations
+
 import hashlib
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from llama_index.core import Document as LlamaDocument
 
 from packages.clients.postgres_document_store import PostgresDocumentStore
+from packages.common.token_utils import count_tokens
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
 from packages.ingest.normalizer import Normalizer
@@ -58,6 +62,9 @@ class IngestWebUseCase:
         qdrant_writer: QdrantWriter,
         document_store: PostgresDocumentStore,
         collection_name: str,
+        flush_threshold: int = 1000,
+        *,
+        document_ingested_callback: Callable[[DocumentModel, int], None] | None = None,
     ) -> None:
         """Initialize IngestWebUseCase with all dependencies.
 
@@ -69,6 +76,9 @@ class IngestWebUseCase:
             qdrant_writer: QdrantWriter instance for vector storage.
             document_store: PostgresDocumentStore for document tracking.
             collection_name: Qdrant collection name.
+            flush_threshold: Number of chunks to accumulate before flushing (default: 1000).
+            document_ingested_callback: Optional hook invoked after a document is
+                persisted; receives the Document model and chunk count.
         """
         self.web_reader = web_reader
         self.normalizer = normalizer
@@ -77,13 +87,18 @@ class IngestWebUseCase:
         self.qdrant_writer = qdrant_writer
         self.document_store = document_store
         self.collection_name = collection_name
+        self.flush_threshold = flush_threshold
+        self._document_ingested_callback = document_ingested_callback
 
-        logger.info(f"Initialized IngestWebUseCase (collection={collection_name})")
+        logger.info(
+            f"Initialized IngestWebUseCase (collection={collection_name}, "
+            f"flush_threshold={flush_threshold})"
+        )
 
-    def execute(
-        self, url: str, limit: int | None = None, job_id: "UUID | None" = None
+    async def execute(
+        self, url: str, limit: int | None = None, job_id: UUID | None = None
     ) -> IngestionJob:
-        """Execute the full ingestion pipeline for a URL.
+        """Execute the full ingestion pipeline for a URL asynchronously.
 
         Pipeline flow:
         1. Create IngestionJob (state=PENDING)
@@ -92,11 +107,11 @@ class IngestWebUseCase:
         4. For each doc:
            a. Normalizer.normalize(doc.text) → markdown
            b. Chunker.chunk_document(markdown_doc) → chunks[]
-           c. Embedder.embed_texts([chunk.text]) → embeddings[]
-           d. QdrantWriter.upsert_batch(chunks, embeddings)
-           e. Update job: pages_processed++, chunks_created+=len(chunks)
-        5. Transition to COMPLETED (or FAILED on error)
-        6. Return job
+           c. Accumulate chunks with flush threshold
+           d. When threshold reached: embed and upsert batch
+        5. Final flush for remaining chunks
+        6. Transition to COMPLETED (or FAILED on error)
+        7. Return job
 
         Args:
             url: URL to crawl and ingest.
@@ -125,7 +140,7 @@ class IngestWebUseCase:
                 job = self._transition_to_completed(job)
                 return job
 
-            # Step 4: Process each document
+            # Step 4: Process each document with batched flushing
             all_chunks: list[Chunk] = []
             for doc in docs:
                 chunks = self._process_document(doc, job, url)
@@ -134,19 +149,14 @@ class IngestWebUseCase:
                 # Update pages_processed
                 job = job.model_copy(update={"pages_processed": job.pages_processed + 1})
 
-            # Step 4c-4d: Embed and upsert all chunks in batch
+                # Flush when threshold reached
+                if len(all_chunks) >= self.flush_threshold:
+                    job = await self._flush_chunks(all_chunks, job)
+                    all_chunks = []
+
+            # Final flush for remaining chunks
             if all_chunks:
-                logger.info(f"Embedding {len(all_chunks)} chunks")
-                chunk_texts = [chunk.content for chunk in all_chunks]
-                embeddings = self.embedder.embed_texts(chunk_texts)
-
-                logger.info(f"Upserting {len(all_chunks)} chunks to Qdrant")
-                self.qdrant_writer.upsert_batch(all_chunks, embeddings)
-
-                # Update chunks_created
-                job = job.model_copy(
-                    update={"chunks_created": job.chunks_created + len(all_chunks)}
-                )
+                job = await self._flush_chunks(all_chunks, job)
 
             # Step 5: Transition to COMPLETED
             job = self._transition_to_completed(job)
@@ -185,7 +195,7 @@ class IngestWebUseCase:
             job = self._transition_to_failed(job, f"Unexpected error: {str(e)}")
             return job
 
-    def _create_job(self, url: str, job_id: "UUID | None" = None) -> IngestionJob:
+    def _create_job(self, url: str, job_id: UUID | None = None) -> IngestionJob:
         """Create a new IngestionJob in PENDING state.
 
         Args:
@@ -236,6 +246,28 @@ class IngestWebUseCase:
                 "completed_at": datetime.now(UTC),
             }
         )
+
+    async def _flush_chunks(self, chunks: list[Chunk], job: IngestionJob) -> IngestionJob:
+        """Flush batch of chunks to vector store asynchronously.
+
+        Args:
+            chunks: List of chunks to flush.
+            job: Current job for tracking.
+
+        Returns:
+            IngestionJob: Updated job with chunks_created incremented.
+        """
+        logger.info(f"Flushing {len(chunks)} chunks to vector store")
+
+        # Embed chunks
+        chunk_texts = [chunk.content for chunk in chunks]
+        embeddings = await self.embedder.embed_texts_async(chunk_texts)
+
+        # Upsert to Qdrant
+        await self.qdrant_writer.upsert_batch_async(chunks, embeddings)
+
+        # Update chunks_created
+        return job.model_copy(update={"chunks_created": job.chunks_created + len(chunks)})
 
     def _transition_to_failed(self, job: IngestionJob, error_msg: str) -> IngestionJob:
         """Transition job from RUNNING to FAILED.
@@ -297,8 +329,8 @@ class IngestWebUseCase:
             # Extract metadata
             chunk_index = chunk_doc.metadata.get("chunk_index", 0)
 
-            # Calculate token count (rough estimate: split by whitespace)
-            token_count = len(chunk_doc.text.split())
+            # Calculate token count using tiktoken
+            token_count = count_tokens(chunk_doc.text)
             token_count = max(1, min(token_count, 512))  # Clamp to [1, 512]
 
             # Create Chunk model
@@ -333,6 +365,12 @@ class IngestWebUseCase:
 
         # Store document and content for extraction
         self.document_store.create(doc_record, markdown)
+
+        if self._document_ingested_callback is not None:
+            try:
+                self._document_ingested_callback(doc_record, len(chunks))
+            except Exception:  # noqa: BLE001 - callback failures should not break ingestion
+                logger.exception("Document ingested callback failed", extra={"doc_id": str(doc_id)})
 
         return chunks
 

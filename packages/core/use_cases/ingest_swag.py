@@ -7,6 +7,8 @@ Per CLAUDE.md architecture: Core orchestrates, adapters implement.
 This use-case depends only on ports (GraphWriterPort) and schemas.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 from typing import Any
@@ -111,7 +113,8 @@ class IngestSwagUseCase:
             proxy_name = proxies[0].name if proxies else "swag"
 
             logger.info(f"Writing {len(routes)} ROUTES_TO relationship(s) to Neo4j")
-            route_stats = self.graph_writer.write_routes(proxy_name, routes)
+            route_payloads = [dict(route) for route in routes]
+            route_stats = self.graph_writer.write_routes(proxy_name, route_payloads)
             logger.info(f"Wrote ROUTES_TO relationships: {route_stats}")
 
             # Step 5: Return summary

@@ -1,5 +1,7 @@
 """Tier B dependency matcher for relationship extraction."""
 
+from __future__ import annotations
+
 import re
 from typing import Any
 

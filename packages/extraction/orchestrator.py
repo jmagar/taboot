@@ -3,6 +3,8 @@
 Orchestrates the complete extraction pipeline with state management in Redis.
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import UTC, datetime
 from typing import Protocol

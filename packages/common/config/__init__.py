@@ -8,7 +8,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import Field, HttpUrl, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,6 +40,23 @@ def _is_running_in_container() -> bool:
         pass
 
     return False
+
+
+class TeiConfig(BaseSettings):
+    """Configuration block for Text Embeddings Inference service."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    url: HttpUrl
+    batch_size: int = Field(default=32, ge=1, le=128)
+    timeout: int = Field(default=30, ge=1, le=300)
+
+    @field_validator("batch_size")
+    @classmethod
+    def _validate_batch_size(cls, value: int) -> int:
+        if value % 8 != 0:
+            raise ValueError("batch_size must be multiple of 8")
+        return value
 
 
 class TabootConfig(BaseSettings):
@@ -76,10 +93,23 @@ class TabootConfig(BaseSettings):
     postgres_host: str = "taboot-db"
     postgres_port: int = 5432
 
+    # ========== Connection Pooling ==========
+    neo4j_max_pool_size: int = 50
+    neo4j_connection_timeout: int = 30
+    redis_max_connections: int = 100
+    redis_socket_timeout: int = 10
+    qdrant_max_connections: int = 200
+    postgres_min_pool_size: int = 5
+    postgres_max_pool_size: int = 20
+
     # ========== Vector & Embedding Config ==========
     collection_name: str = "documents"
     tei_embedding_model: str = "Qwen/Qwen3-Embedding-0.6B"
     qdrant_embedding_dim: int = 1024
+    tei_timeout: int = Field(default=30, ge=1, le=300)
+    tei_max_concurrent_requests: int = 80
+    tei_max_batch_tokens: int = 163840
+    tei_tokenization_workers: int = 8
 
     # ========== Reranker Config ==========
     reranker_model: str = "Qwen/Qwen3-Reranker-0.6B"
@@ -101,7 +131,13 @@ class TabootConfig(BaseSettings):
 
     # ========== Ingestion Tuning ==========
     crawl_concurrency: int = 5  # Concurrent crawling requests
-    embedding_batch_size: int = 32  # TEI embedding batch size
+    embedding_batch_size: int = Field(default=64, ge=1, le=128)
+    qdrant_upsert_batch_size: int = 200  # Qdrant upsert batch size
+    ingest_flush_threshold: int = 1000  # Flush threshold for ingestion
+    enable_ingest_events: bool = False
+    ingest_events_stream: str = "stream:documents"
+    ingest_events_group: str = "ingestion-events"
+    ingest_events_consumer_prefix: str = "worker"
 
     # ========== External API Credentials (Optional) ==========
     github_token: SecretStr | None = None
@@ -125,6 +161,11 @@ class TabootConfig(BaseSettings):
     scrape_concurrency: int = 8
     retry_delay: int = 1000
     max_retries: int = 1
+
+    # ========== Neo4j Memory Config ==========
+    neo4j_heap_initial_size: str = "2G"
+    neo4j_heap_max_size: str = "2G"
+    neo4j_pagecache_size: str = "2G"
 
     # ========== Observability ==========
     log_level: str = "INFO"
@@ -156,6 +197,23 @@ class TabootConfig(BaseSettings):
             self.firecrawl_api_url = "http://localhost:3002"
             self.playwright_microservice_url = "http://localhost:3000/scrape"
 
+    @field_validator("embedding_batch_size")
+    @classmethod
+    def _validate_embedding_batch_size(cls, value: int) -> int:
+        if value % 8 != 0:
+            raise ValueError("embedding_batch_size must be a multiple of 8")
+        return value
+
+    @property
+    def tei_config(self) -> TeiConfig:
+        """Return validated TEI configuration block."""
+
+        return TeiConfig(
+            url=self.tei_embedding_url,
+            batch_size=self.embedding_batch_size,
+            timeout=self.tei_timeout,
+        )
+
     @property
     def neo4j_connection_string(self) -> str:
         """Get Neo4j connection string with credentials."""
@@ -183,4 +241,4 @@ def get_config() -> TabootConfig:
 
 
 # Export convenience accessors
-__all__ = ["TabootConfig", "get_config"]
+__all__ = ["TabootConfig", "TeiConfig", "get_config"]

@@ -21,59 +21,61 @@ classifiers = [
 # ---------- Runtime Dependencies ----------
 dependencies = [
   # LlamaIndex core + readers + stores
-  "llama-index-core>=0.14.4",
-  "llama-index-readers-web>=0.5.5",
-  "llama-index-readers-github>=0.8.2",
-  "llama-index-readers-file>=0.5.4",
-  "llama-index-readers-youtube-transcript>=0.4.1",
-  "llama-index-vector-stores-qdrant>=0.8.6",
-  "llama-index-graph-stores-neo4j>=0.5.1",
-  "llama-index-workflows>=0.3.0",
-  "llama-index-storage-docstore-redis>=0.4.1",
+  "llama-index-core>=0.14.4,<1",
+  "llama-index-readers-web>=0.5.5,<1",
+  "llama-index-readers-github>=0.8.2,<1",
+  "llama-index-readers-file>=0.5.4,<1",
+  "llama-index-readers-youtube-transcript>=0.4.1,<1",
+  "llama-index-vector-stores-qdrant>=0.8.6,<1",
+  "llama-index-graph-stores-neo4j>=0.5.1,<1",
+  "llama-index-workflows>=0.3.0,<1",
+  "llama-index-storage-docstore-redis>=0.4.1,<1",
   # LLM + embeddings adapters (self-hosted)
-  "llama-index-llms-ollama>=0.3.0",
-  "llama-index-embeddings-huggingface>=0.3.0",
+  "llama-index-llms-ollama>=0.3.0,<1",
+  "llama-index-embeddings-huggingface>=0.3.0,<1",
   # Optional OpenAI (used by Firecrawl extract, can be disabled)
-  "llama-index-llms-openai>=0.6.4",
+  "llama-index-llms-openai>=0.6.4,<1",
   # Data & external APIs
-  "firecrawl-py>=4.4.0",
-  "qdrant-client>=1.15.1",
+  "firecrawl-py>=4.4.0,<5",
+  "qdrant-client>=1.15.1,<2",
   "neo4j>=5.26.0,<6",
   "redis>=5.0.1,<6",
-  "elasticsearch>=9.1.1",
-  "PyGithub>=2.8.1",
-  "praw>=7.8.1",
-  "google-auth-oauthlib>=1.2.2",
-  "google-api-python-client>=2.184.0",
+  "elasticsearch>=9.1.1,<10",
+  "PyGithub>=2.8.1,<3",
+  "praw>=7.8.1,<8",
+  "google-auth-oauthlib>=1.2.2,<2",
+  "google-api-python-client>=2.184.0,<3",
   # Service & HTTP
-  "fastapi>=0.119.0",
-  "uvicorn>=0.37.0",
-  "httpx>=0.28.1",
-  "anyio>=4.11.0",
+  "fastapi>=0.119.0,<1",
+  "uvicorn>=0.37.0,<1",
+  "httpx>=0.28.1,<1",
+  "anyio>=4.11.0,<5",
   # Config & models
-  "pydantic>=2.12.0",
-  "pydantic-settings>=2.7.0",
-  "python-dotenv>=1.1.1",
-  "python-json-logger>=4.0.0",
-  "pyyaml>=6.0.3",
-  "typer>=0.19.2",
+  "pydantic>=2.12.0,<3",
+  "pydantic-settings>=2.7.0,<3",
+  "python-dotenv>=1.1.1,<2",
+  "python-json-logger>=4.0.0,<5",
+  "pyyaml>=6.0.3,<7",
+  "typer>=0.19.2,<1",
   # Filesystems / SSH
-  "fsspec[ssh]>=2025.9.0",
-  "paramiko>=4.0.0",
+  "fsspec[ssh]>=2025.9.0,<2026",
+  "paramiko>=4.0.0,<5",
   # NLP & extraction stack
-  "spacy>=3.8.1",
-  "pyahocorasick>=2.0.0",
-  "transformers>=4.44.0",
-  "torch>=2.4.0",
-  "accelerate>=0.33.0",
-  "fast-langdetect>=1.0.0",
+  "spacy>=3.8.1,<4",
+  "pyahocorasick>=2.0.0,<3",
+  "transformers>=4.44.0,<5",
+  "torch>=2.4.0,<3",
+  "accelerate>=0.33.0,<1",
+  "fast-langdetect>=1.0.0,<2",
   # Utilities
-  "watchdog>=6.0.0",
-  "orjson>=3.10.7",
-  "rich>=13.9.1",
-  "youtube-transcript-api>=1.2.3",
-  "yt-dlp>=2024.3.10",
-  "psycopg2-binary>=2.9.11",
+  "watchdog>=6.0.0,<7",
+  "orjson>=3.10.7,<4",
+  "rich>=13.9.1,<14",
+  "youtube-transcript-api>=1.2.3,<2",
+  "yt-dlp>=2024.3.10,<2025",
+  "psycopg2-binary>=2.9.11,<3",
+  "pyjwt>=2.10.1,<3",
+  "cryptography>=46.0.3,<47",
 ]
 
 [project.optional-dependencies]
@@ -119,6 +121,8 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 cache_dir = ".cache/mypy"
+explicit_package_bases = true
+namespace_packages = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["apps", "packages"]

@@ -12,11 +12,11 @@ authors = [{ name = "Jacob Magar", email = "jmagar@gmail.com" }]
 license = { text = "Proprietary" }
 
 dependencies = [
-  "fastapi>=0.119.0",
-  "uvicorn>=0.37.0",
-  "pydantic>=2.12.0",
-  "python-dotenv>=1.1.1",
-  "python-json-logger>=4.0.0",
+  "fastapi>=0.119.0,<1",
+  "uvicorn>=0.37.0,<1",
+  "pydantic>=2.12.0,<3",
+  "python-dotenv>=1.1.1,<2",
+  "python-json-logger>=4.0.0,<5",
 ]
 
 [project.optional-dependencies]

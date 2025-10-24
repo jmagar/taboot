@@ -12,12 +12,12 @@ authors = [{ name = "Jacob Magar", email = "jmagar@gmail.com" }]
 license = { text = "Proprietary" }
 
 dependencies = [
-  "PyGithub>=2.8.1",
-  "praw>=7.8.1",
-  "google-auth-oauthlib>=1.2.2",
-  "google-api-python-client>=2.184.0",
-  "elasticsearch>=9.1.1",
-  "pydantic>=2.12.0",
+  "PyGithub>=2.8.1,<3",
+  "praw>=7.8.1,<8",
+  "google-auth-oauthlib>=1.2.2,<2",
+  "google-api-python-client>=2.184.0,<3",
+  "elasticsearch>=9.1.1,<10",
+  "pydantic>=2.12.0,<3",
 ]
 
 [project.optional-dependencies]

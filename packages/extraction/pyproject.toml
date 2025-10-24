@@ -12,11 +12,11 @@ authors = [{ name = "Jacob Magar", email = "jmagar@gmail.com" }]
 license = { text = "Proprietary" }
 
 dependencies = [
-  "spacy>=3.8.1",
-  "pyahocorasick>=2.0.0",
-  "transformers>=4.44.0",
-  "torch>=2.4.0",
-  "pydantic>=2.12.0",
+  "spacy>=3.8.1,<4",
+  "pyahocorasick>=2.0.0,<3",
+  "transformers>=4.44.0,<5",
+  "torch>=2.4.0,<3",
+  "pydantic>=2.12.0,<3",
 ]
 
 [project.optional-dependencies]

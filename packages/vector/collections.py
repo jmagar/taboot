@@ -18,6 +18,7 @@ from qdrant_client.http import models
 from qdrant_client.http.exceptions import UnexpectedResponse
 
 from packages.common.logging import get_logger
+from packages.common.tracing import get_correlation_id
 
 logger = get_logger(__name__)
 
@@ -25,7 +26,7 @@ logger = get_logger(__name__)
 class CollectionCreationError(Exception):
     """Raised when collection creation fails (excluding 409 conflicts)."""
 
-    pass
+    ...
 
 
 def load_collection_config() -> dict[str, Any]:
@@ -62,7 +63,7 @@ def load_collection_config() -> dict[str, Any]:
         / "qdrant-collection.json"
     )
 
-    correlation_id = str(uuid.uuid4())
+    correlation_id = get_correlation_id() or str(uuid.uuid4())
     logger.info(
         "Loading collection configuration",
         extra={
@@ -85,12 +86,11 @@ def load_collection_config() -> dict[str, Any]:
         with contract_path.open(encoding="utf-8") as f:
             config: dict[str, Any] = json.load(f)
     except json.JSONDecodeError as e:
-        logger.error(
+        logger.exception(
             "Failed to parse collection config JSON",
             extra={
                 "correlation_id": correlation_id,
                 "config_path": str(contract_path),
-                "error": str(e),
             },
         )
         raise
@@ -106,7 +106,7 @@ def load_collection_config() -> dict[str, Any]:
     ]
     missing_fields = [field for field in required_fields if field not in config]
     if missing_fields:
-        logger.error(
+        logger.exception(
             "Collection config missing required fields",
             extra={
                 "correlation_id": correlation_id,
@@ -117,7 +117,7 @@ def load_collection_config() -> dict[str, Any]:
 
     vector_size = config["vectors"].get("size")
     if not isinstance(vector_size, int) or vector_size <= 0:
-        logger.error(
+        logger.exception(
             "Invalid vector size in collection config",
             extra={
                 "correlation_id": correlation_id,
@@ -132,7 +132,7 @@ def load_collection_config() -> dict[str, Any]:
 
     distance_name = distance_value.upper()
     if distance_name not in models.Distance.__members__:
-        logger.error(
+        logger.exception(
             "Invalid distance metric in collection config",
             extra={
                 "correlation_id": correlation_id,
@@ -195,7 +195,7 @@ def create_collection(client: QdrantClient, collection_name: str) -> None:
         >>> client = QdrantClient(url="http://localhost:6333")
         >>> create_collection(client, "documents")
     """
-    correlation_id = str(uuid.uuid4())
+    correlation_id = get_correlation_id() or str(uuid.uuid4())
     logger.info(
         "Creating collection",
         extra={
@@ -245,7 +245,7 @@ def create_collection(client: QdrantClient, collection_name: str) -> None:
         )
 
     except KeyError as e:
-        logger.error(
+        logger.exception(
             "Collection config missing required parameter",
             extra={
                 "correlation_id": correlation_id,
@@ -283,13 +283,12 @@ def create_collection(client: QdrantClient, collection_name: str) -> None:
             return
 
         # 500 Internal Server Error or other unexpected error
-        logger.error(
+        logger.exception(
             "Failed to create collection",
             extra={
                 "correlation_id": correlation_id,
                 "collection_name": collection_name,
                 "status_code": e.status_code,
-                "error": str(e),
             },
         )
         raise CollectionCreationError(
@@ -297,12 +296,11 @@ def create_collection(client: QdrantClient, collection_name: str) -> None:
         ) from e
     except Exception as e:
         # Network errors or other unexpected failures
-        logger.error(
+        logger.exception(
             "Failed to create collection due to network or unexpected error",
             extra={
                 "correlation_id": correlation_id,
                 "collection_name": collection_name,
-                "error": str(e),
                 "error_type": type(e).__name__,
             },
         )
@@ -339,7 +337,7 @@ async def create_qdrant_collections() -> None:
 # Export public API
 __all__ = [
     "CollectionCreationError",
-    "load_collection_config",
     "create_collection",
     "create_qdrant_collections",
+    "load_collection_config",
 ]

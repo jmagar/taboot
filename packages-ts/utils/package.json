@@ -1,0 +1,41 @@
+{
+  "name": "@taboot/utils",
+  "version": "0.4.0",
+  "private": true,
+  "exports": {
+    ".": {
+      "default": "./dist/index.js",
+      "types": "./src/index.ts"
+    },
+    "./helpers": {
+      "default": "./dist/helpers/index.js",
+      "types": "./src/helpers/index.ts"
+    },
+    "./schemas": {
+      "default": "./dist/schemas/index.js",
+      "types": "./src/schemas/index.ts"
+    },
+    "./types": {
+      "default": "./dist/types/index.js",
+      "types": "./src/types/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo node_modules",
+    "dev": "tsc --build --watch",
+    "lint": "eslint . --max-warnings 0"
+  },
+  "prettier": "@taboot/prettier-config",
+  "dependencies": {
+    "date-fns": "catalog:core",
+    "zod": "catalog:core"
+  },
+  "devDependencies": {
+    "@taboot/eslint-config": "workspace:^",
+    "@taboot/prettier-config": "workspace:*",
+    "@taboot/typescript-config": "workspace:*",
+    "typescript": "5.9.2"
+  }
+}

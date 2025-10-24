@@ -1,19 +1,20 @@
 """Tests for graph node Pydantic models (Neo4j entities)."""
 
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
 from pydantic import ValidationError
 
 from packages.schemas.models import (
-    Service,
-    Host,
     IP,
-    Proxy,
     Endpoint,
-    IPType,
-    IPAllocation,
-    ProxyType,
+    Host,
     HttpMethod,
+    IPAllocation,
+    IPType,
+    Proxy,
+    ProxyType,
+    Service,
 )
 
 
@@ -22,7 +23,7 @@ class TestService:
 
     def test_valid_service(self) -> None:
         """Test valid Service node."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         service = Service(
             name="api-service",
@@ -44,7 +45,7 @@ class TestService:
 
     def test_service_name_required(self) -> None:
         """Test that name is required."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Service(created_at=now, updated_at=now)
@@ -54,7 +55,7 @@ class TestService:
 
     def test_service_name_max_length(self) -> None:
         """Test that name has max length of 256 chars."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Service(name="x" * 257, created_at=now, updated_at=now)
@@ -68,7 +69,7 @@ class TestHost:
 
     def test_valid_host(self) -> None:
         """Test valid Host node."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         host = Host(
             hostname="server01.example.com",
@@ -88,7 +89,7 @@ class TestHost:
 
     def test_host_hostname_required(self) -> None:
         """Test that hostname is required."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Host(created_at=now, updated_at=now)
@@ -98,7 +99,7 @@ class TestHost:
 
     def test_host_hostname_max_length(self) -> None:
         """Test that hostname has max length of 256 chars."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Host(hostname="x" * 257, created_at=now, updated_at=now)
@@ -112,7 +113,7 @@ class TestIP:
 
     def test_valid_ipv4(self) -> None:
         """Test valid IPv4 address."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         ip = IP(
             addr="192.168.1.10",
@@ -129,7 +130,7 @@ class TestIP:
 
     def test_valid_ipv6(self) -> None:
         """Test valid IPv6 address."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         ip = IP(
             addr="2001:0db8:85a3::8a2e:0370:7334",
@@ -144,7 +145,7 @@ class TestIP:
 
     def test_valid_cidr(self) -> None:
         """Test valid CIDR notation."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         ip = IP(
             addr="10.0.0.0/24",
@@ -158,7 +159,7 @@ class TestIP:
 
     def test_ip_addr_required(self) -> None:
         """Test that addr is required."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             IP(ip_type=IPType.V4, allocation=IPAllocation.STATIC, created_at=now, updated_at=now)
@@ -168,7 +169,7 @@ class TestIP:
 
     def test_ip_type_required(self) -> None:
         """Test that ip_type is required."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             IP(addr="192.168.1.10", allocation=IPAllocation.STATIC, created_at=now, updated_at=now)
@@ -182,7 +183,7 @@ class TestProxy:
 
     def test_valid_proxy(self) -> None:
         """Test valid Proxy node."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         proxy = Proxy(
             name="nginx-proxy",
@@ -199,7 +200,7 @@ class TestProxy:
 
     def test_proxy_swag_type(self) -> None:
         """Test SWAG proxy type."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         proxy = Proxy(
             name="swag",
@@ -212,7 +213,7 @@ class TestProxy:
 
     def test_proxy_name_required(self) -> None:
         """Test that name is required."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Proxy(proxy_type=ProxyType.NGINX, created_at=now, updated_at=now)
@@ -222,7 +223,7 @@ class TestProxy:
 
     def test_proxy_type_required(self) -> None:
         """Test that proxy_type is required."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Proxy(name="proxy", created_at=now, updated_at=now)
@@ -236,7 +237,7 @@ class TestEndpoint:
 
     def test_valid_endpoint(self) -> None:
         """Test valid Endpoint node."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         endpoint = Endpoint(
             service="api-service",
@@ -257,7 +258,7 @@ class TestEndpoint:
 
     def test_endpoint_all_methods(self) -> None:
         """Test all HTTP method enums."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         methods = [
             HttpMethod.GET,
@@ -280,7 +281,7 @@ class TestEndpoint:
 
     def test_endpoint_service_required(self) -> None:
         """Test that service is required."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Endpoint(method=HttpMethod.GET, path="/test", created_at=now, updated_at=now)
@@ -290,7 +291,7 @@ class TestEndpoint:
 
     def test_endpoint_method_required(self) -> None:
         """Test that method is required."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Endpoint(service="api", path="/test", created_at=now, updated_at=now)
@@ -300,7 +301,7 @@ class TestEndpoint:
 
     def test_endpoint_path_required(self) -> None:
         """Test that path is required."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Endpoint(service="api", method=HttpMethod.GET, created_at=now, updated_at=now)
@@ -310,7 +311,7 @@ class TestEndpoint:
 
     def test_endpoint_path_max_length(self) -> None:
         """Test that path has max length of 512 chars."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Endpoint(
@@ -326,7 +327,7 @@ class TestEndpoint:
 
     def test_endpoint_rate_limit_non_negative(self) -> None:
         """Test that rate_limit must be non-negative."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Endpoint(

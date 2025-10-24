@@ -7,15 +7,12 @@ Required by FR-045: API MUST provide extraction endpoints with job tracking.
 """
 
 import logging
-import os
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from redis import asyncio as redis
 
 from apps.api.deps.auth import verify_api_key
-
 from packages.common.health import check_system_health
 from packages.core.use_cases.extract_pending import ExtractPendingUseCase
 from packages.core.use_cases.get_status import (

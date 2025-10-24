@@ -1,6 +1,7 @@
 """Tests for custom retrieval prompts with inline citations."""
 
 import pytest
+
 from packages.retrieval.context.prompts import get_qa_prompt_template, get_synthesis_prompt
 
 

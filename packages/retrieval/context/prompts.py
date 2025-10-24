@@ -1,6 +1,5 @@
 """Custom prompts for retrieval with inline citation formatting."""
 
-from typing import Optional
 
 
 def get_qa_prompt_template() -> str:

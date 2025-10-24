@@ -4,7 +4,6 @@ Tests semantic chunking using LlamaIndex SentenceSplitter.
 Following TDD methodology (RED-GREEN-REFACTOR).
 """
 
-import pytest
 from llama_index.core import Document
 
 

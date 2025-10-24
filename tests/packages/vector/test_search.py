@@ -1,10 +1,10 @@
 """Tests for Qdrant vector search with metadata filters."""
 
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, UTC
-from uuid import uuid4
+
 from packages.vector.search import VectorSearch
-from packages.schemas.models import Chunk
 
 
 @pytest.mark.unit

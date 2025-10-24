@@ -1,6 +1,7 @@
 """Tests for query orchestration use-case."""
 
 import pytest
+
 from packages.core.use_cases.query import execute_query
 
 
@@ -42,7 +43,7 @@ def test_execute_query_with_real_services(qdrant_client, neo4j_client):
 @pytest.mark.unit
 def test_execute_query_with_filters():
     """Test query with source type and date filters."""
-    from datetime import datetime, UTC
+    from datetime import UTC, datetime
 
     # Should not raise error
     result = execute_query(

@@ -1,6 +1,7 @@
 """Tests for hybrid retriever combining vector search and graph traversal."""
 
 import pytest
+
 from packages.retrieval.retrievers.hybrid import HybridRetriever
 
 

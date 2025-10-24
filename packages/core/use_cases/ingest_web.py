@@ -13,18 +13,20 @@ from uuid import uuid4
 
 from llama_index.core import Document as LlamaDocument
 
-from packages.common.postgres_document_store import PostgresDocumentStore
+from packages.clients.postgres_document_store import PostgresDocumentStore
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
 from packages.ingest.normalizer import Normalizer
 from packages.ingest.readers.web import WebReader
 from packages.schemas.models import (
     Chunk,
-    Document as DocumentModel,
     ExtractionState,
     IngestionJob,
     JobState,
     SourceType,
+)
+from packages.schemas.models import (
+    Document as DocumentModel,
 )
 from packages.vector.writer import QdrantWriter
 

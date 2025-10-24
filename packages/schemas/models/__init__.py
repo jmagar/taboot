@@ -5,13 +5,12 @@ Includes relational entities (Document, Chunk, IngestionJob, ExtractionJob, Extr
 and graph node models (Service, Host, IP, Proxy, Endpoint).
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
-
 
 # ========== Enums ==========
 
@@ -241,7 +240,7 @@ class ExtractionWindow(BaseModel):
         """
         from datetime import timezone
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if v > now:
             raise ValueError("processed_at cannot be in the future")
         return v
@@ -285,7 +284,7 @@ class ExtractionJob(BaseModel):
 
         from datetime import timezone
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if v > now:
             raise ValueError("started_at cannot be in the future")
         return v
@@ -317,7 +316,18 @@ class ExtractionJob(BaseModel):
 # ========== Graph Node Models ==========
 
 
-class Service(BaseModel):
+class GraphNodeBase(BaseModel):
+    """Base model for graph node entities with common timestamp and metadata fields."""
+
+    metadata: dict[str, Any] | None = Field(default=None, description="Arbitrary metadata")
+    created_at: datetime = Field(..., description="Node creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+    extraction_version: str | None = Field(
+        default=None, max_length=64, description="Extractor version"
+    )
+
+
+class Service(GraphNodeBase):
     """Service node entity (Neo4j).
 
     Per data-model.md: Represents a software service/application.
@@ -329,17 +339,9 @@ class Service(BaseModel):
         default=None, max_length=512, description="Docker image or binary path"
     )
     version: str | None = Field(default=None, max_length=64, description="Version or tag")
-    metadata: dict[str, Any] | None = Field(
-        default=None, description="Arbitrary metadata"
-    )
-    created_at: datetime = Field(..., description="Node creation timestamp")
-    updated_at: datetime = Field(..., description="Last update timestamp")
-    extraction_version: str | None = Field(
-        default=None, max_length=64, description="Extractor version"
-    )
 
 
-class Host(BaseModel):
+class Host(GraphNodeBase):
     """Host node entity (Neo4j).
 
     Per data-model.md: Represents a physical or virtual machine.
@@ -351,15 +353,9 @@ class Host(BaseModel):
     )
     os: str | None = Field(default=None, max_length=128, description="Operating system")
     location: str | None = Field(default=None, max_length=256, description="Location")
-    metadata: dict[str, Any] | None = Field(default=None, description="Arbitrary metadata")
-    created_at: datetime = Field(..., description="Node creation timestamp")
-    updated_at: datetime = Field(..., description="Last update timestamp")
-    extraction_version: str | None = Field(
-        default=None, max_length=64, description="Extractor version"
-    )
 
 
-class IP(BaseModel):
+class IP(GraphNodeBase):
     """IP address node entity (Neo4j).
 
     Per data-model.md: Represents an IP address.
@@ -370,15 +366,9 @@ class IP(BaseModel):
     )
     ip_type: IPType = Field(..., description="IPv4 or IPv6")
     allocation: IPAllocation = Field(..., description="Allocation method")
-    metadata: dict[str, Any] | None = Field(default=None, description="Arbitrary metadata")
-    created_at: datetime = Field(..., description="Node creation timestamp")
-    updated_at: datetime = Field(..., description="Last update timestamp")
-    extraction_version: str | None = Field(
-        default=None, max_length=64, description="Extractor version"
-    )
 
 
-class Proxy(BaseModel):
+class Proxy(GraphNodeBase):
     """Proxy node entity (Neo4j).
 
     Per data-model.md: Represents a reverse proxy or gateway.
@@ -389,15 +379,9 @@ class Proxy(BaseModel):
     config_path: str | None = Field(
         default=None, max_length=512, description="Config file path"
     )
-    metadata: dict[str, Any] | None = Field(default=None, description="Arbitrary metadata")
-    created_at: datetime = Field(..., description="Node creation timestamp")
-    updated_at: datetime = Field(..., description="Last update timestamp")
-    extraction_version: str | None = Field(
-        default=None, max_length=64, description="Extractor version"
-    )
 
 
-class Endpoint(BaseModel):
+class Endpoint(GraphNodeBase):
     """Endpoint node entity (Neo4j).
 
     Per data-model.md: Represents an HTTP/API endpoint.
@@ -412,12 +396,6 @@ class Endpoint(BaseModel):
     )
     rate_limit: int | None = Field(
         default=None, ge=0, description="Requests per minute"
-    )
-    metadata: dict[str, Any] | None = Field(default=None, description="Arbitrary metadata")
-    created_at: datetime = Field(..., description="Node creation timestamp")
-    updated_at: datetime = Field(..., description="Last update timestamp")
-    extraction_version: str | None = Field(
-        default=None, max_length=64, description="Extractor version"
     )
 
 
@@ -441,6 +419,7 @@ __all__ = [
     "ExtractionWindow",
     "ExtractionJob",
     # Graph node models
+    "GraphNodeBase",  # noqa: RUF022
     "Service",
     "Host",
     "IP",

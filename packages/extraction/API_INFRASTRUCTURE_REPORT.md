@@ -515,7 +515,7 @@ def get_ingest_use_case() -> IngestWebUseCase:
     """Dependency factory for IngestWebUseCase."""
     from packages.common.config import get_config
     from packages.common.db_schema import get_postgres_client
-    from packages.common.postgres_document_store import PostgresDocumentStore
+    from packages.clients.postgres_document_store import PostgresDocumentStore
 
     config = get_config()
 

@@ -1,45 +1,71 @@
-# Web App
+# Next.js Turborepo App
 
-Optional Next.js dashboard for monitoring crawls, ingestion pipelines, and
-extraction health. It consumes the public API exposed by `taboot-app`.
-
-## Architecture
-
-- Keep page and layout components under `apps/web/pages/` and feature modules in
-  `apps/web/features/` (create directories as we implement them).
-- Fetch data via generated clients in `packages/clients`—do not hardcode API
-  payload shapes.
-- Centralize shared hooks/state in `apps/web/lib/` once scaffolded.
+This is a Next.js application managed in a Turborepo monorepo setup. It comes with database and authentication setup.
 
 ## Setup
 
-```bash
-pnpm install                     # once per checkout
-pnpm dev --filter web -- --port 5173
-```
-
-Set `NEXT_PUBLIC_API_URL` in `.env` so the web client points at the correct
-backend (defaults to `http://localhost:8000`). When running inside the compose
-stack, the `taboot-app` container injects this value automatically.
-
-## Build & lint
+### 1. Install Dependencies
 
 ```bash
-pnpm lint --filter web
-pnpm build --filter web
+pnpm install
 ```
 
-Add component stories, integration tests, and API client hooks in this package.
-Generated API clients live under `packages/clients`—import from there rather
-than re-declaring schemas.
+### 2. Environment Variables
 
-## Testing
+Copy the example environment file:
 
 ```bash
-pnpm test --filter web              # once tests are in place
-pnpm lint --filter web
-pnpm build --filter web
+cp .env.example .env.local
 ```
 
-Place Playwright/Storybook/integration suites under `apps/web/tests/`
-mirroring component structure when the testing scaffold is added.
+Then, update the variables in your `.env.local` file:
+
+#### Database
+
+Set your database connection URL:
+
+```env
+DATABASE_URL=your-database-connection-string
+```
+
+For example, a PostgreSQL URL:
+
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/mydb
+```
+
+> [!NOTE]
+> You also need to update the same DATABASE_URL in the packages/db/.env file (by copying the contents of .env.example in the packages/db/ directory), as Prisma reads it from there.
+
+#### Auth.js Secret
+
+Set your Better Auth development secret:
+
+```env
+BETTER_AUTH_SECRET=your-dev-secret
+```
+
+You can generate a random secret using Node.js:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+### 3. Database Setup
+
+Run migrations or generate the client:
+
+- Navigate to the `packages/db` directory and run:
+
+```bash
+pnpm db:generate
+pnpm db:migrate
+```
+
+### 4. Run the App
+
+```bash
+pnpm dev
+```
+
+Visit [http://localhost:3000](http://localhost:3000) to see the app running.

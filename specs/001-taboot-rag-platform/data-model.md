@@ -18,7 +18,8 @@ Represents an ingested document from any source.
 **Fields**:
 - `doc_id`: UUID (primary key, generated on ingestion)
 - `source_url`: str (original source URL or identifier, max 2048 chars)
-- `source_type`: enum (`web`, `github`, `reddit`, `youtube`, `gmail`, `elasticsearch`, `docker_compose`, `swag`, `tailscale`, `unifi`, `ai_session`)
+- `source_type`: enum (web, GitHub, Reddit, YouTube, Gmail, Elasticsearch, Docker Compose, SWAG, Tailscale, UniFi, AI Session)
+  - *Note: Enum values stored lowercase (`web`, `github`, `reddit`, `youtube`, etc.); docs use proper casing for readability*
 - `content_hash`: str (SHA-256 hex digest of normalized content, 64 chars)
 - `ingested_at`: datetime (UTC timestamp of ingestion)
 - `extraction_state`: enum (`pending`, `tier_a_done`, `tier_b_done`, `tier_c_done`, `completed`, `failed`)
@@ -545,7 +546,7 @@ Represents an extraction task for a document.
 
 ### Document Extraction State
 
-```
+```text
 pending
   ↓
 tier_a_done (Deterministic extraction complete)
@@ -578,4 +579,4 @@ This data model defines:
 - **Validation rules**: Field constraints, uniqueness, foreign keys, state transitions
 - **Indexes**: Primary keys, composite indexes for query performance
 
-All fields have explicit validation rules. All relationships have confidence scores and extraction provenance. All nodes/relationships are versioned for reprocessing.
+Fields enforce explicit validation rules; relationships include confidence scores and extraction provenance; nodes and relationships are versioned to support reprocessing.

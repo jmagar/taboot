@@ -6,7 +6,6 @@ Following TDD methodology - these tests should fail until T024 implements db_sch
 
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
@@ -230,11 +229,11 @@ def test_verify_schema_query_structure(test_config: TabootConfig, mocker: Any) -
 @pytest.mark.integration
 def test_document_content_table_exists():
     """Test that document_content table is created in schema."""
-    from packages.common.db_schema import create_postgresql_schema, get_postgres_client
-
     # Ensure schema is created
     # This is async but we need to run it synchronously for this test
     import asyncio
+
+    from packages.common.db_schema import create_postgresql_schema, get_postgres_client
     asyncio.run(create_postgresql_schema())
 
     conn = get_postgres_client()

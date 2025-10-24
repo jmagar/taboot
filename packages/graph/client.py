@@ -10,9 +10,9 @@ Implements requirements from data-model.md and follows project standards:
 - Correlation ID tracking
 """
 
+from collections.abc import Generator
 from contextlib import contextmanager
 from types import TracebackType
-from typing import Generator
 
 from neo4j import Driver, GraphDatabase, Session
 from neo4j.exceptions import Neo4jError, ServiceUnavailable
@@ -102,11 +102,12 @@ class Neo4jClient:
             self._driver = GraphDatabase.driver(
                 self._config.neo4j_uri,
                 auth=(self._config.neo4j_user, self._config.neo4j_password),
-                database=self._config.neo4j_db,
             )
 
-            # Verify connectivity immediately (fail early)
+            # Verify connectivity and target database immediately (fail early)
             self._driver.verify_connectivity()
+            with self._driver.session(database=self._config.neo4j_db) as session:
+                session.run("RETURN 1").consume()
 
             logger.info(
                 "Neo4j connection established",
@@ -190,8 +191,10 @@ class Neo4jClient:
 
         try:
             self._driver.verify_connectivity()
+            with self._driver.session(database=self._config.neo4j_db) as session:
+                session.run("RETURN 1").consume()
             return True
-        except (Neo4jError, ServiceUnavailable, Exception) as e:
+        except (Neo4jError, ServiceUnavailable) as e:
             logger.warning(
                 "Neo4j health check failed",
                 extra={

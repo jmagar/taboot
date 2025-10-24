@@ -1,6 +1,5 @@
 import os
 from functools import lru_cache
-from typing import List
 
 import torch
 from fastapi import FastAPI, HTTPException
@@ -10,16 +9,16 @@ from sentence_transformers import CrossEncoder
 
 class RerankRequest(BaseModel):
     query: str = Field(..., description="User query text.")
-    documents: List[str] = Field(
+    documents: list[str] = Field(
         ..., description="Candidate documents ordered arbitrarily."
     )
 
 
 class RerankResponse(BaseModel):
-    scores: List[float] = Field(
+    scores: list[float] = Field(
         ..., description="Score per document (aligned with input order)."
     )
-    ranking: List[int] = Field(
+    ranking: list[int] = Field(
         ...,
         description="Indices into the input list sorted from highest to lowest score.",
     )

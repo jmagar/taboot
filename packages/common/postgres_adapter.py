@@ -5,7 +5,7 @@ using synchronous psycopg2 connection.
 """
 
 import logging
-from typing import Optional
+from typing import Any, cast
 
 from psycopg2.extensions import connection
 
@@ -33,8 +33,8 @@ class PostgresDocumentsClient:
         self,
         limit: int,
         offset: int,
-        source_type: Optional[SourceType] = None,
-        extraction_state: Optional[ExtractionState] = None,
+        source_type: SourceType | None = None,
+        extraction_state: ExtractionState | None = None,
     ) -> list[Document]:
         """Fetch documents with filters and pagination.
 
@@ -48,7 +48,7 @@ class PostgresDocumentsClient:
             List of Document instances.
         """
         query = "SELECT * FROM documents WHERE 1=1"
-        params: list = []
+        params: list[str | int] = []
 
         if source_type:
             query += " AND source_type = %s"
@@ -62,15 +62,15 @@ class PostgresDocumentsClient:
         params.extend([limit, offset])
 
         with self.conn.cursor() as cur:
-            cur.execute(query, params)
+            cur.execute(query, tuple(params))
             rows = cur.fetchall()
 
-        return [Document(**row) for row in rows]
+        return [Document(**cast(dict[str, Any], row)) for row in rows]
 
     async def count_documents(
         self,
-        source_type: Optional[SourceType] = None,
-        extraction_state: Optional[ExtractionState] = None,
+        source_type: SourceType | None = None,
+        extraction_state: ExtractionState | None = None,
     ) -> int:
         """Count total documents matching filters.
 
@@ -82,7 +82,7 @@ class PostgresDocumentsClient:
             Total count of matching documents.
         """
         query = "SELECT COUNT(*) as count FROM documents WHERE 1=1"
-        params: list = []
+        params: list[str | int] = []
 
         if source_type:
             query += " AND source_type = %s"
@@ -93,7 +93,7 @@ class PostgresDocumentsClient:
             params.append(extraction_state.value)
 
         with self.conn.cursor() as cur:
-            cur.execute(query, params)
+            cur.execute(query, tuple(params))
             row = cur.fetchone()
 
-        return row["count"] if row else 0
+        return int(cast(dict[str, Any], row)["count"]) if row else 0

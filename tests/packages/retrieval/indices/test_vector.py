@@ -1,10 +1,10 @@
 """Tests for VectorStoreIndex over Qdrant."""
 
-import os
 import pytest
-from packages.retrieval.indices.vector import create_vector_index
 from llama_index.core import Settings
 from llama_index.embeddings.text_embeddings_inference import TextEmbeddingsInference
+
+from packages.retrieval.indices.vector import create_vector_index
 
 
 @pytest.mark.integration

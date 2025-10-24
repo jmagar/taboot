@@ -1,6 +1,5 @@
 """Tests for Tier A entity pattern matching using Aho-Corasick."""
 
-import pytest
 from packages.extraction.tier_a.patterns import EntityPatternMatcher
 
 

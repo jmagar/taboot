@@ -5,8 +5,8 @@ Follows TDD RED-GREEN-REFACTOR methodology.
 """
 
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -23,7 +23,7 @@ def mock_db_client():
 @pytest.fixture
 def sample_documents():
     """Sample documents for testing."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return [
         Document(
             doc_id=uuid.uuid4(),

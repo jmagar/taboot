@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from neo4j import Driver
 from neo4j.exceptions import Neo4jError
 
 from packages.common.config import TabootConfig
@@ -88,8 +87,8 @@ class TestConstraintCreation:
         """
         # Import will fail until T020 implements this
         from packages.graph.constraints import (
-            create_constraints,
             ConstraintCreationError,
+            create_constraints,
         )
 
         # Setup mock session that raises error

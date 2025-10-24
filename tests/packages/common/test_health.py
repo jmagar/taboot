@@ -3,8 +3,9 @@
 Following TDD: Write tests first (RED), then implement to pass (GREEN).
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from packages.common.config import TabootConfig
 from packages.common.health import (

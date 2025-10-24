@@ -1,18 +1,26 @@
 """ExtractPendingUseCase - Core orchestration for pending document extraction.
 
 Orchestrates the extraction of pending documents:
-DocumentStore → ExtractionOrchestrator → DocumentStore (update state)
+DocumentStore → ExtractionOrchestratorPort → DocumentStore (update state)
 
 With per-document error handling and batch summary statistics.
 """
 
 import logging
-from typing import Any, Protocol
+from typing import Protocol
+from uuid import UUID
 
-from packages.extraction.orchestrator import ExtractionOrchestrator
 from packages.schemas.models import Document, ExtractionJob, ExtractionState
 
 logger = logging.getLogger(__name__)
+
+
+class ExtractionOrchestratorPort(Protocol):
+    """Port for extraction orchestrator (dependency inversion)."""
+
+    async def process_document(self, doc_id: UUID, content: str) -> ExtractionJob:
+        """Process a single document through extraction pipeline."""
+        ...
 
 
 class DocumentStore(Protocol):
@@ -33,7 +41,7 @@ class DocumentStore(Protocol):
         """
         ...
 
-    def get_content(self, doc_id: Any) -> str:
+    def get_content(self, doc_id: UUID) -> str:
         """Get document text content by doc_id.
 
         Args:
@@ -58,26 +66,26 @@ class ExtractPendingUseCase:
 
     Orchestrates the extraction pipeline:
     1. Query pending documents from store
-    2. For each document, call ExtractionOrchestrator.process_document()
+    2. For each document, call ExtractionOrchestratorPort.process_document()
     3. Update document extraction_state based on ExtractionJob result
     4. Return summary statistics
 
-    NO framework dependencies - only imports from adapter packages.
+    NO framework dependencies - only imports from packages.schemas and packages.common.
 
     Attributes:
-        orchestrator: ExtractionOrchestrator for multi-tier extraction.
+        orchestrator: ExtractionOrchestratorPort for multi-tier extraction.
         document_store: DocumentStore for persistence operations.
     """
 
     def __init__(
         self,
-        orchestrator: ExtractionOrchestrator,
+        orchestrator: ExtractionOrchestratorPort,
         document_store: DocumentStore,
     ) -> None:
         """Initialize ExtractPendingUseCase with dependencies.
 
         Args:
-            orchestrator: ExtractionOrchestrator instance for extraction.
+            orchestrator: ExtractionOrchestratorPort instance for extraction.
             document_store: DocumentStore instance for persistence.
         """
         self.orchestrator = orchestrator
@@ -108,9 +116,9 @@ class ExtractPendingUseCase:
                 - failed: Documents that failed extraction
         """
         # Step 1: Query pending documents
-        logger.info(f"Querying pending documents (limit={limit})")
+        logger.info("Querying pending documents (limit=%s)", limit)
         pending_docs = self.document_store.query_pending(limit=limit)
-        logger.info(f"Found {len(pending_docs)} pending documents")
+        logger.info("Found %s pending documents", len(pending_docs))
 
         # Early exit for empty queue
         if not pending_docs:
@@ -128,8 +136,11 @@ class ExtractPendingUseCase:
                 # Log progress every 10 documents
                 if processed > 0 and processed % 10 == 0:
                     logger.info(
-                        f"Progress: {processed}/{len(pending_docs)} documents processed "
-                        f"(succeeded={succeeded}, failed={failed})"
+                        "Progress: %s/%s documents processed (succeeded=%s, failed=%s)",
+                        processed,
+                        len(pending_docs),
+                        succeeded,
+                        failed,
                     )
 
                 # Step 2a: Get document content
@@ -187,4 +198,4 @@ class ExtractPendingUseCase:
 
 
 # Export public API
-__all__ = ["ExtractPendingUseCase", "DocumentStore"]
+__all__ = ["ExtractPendingUseCase", "DocumentStore", "ExtractionOrchestratorPort"]

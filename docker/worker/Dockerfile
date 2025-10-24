@@ -60,5 +60,5 @@ RUN useradd -m -u 10002 taboot && chown -R taboot:taboot /app
 
 USER taboot
 
-CMD ["llama", "worker", "start"]
+CMD ["python", "-m", "apps.worker.main"]
 

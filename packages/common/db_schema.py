@@ -5,7 +5,6 @@ schema, and verifying table existence. Used during initialization (taboot init).
 """
 
 from pathlib import Path
-from typing import Any
 
 import psycopg2
 from psycopg2.extensions import connection
@@ -67,14 +66,17 @@ def _get_connection(config: TabootConfig) -> connection:
         raise ConnectionError(f"Failed to connect to PostgreSQL: {e}") from e
 
 
-def create_schema(config: TabootConfig) -> None:
+def create_schema(config: TabootConfig, schema_path: str | None = None) -> None:
     """Create PostgreSQL schema by executing schema SQL file.
 
-    Loads SQL from specs/001-taboot-rag-platform/contracts/postgresql-schema.sql,
-    executes it within a transaction, and commits on success or rolls back on error.
+    Loads SQL from specs/001-taboot-rag-platform/contracts/postgresql-schema.sql
+    (or from custom path if provided), executes it within a transaction, and commits
+    on success or rolls back on error.
 
     Args:
         config: Taboot configuration containing postgres_connection_string.
+        schema_path: Optional path to SQL schema file. If None, defaults to
+            specs/001-taboot-rag-platform/contracts/postgresql-schema.sql.
 
     Raises:
         FileNotFoundError: If schema file doesn't exist.
@@ -85,6 +87,8 @@ def create_schema(config: TabootConfig) -> None:
         >>> from packages.common.config import get_config
         >>> config = get_config()
         >>> create_schema(config)
+        >>> # Or with custom schema path:
+        >>> create_schema(config, schema_path="/custom/schema.sql")
     """
     with TracingContext() as correlation_id:
         logger.info(
@@ -93,20 +97,24 @@ def create_schema(config: TabootConfig) -> None:
         )
 
         # Load schema SQL
-        schema_path = (
-            Path(__file__).resolve().parent.parent.parent
-            / "specs"
-            / "001-taboot-rag-platform"
-            / "contracts"
-            / "postgresql-schema.sql"
-        )
-        sql_content = load_schema_file(schema_path)
+        if schema_path is None:
+            schema_path_obj = (
+                Path(__file__).resolve().parent.parent.parent
+                / "specs"
+                / "001-taboot-rag-platform"
+                / "contracts"
+                / "postgresql-schema.sql"
+            )
+        else:
+            schema_path_obj = Path(schema_path)
+
+        sql_content = load_schema_file(schema_path_obj)
 
         logger.info(
             "Loaded schema SQL",
             extra={
                 "correlation_id": correlation_id,
-                "file_path": str(schema_path),
+                "file_path": str(schema_path_obj),
                 "sql_length": len(sql_content),
             },
         )
@@ -133,15 +141,11 @@ def create_schema(config: TabootConfig) -> None:
         except Exception as e:
             # Rollback on error
             conn.rollback()
-            logger.error(
+            logger.exception(
                 "Schema creation failed, rolling back",
-                extra={
-                    "correlation_id": correlation_id,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                },
+                extra={"correlation_id": correlation_id},
             )
-            raise
+            raise RuntimeError("Schema creation failed") from e
 
         finally:
             conn.close()
@@ -222,20 +226,22 @@ async def create_postgresql_schema() -> None:
     Example:
         >>> await create_postgresql_schema()
     """
+    import asyncio
+
     from packages.common.config import get_config
 
     config = get_config()
-    create_schema(config)
+    await asyncio.to_thread(create_schema, config)
 
 
-def get_postgres_client() -> Any:
+def get_postgres_client() -> connection:
     """Get PostgreSQL client connection.
 
     Returns:
-        psycopg2.connection: PostgreSQL connection object with RealDictCursor factory.
+        connection: PostgreSQL connection object with RealDictCursor factory.
 
     Raises:
-        Exception: If connection fails.
+        ConnectionError: If connection fails.
 
     Example:
         >>> conn = get_postgres_client()
@@ -258,11 +264,11 @@ def get_postgres_client() -> Any:
             database=config.postgres_db,
             cursor_factory=RealDictCursor,
         )
-        logger.info(f"PostgreSQL client connected (host={host})")
+        logger.info("PostgreSQL client connected", extra={"host": host})
         return conn
     except psycopg2.Error as e:
-        logger.error(f"Failed to connect to PostgreSQL: {e}")
-        raise
+        logger.exception("Failed to connect to PostgreSQL")
+        raise ConnectionError("Failed to connect to PostgreSQL") from e
 
 
 # Export public API

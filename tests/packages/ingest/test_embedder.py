@@ -4,9 +4,10 @@ Tests batch embedding using Text Embeddings Inference (TEI) service.
 Following TDD methodology (RED-GREEN-REFACTOR).
 """
 
-import pytest
 from unittest.mock import Mock, patch
+
 import httpx
+import pytest
 
 
 class TestEmbedder:

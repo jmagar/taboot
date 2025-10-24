@@ -1,0 +1,22 @@
+{
+  "extends": "@workspace/typescript-config/base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "jsx": "react-jsx"
+  },
+  "references": [
+    {
+      "path": "../db"
+    },
+    {
+      "path": "../email"
+    },
+    {
+      "path": "../rate-limit"
+    }
+  ],
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

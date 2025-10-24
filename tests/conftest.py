@@ -5,7 +5,7 @@ and test data factories used across all test modules.
 """
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -14,17 +14,16 @@ import pytest
 from packages.common.config import TabootConfig
 from packages.schemas.models import (
     Document,
-    SourceType,
     ExtractionState,
-    Service,
     Host,
+    Service,
+    SourceType,
 )
 from tests.utils.mocks import (
     create_mock_neo4j_driver,
     create_mock_qdrant_client,
     create_mock_redis_client,
 )
-
 
 # ========== Test Environment Setup ==========
 
@@ -147,9 +146,9 @@ def sample_document() -> Document:
         source_url="https://example.com/docs/test",
         source_type=SourceType.WEB,
         content_hash="a" * 64,
-        ingested_at=datetime.now(timezone.utc),
+        ingested_at=datetime.now(UTC),
         extraction_state=ExtractionState.PENDING,
-        updated_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(UTC),
     )
 
 
@@ -160,7 +159,7 @@ def sample_service() -> Service:
     Returns:
         Service: A valid Service instance.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return Service(
         name="test-api-service",
         description="Test API service",
@@ -179,7 +178,7 @@ def sample_host() -> Host:
     Returns:
         Host: A valid Host instance.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return Host(
         hostname="test-server-01.example.com",
         ip_addresses=["192.168.1.10", "10.0.0.5"],
@@ -217,9 +216,9 @@ def document_factory() -> Any:
             "source_url": "https://example.com/docs/test",
             "source_type": SourceType.WEB,
             "content_hash": "a" * 64,
-            "ingested_at": datetime.now(timezone.utc),
+            "ingested_at": datetime.now(UTC),
             "extraction_state": ExtractionState.PENDING,
-            "updated_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(UTC),
         }
         defaults.update(kwargs)
         return Document(**defaults)
@@ -246,7 +245,7 @@ def service_factory() -> Any:
         Returns:
             Service: Service instance.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         defaults = {
             "name": f"test-service-{uuid4().hex[:8]}",
             "description": "Test service",

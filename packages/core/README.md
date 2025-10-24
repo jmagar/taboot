@@ -43,14 +43,14 @@ flows. Keep modules small and cohesive.
 ```python
 # packages/core/use_cases/ingest_document.py
 from packages.graph.client import Neo4jClient
-from packages.vector.client import QdrantClient
+from packages.vector.qdrant_client import QdrantClient
 from packages.schemas.models import Document, Chunk
 
 class IngestDocumentUseCase:
     def __init__(self, graph: Neo4jClient, vector: QdrantClient):
         self.graph = graph
         self.vector = vector
-    
+
     def execute(self, doc: Document) -> None:
         # Business logic here
         chunks = self._chunk_document(doc)

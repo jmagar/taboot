@@ -5,7 +5,7 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 """
 
 import logging
-from typing import Optional, Any
+from typing import Any
 
 from llama_index.core import Document
 from llama_index.readers.elasticsearch import ElasticsearchReader as LlamaElasticsearchReader
@@ -55,7 +55,7 @@ class ElasticsearchReader:
         )
 
     def load_data(
-        self, query: dict[str, Any], limit: Optional[int] = None
+        self, query: dict[str, Any], limit: int | None = None
     ) -> list[Document]:
         """Load documents from Elasticsearch.
 
@@ -77,7 +77,7 @@ class ElasticsearchReader:
         reader = LlamaElasticsearchReader(endpoint=self.endpoint, index=self.index)
 
         # Retry logic
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for attempt in range(self.max_retries):
             try:
                 # Load documents

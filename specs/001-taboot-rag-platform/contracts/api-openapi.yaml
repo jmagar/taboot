@@ -25,6 +25,9 @@ tags:
   - name: status
     description: System health and job monitoring
 
+security:
+  - bearerAuth: []
+
 paths:
   /init:
     post:
@@ -45,16 +48,19 @@ paths:
                     enum: [success]
                   neo4j_constraints:
                     type: array
+                    maxItems: 50
                     items:
                       type: string
                     example: ["Service.name UNIQUE", "Host.hostname UNIQUE"]
                   qdrant_collections:
                     type: array
+                    maxItems: 50
                     items:
                       type: string
                     example: ["documents"]
                   services_healthy:
                     type: array
+                    maxItems: 20
                     items:
                       type: string
                     example: ["neo4j", "qdrant", "redis", "tei", "ollama", "firecrawl"]
@@ -308,6 +314,13 @@ paths:
                     example: 0
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token authentication for API access
+
   schemas:
     Error:
       type: object

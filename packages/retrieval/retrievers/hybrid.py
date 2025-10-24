@@ -1,10 +1,11 @@
 """Hybrid retriever combining vector search with graph traversal."""
 
-from typing import List, Dict, Any, Optional
-from packages.vector.search import VectorSearch
-from packages.vector.reranker import Reranker
+from typing import Any
+
 from packages.graph.traversal import GraphTraversal
 from packages.ingest.embedder import get_embedding
+from packages.vector.reranker import Reranker
+from packages.vector.search import VectorSearch
 
 
 class HybridRetriever:
@@ -19,7 +20,7 @@ class HybridRetriever:
         neo4j_password: str,
         reranker_model: str = "Qwen/Qwen3-Reranker-0.6B",
         reranker_device: str = "auto",
-        tei_embedding_url: Optional[str] = None
+        tei_embedding_url: str | None = None
     ):
         """
         Initialize hybrid retriever.
@@ -64,8 +65,8 @@ class HybridRetriever:
         top_k: int = 20,
         rerank_top_n: int = 5,
         max_graph_hops: int = 2,
-        source_types: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
+        source_types: list[str] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Perform hybrid retrieval: vector search → rerank → graph expansion.
 
@@ -122,7 +123,7 @@ class HybridRetriever:
 
         return [combined]
 
-    def _extract_entity_names(self, chunks: List[Dict[str, Any]]) -> List[str]:
+    def _extract_entity_names(self, chunks: list[dict[str, Any]]) -> list[str]:
         """
         Extract entity names mentioned in chunks.
 

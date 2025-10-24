@@ -1,8 +1,9 @@
 """Tests for ExtractionJob Pydantic model."""
 
+from datetime import UTC, datetime
+from uuid import uuid4
+
 import pytest
-from datetime import datetime, timezone
-from uuid import UUID, uuid4
 from pydantic import ValidationError
 
 from packages.schemas.models import ExtractionJob
@@ -41,8 +42,8 @@ class TestExtractionJob:
         """Test valid ExtractionJob in completed state with metrics."""
         job_id = uuid4()
         doc_id = uuid4()
-        started = datetime.now(timezone.utc)
-        completed = datetime.now(timezone.utc)
+        started = datetime.now(UTC)
+        completed = datetime.now(UTC)
 
         job = ExtractionJob(
             job_id=job_id,
@@ -241,8 +242,8 @@ class TestExtractionJob:
 
     def test_started_at_before_completed_at(self) -> None:
         """Test that started_at must be before completed_at."""
-        started = datetime(2025, 10, 21, 12, 0, 0, tzinfo=timezone.utc)
-        completed = datetime(2025, 10, 21, 11, 0, 0, tzinfo=timezone.utc)  # Before started
+        started = datetime(2025, 10, 21, 12, 0, 0, tzinfo=UTC)
+        completed = datetime(2025, 10, 21, 11, 0, 0, tzinfo=UTC)  # Before started
 
         with pytest.raises(ValidationError) as exc_info:
             ExtractionJob(
@@ -262,7 +263,7 @@ class TestExtractionJob:
 
     def test_started_at_not_future(self) -> None:
         """Test that started_at cannot be in the future."""
-        future_time = datetime(2099, 1, 1, tzinfo=timezone.utc)
+        future_time = datetime(2099, 1, 1, tzinfo=UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             ExtractionJob(

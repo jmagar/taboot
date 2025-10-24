@@ -28,7 +28,7 @@ dependencies = [
   "llama-index-readers-youtube-transcript>=0.4.1,<1",
   "llama-index-vector-stores-qdrant>=0.8.6,<1",
   "llama-index-graph-stores-neo4j>=0.5.1,<1",
-  "llama-index-workflows>=0.3.0,<1",
+  "llama-index-workflows>=2,<3",
   "llama-index-storage-docstore-redis>=0.4.1,<1",
   # LLM + embeddings adapters (self-hosted)
   "llama-index-llms-ollama>=0.3.0,<1",

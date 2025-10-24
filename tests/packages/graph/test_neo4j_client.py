@@ -5,7 +5,6 @@ Following TDD methodology: RED phase - tests written before implementation.
 """
 
 import pytest
-from neo4j import Driver
 from neo4j.exceptions import ServiceUnavailable
 
 from packages.graph.client import Neo4jClient, Neo4jConnectionError

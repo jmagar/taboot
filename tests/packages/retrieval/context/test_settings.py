@@ -1,6 +1,7 @@
 """Tests for retrieval settings configuration."""
 
 import pytest
+
 from packages.retrieval.context.settings import RetrievalSettings
 
 

@@ -1,7 +1,8 @@
 """Query orchestration use-case coordinating retrieval and synthesis."""
 
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any
+
 from packages.retrieval.query_engines.qa import QAQueryEngine
 
 
@@ -15,10 +16,10 @@ def execute_query(
     ollama_base_url: str = "http://localhost:11434",
     top_k: int = 20,
     rerank_top_n: int = 5,
-    source_types: Optional[List[str]] = None,
-    after: Optional[datetime] = None,
+    source_types: list[str] | None = None,
+    after: datetime | None = None,
     dry_run: bool = False
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """
     Execute natural language query with hybrid retrieval.
 

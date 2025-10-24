@@ -130,4 +130,4 @@ def get_logger(name: str) -> logging.Logger:
 
 
 # Export public API
-__all__ = ["setup_logging", "get_logger", "CorrelationIdFilter", "CustomJsonFormatter"]
+__all__ = ["CorrelationIdFilter", "CustomJsonFormatter", "get_logger", "setup_logging"]

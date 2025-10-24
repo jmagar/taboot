@@ -1,10 +1,12 @@
 """QA query engine with retrieval, synthesis, and citation formatting."""
 
 import time
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
+
 from llama_index.llms.ollama import Ollama
+
+from packages.retrieval.context.prompts import format_source_list, get_qa_prompt_template
 from packages.retrieval.retrievers.hybrid import HybridRetriever
-from packages.retrieval.context.prompts import get_qa_prompt_template, format_source_list
 
 
 class QAQueryEngine:
@@ -20,7 +22,7 @@ class QAQueryEngine:
         ollama_base_url: str = "http://localhost:11434",
         llm_model: str = "qwen3:4b",
         llm_temperature: float = 0.0,
-        tei_embedding_url: Optional[str] = None
+        tei_embedding_url: str | None = None
     ):
         """
         Initialize QA query engine.
@@ -64,8 +66,8 @@ class QAQueryEngine:
         question: str,
         top_k: int = 20,
         rerank_top_n: int = 5,
-        source_types: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+        source_types: list[str] | None = None
+    ) -> dict[str, Any]:
         """
         Execute query with retrieval and synthesis.
 
@@ -123,7 +125,7 @@ class QAQueryEngine:
             "graph_count": len(retrieval_results[0]["graph_results"]) if retrieval_results else 0
         }
 
-    def _build_context(self, retrieval_results: List[Dict[str, Any]]) -> str:
+    def _build_context(self, retrieval_results: list[dict[str, Any]]) -> str:
         """Build context string from retrieval results."""
         if not retrieval_results:
             return ""
@@ -145,8 +147,8 @@ class QAQueryEngine:
 
     def _extract_sources(
         self,
-        retrieval_results: List[Dict[str, Any]]
-    ) -> List[Tuple[str, str]]:
+        retrieval_results: list[dict[str, Any]]
+    ) -> list[tuple[str, str]]:
         """Extract (title, url) tuples from results."""
         if not retrieval_results:
             return []
@@ -167,7 +169,7 @@ class QAQueryEngine:
 
         return sources
 
-    def format_sources(self, sources: List[Tuple[str, str]]) -> str:
+    def format_sources(self, sources: list[tuple[str, str]]) -> str:
         """Format source list with citations."""
         return format_source_list(sources)
 

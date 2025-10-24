@@ -4,7 +4,6 @@ Tests Unifi Controller API client following TDD methodology (RED-GREEN-REFACTOR)
 Extracts network topology: devices, clients, Host nodes, IP nodes, LOCATED_AT relationships.
 """
 
-from datetime import datetime
 from unittest.mock import Mock, patch
 
 import pytest

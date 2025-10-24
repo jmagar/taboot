@@ -4,7 +4,6 @@ Tests HTML-to-Markdown conversion and boilerplate removal.
 Following TDD methodology (RED-GREEN-REFACTOR).
 """
 
-import pytest
 
 
 class TestNormalizer:

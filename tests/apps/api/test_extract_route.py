@@ -204,9 +204,9 @@ class TestGetExtractStatusEndpoint:
     ) -> None:
         """Test that GET /extract/status returns 200 with stub status data."""
         from packages.core.use_cases.get_status import (
-            SystemStatus,
-            QueueDepth,
             MetricsSnapshot,
+            QueueDepth,
+            SystemStatus,
         )
 
         # Mock the use case factory function
@@ -238,9 +238,9 @@ class TestGetExtractStatusEndpoint:
     def test_extract_status_stub_returns_ready(self, client: TestClient) -> None:
         """Test that stub status returns 'ready' and queue_depth 0."""
         from packages.core.use_cases.get_status import (
-            SystemStatus,
-            QueueDepth,
             MetricsSnapshot,
+            QueueDepth,
+            SystemStatus,
         )
 
         # Mock the use case factory function

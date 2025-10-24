@@ -1,0 +1,47 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": [
+        "FIRECRAWL_API_URL",
+        "REDIS_URL",
+        "QDRANT_URL",
+        "NEO4J_URI",
+        "NEO4J_USER",
+        "NEO4J_PASSWORD",
+        "TEI_EMBEDDING_URL",
+        "RERANKER_URL",
+        "OLLAMA_PORT",
+        "LLAMACRAWL_API_URL"
+      ]
+    },
+    "type-check": {
+      "dependsOn": ["^build"]
+    },
+    "clean": {
+      "cache": false
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^build"],
+      "env": [
+        "NODE_ENV",
+        "FIRECRAWL_API_URL",
+        "REDIS_URL",
+        "QDRANT_URL",
+        "NEO4J_URI"
+      ]
+    },
+    "test": {
+      "outputs": ["coverage/**"],
+      "dependsOn": []
+    }
+  }
+}

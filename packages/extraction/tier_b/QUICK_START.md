@@ -59,7 +59,8 @@ print(entities)
 
 ### Step 1: Install Dependencies
 ```bash
-cd /home/jmagar/code/taboot
+# From repository root
+cd $(git rev-parse --show-toplevel)
 uv add spacy redis orjson pyahocorasick
 python -m spacy download en_core_web_md
 ```
@@ -354,9 +355,9 @@ print(extractor.batch_size)
 
 ## Full Documentation
 
-- **Complete Implementation Guide:** `/home/jmagar/code/taboot/packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md`
-- **Research Summary:** `/home/jmagar/code/taboot/packages/extraction/tier_b/RESEARCH_SUMMARY.md`
-- **Project Documentation:** `/home/jmagar/code/taboot/CLAUDE.md`
+- **Complete Implementation Guide:** `packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md`
+- **Research Summary:** `packages/extraction/tier_b/RESEARCH_SUMMARY.md`
+- **Project Documentation:** `CLAUDE.md`
 
 ---
 

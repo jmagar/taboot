@@ -7,10 +7,8 @@ Tests job state transitions and metadata tracking per data-model.md:
 - Track: pages_processed, chunks_created, errors[]
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
-
-import pytest
 
 from packages.schemas.models import IngestionJob, JobState, SourceType
 
@@ -25,7 +23,7 @@ class TestIngestionJobStateTransitions:
             source_type=SourceType.WEB,
             source_target="https://example.com",
             state=JobState.PENDING,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             pages_processed=0,
             chunks_created=0,
         )
@@ -39,7 +37,7 @@ class TestIngestionJobStateTransitions:
 
     def test_transition_to_running_sets_started_at(self) -> None:
         """Test transition from PENDING to RUNNING sets started_at."""
-        created_at = datetime.now(timezone.utc)
+        created_at = datetime.now(UTC)
         job = IngestionJob(
             job_id=uuid4(),
             source_type=SourceType.WEB,
@@ -51,7 +49,7 @@ class TestIngestionJobStateTransitions:
         )
 
         # Transition to RUNNING
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         running_job = job.model_copy(update={"state": JobState.RUNNING, "started_at": started_at})
 
         assert running_job.state == JobState.RUNNING
@@ -61,8 +59,8 @@ class TestIngestionJobStateTransitions:
 
     def test_transition_to_completed_sets_completed_at(self) -> None:
         """Test transition from RUNNING to COMPLETED sets completed_at."""
-        created_at = datetime.now(timezone.utc)
-        started_at = datetime.now(timezone.utc)
+        created_at = datetime.now(UTC)
+        started_at = datetime.now(UTC)
         job = IngestionJob(
             job_id=uuid4(),
             source_type=SourceType.WEB,
@@ -75,7 +73,7 @@ class TestIngestionJobStateTransitions:
         )
 
         # Transition to COMPLETED
-        completed_at = datetime.now(timezone.utc)
+        completed_at = datetime.now(UTC)
         completed_job = job.model_copy(
             update={"state": JobState.COMPLETED, "completed_at": completed_at}
         )
@@ -88,8 +86,8 @@ class TestIngestionJobStateTransitions:
 
     def test_transition_to_failed_sets_completed_at_and_errors(self) -> None:
         """Test transition from RUNNING to FAILED sets completed_at and errors."""
-        created_at = datetime.now(timezone.utc)
-        started_at = datetime.now(timezone.utc)
+        created_at = datetime.now(UTC)
+        started_at = datetime.now(UTC)
         job = IngestionJob(
             job_id=uuid4(),
             source_type=SourceType.WEB,
@@ -102,7 +100,7 @@ class TestIngestionJobStateTransitions:
         )
 
         # Transition to FAILED
-        completed_at = datetime.now(timezone.utc)
+        completed_at = datetime.now(UTC)
         errors = [{"error": "Connection timeout", "url": "https://example.com/page"}]
         failed_job = job.model_copy(
             update={"state": JobState.FAILED, "completed_at": completed_at, "errors": errors}
@@ -120,8 +118,8 @@ class TestIngestionJobStateTransitions:
             source_type=SourceType.WEB,
             source_target="https://example.com",
             state=JobState.RUNNING,
-            created_at=datetime.now(timezone.utc),
-            started_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            started_at=datetime.now(UTC),
             pages_processed=0,
             chunks_created=0,
         )
@@ -143,8 +141,8 @@ class TestIngestionJobStateTransitions:
             source_type=SourceType.WEB,
             source_target="https://example.com",
             state=JobState.RUNNING,
-            created_at=datetime.now(timezone.utc),
-            started_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            started_at=datetime.now(UTC),
             pages_processed=0,
             chunks_created=0,
         )
@@ -166,8 +164,8 @@ class TestIngestionJobStateTransitions:
             source_type=SourceType.WEB,
             source_target="https://example.com",
             state=JobState.RUNNING,
-            created_at=datetime.now(timezone.utc),
-            started_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            started_at=datetime.now(UTC),
             pages_processed=0,
             chunks_created=0,
         )

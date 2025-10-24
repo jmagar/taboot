@@ -1,0 +1,31 @@
+{
+  "extends": "@taboot/typescript-config/nextjs.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@taboot/ui/*": ["../../packages-ts/ui/src/*"],
+      "@taboot/utils/*": ["../../packages-ts/utils/src/*"]
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "references": [
+    {
+      "path": "../../packages-ts/utils"
+    }
+  ],
+  "include": [
+    "next-env.d.ts",
+    "next.config.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "../../packages-ts/ui/src/**/*",
+    "../../packages-ts/utils/src/**/*"
+  ],
+  "exclude": ["node_modules"]
+}

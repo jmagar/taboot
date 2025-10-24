@@ -1,6 +1,7 @@
 """Neo4j graph traversal for knowledge graph expansion."""
 
-from typing import List, Dict, Any, Optional
+from typing import Any
+
 from neo4j import GraphDatabase
 
 
@@ -13,7 +14,7 @@ class GraphTraversal:
         username: str,
         password: str,
         max_hops: int = 2,
-        relationship_priority: Optional[List[str]] = None
+        relationship_priority: list[str] | None = None
     ):
         """
         Initialize graph traversal client.
@@ -40,15 +41,15 @@ class GraphTraversal:
             auth=(username, password)
         )
 
-    def get_relationship_priority(self) -> List[str]:
+    def get_relationship_priority(self) -> list[str]:
         """Get relationship type priority order."""
         return self.relationship_priority
 
     def build_traversal_query(
         self,
-        start_node_names: List[str],
-        relationship_types: Optional[List[str]] = None,
-        max_hops: Optional[int] = None
+        start_node_names: list[str],
+        relationship_types: list[str] | None = None,
+        max_hops: int | None = None
     ) -> str:
         """
         Build Cypher query for multi-hop graph traversal.
@@ -85,10 +86,10 @@ class GraphTraversal:
 
     def traverse_from_entities(
         self,
-        entity_names: List[str],
-        max_hops: Optional[int] = None,
-        relationship_types: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
+        entity_names: list[str],
+        max_hops: int | None = None,
+        relationship_types: list[str] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Traverse graph from given entity names.
 

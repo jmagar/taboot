@@ -1,6 +1,7 @@
 """Tests for Tier B window selector for Tier C LLM processing."""
 
 import pytest
+
 from packages.extraction.tier_b.window_selector import WindowSelector
 
 

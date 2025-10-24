@@ -1,11 +1,13 @@
 """End-to-end integration test for query workflow."""
 
-import pytest
 import os
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
+import pytest
+
 from packages.core.use_cases.query import execute_query
-from packages.vector.client import QdrantClient as QdrantClientWrapper
 from packages.graph.client import Neo4jClient
+from packages.vector.qdrant_client import QdrantClient as QdrantClientWrapper
 
 
 @pytest.mark.integration

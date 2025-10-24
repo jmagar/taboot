@@ -1,0 +1,30 @@
+{
+  "name": "@taboot/email",
+  "version": "0.0.1",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist generated .turbo node_modules",
+    "dev": "tsc --watch",
+    "lint": "eslint . --max-warnings 0"
+  },
+  "prettier": "@taboot/prettier-config",
+  "dependencies": {
+    "@react-email/components": "catalog:web",
+    "react": "catalog:web",
+    "resend": "catalog:web",
+    "zod": "catalog:core"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:dev",
+    "@taboot/eslint-config": "workspace:^",
+    "@taboot/prettier-config": "workspace:*",
+    "@taboot/typescript-config": "workspace:*",
+    "@types/react": "catalog:web",
+    "@types/react-dom": "catalog:web",
+    "typescript": "catalog:dev"
+  }
+}

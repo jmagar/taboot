@@ -1,11 +1,11 @@
 """Tests for PropertyGraphIndex over Neo4j."""
 
-import os
 import pytest
-from packages.retrieval.indices.graph import create_graph_index
 from llama_index.core import Settings
 from llama_index.embeddings.text_embeddings_inference import TextEmbeddingsInference
 from llama_index.llms.ollama import Ollama
+
+from packages.retrieval.indices.graph import create_graph_index
 
 
 @pytest.mark.integration

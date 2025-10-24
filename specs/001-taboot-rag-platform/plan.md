@@ -91,7 +91,7 @@ Build a Doc-to-Graph RAG platform that ingests technical documentation from 11+ 
 
 ### Documentation (this feature)
 
-```
+```text
 specs/[###-feature]/
 ├── plan.md              # This file (/speckit.plan command output)
 ├── research.md          # Phase 0 output (/speckit.plan command)
@@ -103,7 +103,7 @@ specs/[###-feature]/
 
 ### Source Code (repository root)
 
-```
+```text
 apps/                           # Application entry points (thin I/O shells)
 ├── api/                       # FastAPI service (HTTP endpoints)
 │   ├── app.py                # Main FastAPI app
@@ -119,6 +119,10 @@ apps/                           # Application entry points (thin I/O shells)
     └── [Next.js structure]
 
 packages/                      # Adapter packages (framework implementations)
+├── clients/                   # Generated client SDKs (Python, TypeScript)
+│   ├── python/              # Auto-generated Python client (pydantic/httpx)
+│   ├── typescript/          # Auto-generated TypeScript client
+│   └── scripts/             # OpenAPI generation automation
 ├── core/                     # Business logic (framework-agnostic)
 │   ├── domain/              # Domain models
 │   ├── use_cases/           # Use-case orchestration

@@ -5,9 +5,8 @@ WebReader → Normalizer → Chunker → Embedder → QdrantWriter
 With job state tracking and error handling.
 """
 
-from datetime import datetime, timezone
-from unittest.mock import Mock, MagicMock
-from uuid import UUID, uuid4
+from unittest.mock import Mock
+from uuid import UUID
 
 import pytest
 from llama_index.core import Document as LlamaDocument

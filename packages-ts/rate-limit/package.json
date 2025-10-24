@@ -1,0 +1,26 @@
+{
+  "name": "@taboot/rate-limit",
+  "version": "0.0.1",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist generated .turbo node_modules",
+    "dev": "tsc --build --watch",
+    "lint": "eslint . --max-warnings 0"
+  },
+  "prettier": "@taboot/prettier-config",
+  "dependencies": {
+    "@upstash/ratelimit": "catalog:core",
+    "@upstash/redis": "catalog:core"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:dev",
+    "@taboot/eslint-config": "workspace:^",
+    "@taboot/prettier-config": "workspace:*",
+    "@taboot/typescript-config": "workspace:*",
+    "typescript": "catalog:dev"
+  }
+}

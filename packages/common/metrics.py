@@ -82,6 +82,9 @@ class MetricsCollector:
     DB_WRITE_DURATIONS = f"{KEY_PREFIX}:db:write:durations"
     FIRST_WINDOW_TIME = f"{KEY_PREFIX}:window:first_time"
 
+    # ZSET memory bounds: keep only latest N entries to prevent unbounded growth
+    MAX_ZSET_SIZE = 10_000
+
     def __init__(self, redis_client: aioredis.Redis) -> None:
         """Initialize metrics collector.
 
@@ -112,6 +115,9 @@ class MetricsCollector:
         timestamp = time.time()
         member = f"{timestamp}:{latency_ms}"
         await self._redis.zadd(latencies_key, {member: latency_ms})
+
+        # Trim ZSET to prevent unbounded growth (keep only latest entries)
+        await self._redis.zremrangebyrank(latencies_key, 0, -self.MAX_ZSET_SIZE - 1)
 
         # Record first window time if not set
         await self._redis.setnx(self.FIRST_WINDOW_TIME, timestamp)
@@ -156,6 +162,9 @@ class MetricsCollector:
         timestamp = time.time()
         member = f"{timestamp}:{duration_ms}:{count}"
         await self._redis.zadd(self.DB_WRITE_DURATIONS, {member: timestamp})
+
+        # Trim ZSET to prevent unbounded growth (keep only latest entries)
+        await self._redis.zremrangebyrank(self.DB_WRITE_DURATIONS, 0, -self.MAX_ZSET_SIZE - 1)
 
         logger.debug(
             "Recorded DB write",
@@ -315,6 +324,10 @@ class MetricsCollector:
 
         for member, _timestamp_score in members_with_scores:
             # Member format: "timestamp:duration_ms:count"
+            # Handle bytes if Redis client didn't decode responses
+            if isinstance(member, (bytes, bytearray)):
+                member = member.decode("utf-8", errors="ignore")
+
             parts = member.split(":")
             if len(parts) == 3:
                 timestamp = float(parts[0])

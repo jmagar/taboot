@@ -5,9 +5,9 @@ import os
 from datetime import UTC, datetime
 
 import pytest
+import redis.asyncio as redis
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-import redis.asyncio as redis
 
 from apps.api.deps.auth import verify_api_key
 from packages.common.api_key_store import ApiKeyStore

@@ -5,10 +5,9 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 """
 
 import logging
-from typing import Optional
 
 from llama_index.core import Document
-from llama_index.readers.github import GithubRepositoryReader, GithubClient
+from llama_index.readers.github import GithubClient, GithubRepositoryReader
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,7 @@ class GithubReader:
 
         logger.info(f"Initialized GithubReader (max_retries={max_retries})")
 
-    def load_data(self, repo: str, limit: Optional[int] = None, branch: Optional[str] = None) -> list[Document]:
+    def load_data(self, repo: str, limit: int | None = None, branch: str | None = None) -> list[Document]:
         """Load documents from GitHub repository.
 
         Args:
@@ -94,7 +93,7 @@ class GithubReader:
             logger.info(f"Auto-detected branches to try: {branches_to_try}")
 
         # Retry logic
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for attempt in range(self.max_retries):
             for branch_name in branches_to_try:
                 try:

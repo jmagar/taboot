@@ -273,18 +273,18 @@ async def check_system_health() -> SystemHealthStatus:
             extra={"failed_services": failed},
         )
 
-    return SystemHealthStatus(healthy=healthy, services=services)
+    return {"healthy": healthy, "services": services}
 
 
 # Export public API
 __all__ = [
+    "SystemHealthStatus",
+    "check_firecrawl_health",
     "check_neo4j_health",
+    "check_ollama_health",
+    "check_playwright_health",
     "check_qdrant_health",
     "check_redis_health",
-    "check_tei_health",
-    "check_ollama_health",
-    "check_firecrawl_health",
-    "check_playwright_health",
     "check_system_health",
-    "SystemHealthStatus",
+    "check_tei_health",
 ]

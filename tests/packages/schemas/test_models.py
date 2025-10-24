@@ -4,8 +4,8 @@ Tests all entity models defined in packages/schemas/models.py following TDD meth
 Validates field types, constraints, and validation rules per data-model.md.
 """
 
-from datetime import datetime, timezone
-from uuid import UUID, uuid4
+from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -13,10 +13,10 @@ from pydantic import ValidationError
 from packages.schemas.models import (
     Chunk,
     Document,
+    ExtractionState,
     IngestionJob,
     JobState,
     SourceType,
-    ExtractionState,
 )
 
 
@@ -26,7 +26,7 @@ class TestDocumentModel:
     def test_document_creation_with_valid_data(self) -> None:
         """Test creating a Document with valid data."""
         doc_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         doc = Document(
             doc_id=doc_id,
@@ -55,9 +55,9 @@ class TestDocumentModel:
                 source_url="https://example.com",
                 source_type=SourceType.WEB,
                 content_hash="a" * 64,
-                ingested_at=datetime.now(timezone.utc),
+                ingested_at=datetime.now(UTC),
                 extraction_state=ExtractionState.PENDING,
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(UTC),
             )
 
     def test_document_requires_source_url(self) -> None:
@@ -68,9 +68,9 @@ class TestDocumentModel:
                 source_url="",
                 source_type=SourceType.WEB,
                 content_hash="a" * 64,
-                ingested_at=datetime.now(timezone.utc),
+                ingested_at=datetime.now(UTC),
                 extraction_state=ExtractionState.PENDING,
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(UTC),
             )
 
     def test_document_validates_content_hash_length(self) -> None:
@@ -81,9 +81,9 @@ class TestDocumentModel:
                 source_url="https://example.com",
                 source_type=SourceType.WEB,
                 content_hash="too_short",  # Not 64 chars
-                ingested_at=datetime.now(timezone.utc),
+                ingested_at=datetime.now(UTC),
                 extraction_state=ExtractionState.PENDING,
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(UTC),
             )
 
     def test_document_validates_source_type_enum(self) -> None:
@@ -94,9 +94,9 @@ class TestDocumentModel:
                 source_url="https://example.com",
                 source_type="invalid_type",  # Not a valid enum
                 content_hash="a" * 64,
-                ingested_at=datetime.now(timezone.utc),
+                ingested_at=datetime.now(UTC),
                 extraction_state=ExtractionState.PENDING,
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(UTC),
             )
 
     def test_document_validates_extraction_state_enum(self) -> None:
@@ -107,9 +107,9 @@ class TestDocumentModel:
                 source_url="https://example.com",
                 source_type=SourceType.WEB,
                 content_hash="a" * 64,
-                ingested_at=datetime.now(timezone.utc),
+                ingested_at=datetime.now(UTC),
                 extraction_state="invalid_state",  # Not a valid enum
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(UTC),
             )
 
     def test_document_with_optional_fields(self) -> None:
@@ -119,10 +119,10 @@ class TestDocumentModel:
             source_url="https://example.com",
             source_type=SourceType.WEB,
             content_hash="a" * 64,
-            ingested_at=datetime.now(timezone.utc),
+            ingested_at=datetime.now(UTC),
             extraction_state=ExtractionState.COMPLETED,
             extraction_version="v1.2.0",
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
             metadata={"page_count": 42, "author": "Test Author"},
         )
 
@@ -137,7 +137,7 @@ class TestChunkModel:
         """Test creating a Chunk with valid data."""
         chunk_id = uuid4()
         doc_id = uuid4()
-        now_ts = int(datetime.now(timezone.utc).timestamp())
+        now_ts = int(datetime.now(UTC).timestamp())
 
         chunk = Chunk(
             chunk_id=chunk_id,
@@ -172,7 +172,7 @@ class TestChunkModel:
                 token_count=100,
                 source_url="https://example.com",
                 source_type=SourceType.WEB,
-                ingested_at=int(datetime.now(timezone.utc).timestamp()),
+                ingested_at=int(datetime.now(UTC).timestamp()),
             )
 
     def test_chunk_validates_content_length(self) -> None:
@@ -187,7 +187,7 @@ class TestChunkModel:
                 token_count=1,
                 source_url="https://example.com",
                 source_type=SourceType.WEB,
-                ingested_at=int(datetime.now(timezone.utc).timestamp()),
+                ingested_at=int(datetime.now(UTC).timestamp()),
             )
 
         # Test content too long
@@ -200,7 +200,7 @@ class TestChunkModel:
                 token_count=1,
                 source_url="https://example.com",
                 source_type=SourceType.WEB,
-                ingested_at=int(datetime.now(timezone.utc).timestamp()),
+                ingested_at=int(datetime.now(UTC).timestamp()),
             )
 
     def test_chunk_validates_token_count_range(self) -> None:
@@ -215,7 +215,7 @@ class TestChunkModel:
                 token_count=0,
                 source_url="https://example.com",
                 source_type=SourceType.WEB,
-                ingested_at=int(datetime.now(timezone.utc).timestamp()),
+                ingested_at=int(datetime.now(UTC).timestamp()),
             )
 
         # Test token_count > 512
@@ -228,7 +228,7 @@ class TestChunkModel:
                 token_count=513,
                 source_url="https://example.com",
                 source_type=SourceType.WEB,
-                ingested_at=int(datetime.now(timezone.utc).timestamp()),
+                ingested_at=int(datetime.now(UTC).timestamp()),
             )
 
     def test_chunk_with_optional_tags(self) -> None:
@@ -241,7 +241,7 @@ class TestChunkModel:
             token_count=50,
             source_url="https://example.com",
             source_type=SourceType.WEB,
-            ingested_at=int(datetime.now(timezone.utc).timestamp()),
+            ingested_at=int(datetime.now(UTC).timestamp()),
             tags=["kubernetes", "networking"],
         )
 
@@ -254,7 +254,7 @@ class TestIngestionJobModel:
     def test_ingestion_job_creation_with_valid_data(self) -> None:
         """Test creating an IngestionJob with valid data."""
         job_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         job = IngestionJob(
             job_id=job_id,
@@ -284,7 +284,7 @@ class TestIngestionJobModel:
                 source_type=SourceType.WEB,
                 source_target="https://example.com",
                 state=JobState.PENDING,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 pages_processed=0,
                 chunks_created=0,
             )
@@ -298,7 +298,7 @@ class TestIngestionJobModel:
                 source_type=SourceType.WEB,
                 source_target="",
                 state=JobState.PENDING,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 pages_processed=0,
                 chunks_created=0,
             )
@@ -310,7 +310,7 @@ class TestIngestionJobModel:
                 source_type=SourceType.WEB,
                 source_target="x" * 2049,
                 state=JobState.PENDING,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 pages_processed=0,
                 chunks_created=0,
             )
@@ -323,7 +323,7 @@ class TestIngestionJobModel:
                 source_type=SourceType.WEB,
                 source_target="https://example.com",
                 state=JobState.PENDING,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 pages_processed=-1,
                 chunks_created=0,
             )
@@ -334,14 +334,14 @@ class TestIngestionJobModel:
                 source_type=SourceType.WEB,
                 source_target="https://example.com",
                 state=JobState.PENDING,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 pages_processed=0,
                 chunks_created=-1,
             )
 
     def test_ingestion_job_with_timestamps_and_errors(self) -> None:
         """Test IngestionJob with optional timestamps and errors."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         started = now
         completed = now
 

@@ -654,8 +654,10 @@ docId → section → windows → triples → Neo4j txId
 
 ---
 
-**Document Version:** 2.0.0
-**Last Updated:** 2025-01-20
-**Schema Version:** 2.0.0
-**Author:** Jacob Magar
-**License:** Proprietary
+## Metadata
+
+- **Document Version:** 2.0.0
+- **Last Updated:** 2025-01-20
+- **Schema Version:** 2.0.0
+- **Author:** Jacob Magar
+- **License:** Proprietary

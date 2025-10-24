@@ -1,10 +1,9 @@
 """Tests for Cypher query builders."""
 
-import pytest
 from packages.graph.cypher.builders import (
+    build_batch_merge_nodes,
     build_merge_node,
     build_merge_relationship,
-    build_batch_merge_nodes,
 )
 
 

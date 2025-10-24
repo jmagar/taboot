@@ -36,11 +36,42 @@ apps/web/.next/
 apps/web/out/
 apps/web/node_modules/
 packages/**/node_modules/
+packages-ts/**/node_modules/
+packages-ts/**/dist/
 turbo/
 .turbo/
-pnpm-lock.yaml
 package-lock.json
 yarn.lock
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Next.js
+.next/
+out/
+.vercel/
+*.next.d.ts
+
+# TypeScript
+*.tsbuildinfo
+*.d.ts.map
+
+# Build outputs
+dist/
+build/
+.cache/
+
+# ESLint
+.eslintcache
+
+# Prettier
+.prettierignore
+
+# Turbo
+**/.turbo/
+
+# Prisma
+**/prisma/migrations/dev.db
+**/prisma/migrations/dev.db-journal
 
 # --------------------------------------------
 # Testing & coverage
@@ -55,6 +86,14 @@ htmlcov/
 .ruff_cache/
 .dmypy.json
 dmypy.json
+
+# Jest & Vitest
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+playwright-report/
+playwright/.cache/
 
 # --------------------------------------------
 # IDE & OS

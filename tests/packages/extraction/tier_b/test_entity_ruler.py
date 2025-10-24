@@ -1,6 +1,7 @@
 """Tests for Tier B spaCy entity ruler."""
 
 import pytest
+
 from packages.extraction.tier_b.entity_ruler import SpacyEntityRuler
 
 

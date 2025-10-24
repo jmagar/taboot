@@ -1,9 +1,10 @@
 """Qdrant vector search with metadata filtering."""
 
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import Any
+
 from qdrant_client import QdrantClient
-from qdrant_client.models import Filter, FieldCondition, MatchAny, Range, SearchParams
+from qdrant_client.models import FieldCondition, Filter, MatchAny, Range, SearchParams
 
 
 class VectorSearch:
@@ -23,9 +24,9 @@ class VectorSearch:
 
     def build_metadata_filter(
         self,
-        source_types: Optional[List[str]] = None,
-        after: Optional[datetime] = None
-    ) -> Optional[Filter]:
+        source_types: list[str] | None = None,
+        after: datetime | None = None
+    ) -> Filter | None:
         """
         Build Qdrant filter for metadata constraints.
 
@@ -62,11 +63,11 @@ class VectorSearch:
 
     def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 20,
-        source_types: Optional[List[str]] = None,
-        after: Optional[datetime] = None
-    ) -> List[Dict[str, Any]]:
+        source_types: list[str] | None = None,
+        after: datetime | None = None
+    ) -> list[dict[str, Any]]:
         """
         Perform vector search with optional metadata filters.
 

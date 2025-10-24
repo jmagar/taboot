@@ -18,12 +18,18 @@ yarn.lock                # legacy
 # Project-Specific Artifacts
 # ------------------------------------------------------------------------------
 uv.lock                  # optional if not needed in image
-turbo/                   # turborepo build cache
+.turbo/                  # turborepo build cache (root and nested)
+**/turbo/
 apps/web/.next/          # Next.js output
 apps/web/out/            # static exports
 apps/web/.vercel/        # vercel metadata
 apps/web/node_modules/   # redundant per pnpm workspace
 packages/**/node_modules/
+packages-ts/**/node_modules/
+packages-ts/**/dist/     # TypeScript build outputs
+packages-ts/**/.turbo/   # per-package turbo cache
+**/tsconfig.tsbuildinfo  # TypeScript incremental build info
+**/.DS_Store             # macOS system files
 
 # ------------------------------------------------------------------------------
 # Development & Local Files
@@ -46,3 +52,31 @@ nohup.out
 /tmp/
 data/
 logs/
+*.log
+**/*.log
+
+# ------------------------------------------------------------------------------
+# Testing & Coverage
+# ------------------------------------------------------------------------------
+**/__tests__/
+**/*.test.*
+**/*.spec.*
+coverage/
+.nyc_output/
+**/.pytest_cache/
+**/.coverage
+
+# ------------------------------------------------------------------------------
+# Git & Version Control
+# ------------------------------------------------------------------------------
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# ------------------------------------------------------------------------------
+# Environment Files (use env_file in docker-compose)
+# ------------------------------------------------------------------------------
+.env*
+!.env.example
+!.env.production

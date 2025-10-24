@@ -1,6 +1,7 @@
 """Tests for Tier B dependency matcher for relationship extraction."""
 
 import pytest
+
 from packages.extraction.tier_b.dependency_matcher import DependencyMatcher
 
 

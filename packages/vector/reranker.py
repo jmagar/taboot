@@ -1,6 +1,6 @@
 """Reranking using Qwen3-Reranker-0.6B via SentenceTransformers."""
 
-from typing import List
+
 import torch
 from sentence_transformers import CrossEncoder
 
@@ -50,9 +50,9 @@ class Reranker:
     def rerank(
         self,
         query: str,
-        passages: List[str],
+        passages: list[str],
         top_n: int = 5
-    ) -> List[float]:
+    ) -> list[float]:
         """
         Rerank passages by relevance to query.
 
@@ -89,9 +89,9 @@ class Reranker:
     def rerank_with_indices(
         self,
         query: str,
-        passages: List[str],
+        passages: list[str],
         top_n: int = 5
-    ) -> List[tuple[int, float]]:
+    ) -> list[tuple[int, float]]:
         """
         Rerank passages and return indices with scores.
 

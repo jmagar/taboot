@@ -5,7 +5,6 @@ Per research.md: Use LlamaIndex SentenceSplitter with 256-512 tokens, 10% overla
 """
 
 import logging
-from typing import Optional
 
 from llama_index.core import Document
 from llama_index.core.node_parser import SentenceSplitter

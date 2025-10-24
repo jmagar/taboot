@@ -14,13 +14,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from apps.api.deps.auth import verify_api_key
-
 from packages.core.use_cases.ingest_web import IngestWebUseCase
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
 from packages.ingest.normalizer import Normalizer
 from packages.ingest.readers.web import WebReader
-from packages.schemas.models import IngestionJob, SourceType
+from packages.schemas.models import SourceType
 from packages.vector.writer import QdrantWriter
 
 logger = logging.getLogger(__name__)
@@ -102,7 +101,7 @@ def get_ingest_use_case() -> IngestWebUseCase:
     """
     from packages.common.config import get_config
     from packages.common.db_schema import get_postgres_client
-    from packages.common.postgres_document_store import PostgresDocumentStore
+    from packages.clients.postgres_document_store import PostgresDocumentStore
 
     config = get_config()
 

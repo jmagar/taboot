@@ -1,7 +1,7 @@
 """VectorStoreIndex implementation over Qdrant."""
 
-from typing import Optional
-from llama_index.core import VectorStoreIndex, StorageContext
+
+from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 
@@ -10,7 +10,7 @@ def create_vector_index(
     qdrant_url: str,
     collection_name: str,
     embedding_dim: int = 1024,
-    qdrant_client: Optional[QdrantClient] = None
+    qdrant_client: QdrantClient | None = None
 ) -> VectorStoreIndex:
     """
     Create VectorStoreIndex backed by Qdrant.

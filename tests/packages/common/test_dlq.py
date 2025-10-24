@@ -4,9 +4,9 @@ Tests Redis-based DLQ with retry policy and exponential backoff.
 Follows TDD RED-GREEN-REFACTOR methodology.
 """
 
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock
-from datetime import datetime, timezone
 
 
 @pytest.fixture

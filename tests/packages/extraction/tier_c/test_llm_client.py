@@ -1,9 +1,11 @@
 """Tests for Tier C LLM client."""
 
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
+
 from packages.extraction.tier_c.llm_client import TierCLLMClient
-from packages.extraction.tier_c.schema import ExtractionResult, Triple
+from packages.extraction.tier_c.schema import ExtractionResult
 
 
 @pytest.fixture

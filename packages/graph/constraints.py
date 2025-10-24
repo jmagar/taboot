@@ -23,7 +23,7 @@ class ConstraintCreationError(Exception):
     about which constraint failed during initialization.
     """
 
-    pass
+    ...
 
 
 def get_constraints_file_path() -> Path:
@@ -150,12 +150,13 @@ def create_constraints(driver: Driver) -> None:
                         }
                     )
                 except Neo4jError as e:
-                    logger.error(
-                        f"Failed to execute constraint statement {i}: {statement[:100]}...",
+                    logger.exception(
+                        "Failed to execute constraint statement %d: %s...",
+                        i,
+                        statement[:100],
                         extra={
                             "correlation_id": correlation_id,
                             "statement_number": i,
-                            "error": str(e)
                         }
                     )
                     raise ConstraintCreationError(
@@ -168,8 +169,8 @@ def create_constraints(driver: Driver) -> None:
         )
 
     except FileNotFoundError as e:
-        logger.error(
-            f"Constraints file not found: {str(e)}",
+        logger.exception(
+            "Constraints file not found",
             extra={"correlation_id": correlation_id}
         )
         raise ConstraintCreationError(
@@ -179,8 +180,8 @@ def create_constraints(driver: Driver) -> None:
         # Re-raise ConstraintCreationError without wrapping
         raise
     except Exception as e:
-        logger.error(
-            f"Unexpected error during constraint creation: {str(e)}",
+        logger.exception(
+            "Unexpected error during constraint creation",
             extra={"correlation_id": correlation_id}
         )
         raise ConstraintCreationError(
@@ -212,8 +213,8 @@ async def create_neo4j_constraints() -> None:
 
 __all__ = [
     "ConstraintCreationError",
-    "get_constraints_file_path",
-    "load_constraint_statements",
     "create_constraints",
     "create_neo4j_constraints",
+    "get_constraints_file_path",
+    "load_constraint_statements",
 ]

@@ -5,8 +5,10 @@ All service URLs, credentials, and tuning parameters are defined here.
 """
 
 import os
+from functools import lru_cache
 from pathlib import Path
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,7 +33,7 @@ def _is_running_in_container() -> bool:
 
     # Check cgroup for docker/containerd
     try:
-        with open("/proc/1/cgroup", "r") as f:
+        with open("/proc/1/cgroup") as f:
             content = f.read()
             return "docker" in content or "containerd" in content
     except (FileNotFoundError, PermissionError):
@@ -66,12 +68,13 @@ class TabootConfig(BaseSettings):
 
     # ========== Database Credentials ==========
     neo4j_user: str = "neo4j"
-    neo4j_password: str = "changeme"
+    neo4j_password: SecretStr = SecretStr("changeme")
     neo4j_db: str = "neo4j"
 
     postgres_user: str = "taboot"
-    postgres_password: str = "changeme"
+    postgres_password: SecretStr = SecretStr("changeme")
     postgres_db: str = "taboot"
+    postgres_host: str = "taboot-db"
     postgres_port: int = 5432
 
     # ========== Vector & Embedding Config ==========
@@ -102,22 +105,22 @@ class TabootConfig(BaseSettings):
     embedding_batch_size: int = 32  # TEI embedding batch size
 
     # ========== External API Credentials (Optional) ==========
-    github_token: str | None = None
+    github_token: SecretStr | None = None
     reddit_client_id: str | None = None
-    reddit_client_secret: str | None = None
+    reddit_client_secret: SecretStr | None = None
     reddit_user_agent: str = "Script"
     google_client_id: str | None = None
-    google_client_secret: str | None = None
-    google_oauth_refresh_token: str | None = None
+    google_client_secret: SecretStr | None = None
+    google_oauth_refresh_token: SecretStr | None = None
     elasticsearch_url: str | None = None
-    elasticsearch_api_key: str | None = None
+    elasticsearch_api_key: SecretStr | None = None
     tailscale_api_key: str | None = None
     unifi_username: str | None = None
-    unifi_password: str | None = None
-    unifi_api_token: str | None = None
+    unifi_password: SecretStr | None = None
+    unifi_api_token: SecretStr | None = None
 
     # ========== Firecrawl Config ==========
-    firecrawl_api_key: str = "changeme"
+    firecrawl_api_key: SecretStr = SecretStr("changeme")
     num_workers_per_queue: int = 16
     worker_concurrency: int = 8
     scrape_concurrency: int = 8
@@ -154,28 +157,27 @@ class TabootConfig(BaseSettings):
     @property
     def neo4j_connection_string(self) -> str:
         """Get Neo4j connection string with credentials."""
-        return f"{self.neo4j_uri}?user={self.neo4j_user}&password={self.neo4j_password}&database={self.neo4j_db}"
+        pwd = self.neo4j_password.get_secret_value()
+        return f"{self.neo4j_uri}?user={self.neo4j_user}&password={pwd}&database={self.neo4j_db}"
 
     @property
     def postgres_connection_string(self) -> str:
         """Get PostgreSQL connection string."""
-        return f"postgresql://{self.postgres_user}:{self.postgres_password}@taboot-db:{self.postgres_port}/{self.postgres_db}"
+        pwd = self.postgres_password.get_secret_value()
+        return f"postgresql://{self.postgres_user}:{pwd}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
 
-# Singleton instance
-_config: TabootConfig | None = None
-
-
+@lru_cache(maxsize=1)
 def get_config() -> TabootConfig:
-    """Get or create the singleton configuration instance.
+    """Return cached Settings instance (thread-safe, process-local).
+
+    Uses lru_cache to ensure a single instance is created and reused.
+    Thread-safe through Python's GIL for cache access.
 
     Returns:
         TabootConfig: The configuration instance loaded from environment variables.
     """
-    global _config
-    if _config is None:
-        _config = TabootConfig()
-    return _config
+    return TabootConfig()
 
 
 # Export convenience accessors

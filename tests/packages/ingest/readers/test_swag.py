@@ -4,8 +4,9 @@ Tests nginx config parsing for SWAG proxy configurations.
 Following TDD methodology (RED-GREEN-REFACTOR).
 """
 
+from datetime import datetime
+
 import pytest
-from datetime import datetime, timezone
 
 
 class TestSwagReader:
@@ -319,9 +320,10 @@ class TestSwagReader:
 
     def test_parse_file(self) -> None:
         """Test parsing config from file path."""
-        from packages.ingest.readers.swag import SwagReader
-        import tempfile
         import os
+        import tempfile
+
+        from packages.ingest.readers.swag import SwagReader
 
         config = """
         server {

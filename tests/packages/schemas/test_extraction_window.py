@@ -1,8 +1,9 @@
 """Tests for ExtractionWindow Pydantic model."""
 
+from datetime import UTC, datetime
+from uuid import uuid4
+
 import pytest
-from datetime import datetime, timezone
-from uuid import UUID, uuid4
 from pydantic import ValidationError
 
 from packages.schemas.models import ExtractionWindow
@@ -15,7 +16,7 @@ class TestExtractionWindow:
         """Test valid ExtractionWindow for Tier A."""
         window_id = uuid4()
         doc_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         window = ExtractionWindow(
             window_id=window_id,
@@ -40,7 +41,7 @@ class TestExtractionWindow:
         """Test valid ExtractionWindow for Tier C with LLM metrics."""
         window_id = uuid4()
         doc_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         window = ExtractionWindow(
             window_id=window_id,
@@ -67,7 +68,7 @@ class TestExtractionWindow:
                 content="Test",
                 tier="A",
                 triples_generated=0,
-                processed_at=datetime.now(timezone.utc),
+                processed_at=datetime.now(UTC),
             )
 
         errors = exc_info.value.errors()
@@ -81,7 +82,7 @@ class TestExtractionWindow:
                 content="Test",
                 tier="A",
                 triples_generated=0,
-                processed_at=datetime.now(timezone.utc),
+                processed_at=datetime.now(UTC),
             )
 
         errors = exc_info.value.errors()
@@ -96,7 +97,7 @@ class TestExtractionWindow:
                 content="",
                 tier="A",
                 triples_generated=0,
-                processed_at=datetime.now(timezone.utc),
+                processed_at=datetime.now(UTC),
             )
 
         errors = exc_info.value.errors()
@@ -111,7 +112,7 @@ class TestExtractionWindow:
                 content="x" * 2049,
                 tier="A",
                 triples_generated=0,
-                processed_at=datetime.now(timezone.utc),
+                processed_at=datetime.now(UTC),
             )
 
         errors = exc_info.value.errors()
@@ -126,7 +127,7 @@ class TestExtractionWindow:
                 content="Test",
                 tier="D",
                 triples_generated=0,
-                processed_at=datetime.now(timezone.utc),
+                processed_at=datetime.now(UTC),
             )
 
         errors = exc_info.value.errors()
@@ -141,7 +142,7 @@ class TestExtractionWindow:
                 content="Test",
                 tier="A",
                 triples_generated=-1,
-                processed_at=datetime.now(timezone.utc),
+                processed_at=datetime.now(UTC),
             )
 
         errors = exc_info.value.errors()
@@ -157,7 +158,7 @@ class TestExtractionWindow:
                 tier="C",
                 triples_generated=0,
                 llm_latency_ms=-10,
-                processed_at=datetime.now(timezone.utc),
+                processed_at=datetime.now(UTC),
             )
 
         errors = exc_info.value.errors()
@@ -179,7 +180,7 @@ class TestExtractionWindow:
 
     def test_processed_at_not_future(self) -> None:
         """Test that processed_at cannot be in the future."""
-        future_time = datetime(2099, 1, 1, tzinfo=timezone.utc)
+        future_time = datetime(2099, 1, 1, tzinfo=UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             ExtractionWindow(

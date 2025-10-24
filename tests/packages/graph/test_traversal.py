@@ -1,6 +1,7 @@
 """Tests for Neo4j graph traversal."""
 
 import pytest
+
 from packages.graph.traversal import GraphTraversal
 
 

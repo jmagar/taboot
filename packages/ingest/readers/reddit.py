@@ -5,7 +5,6 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 """
 
 import logging
-from typing import Optional
 
 from llama_index.core import Document
 from llama_index.readers.reddit import RedditReader as LlamaRedditReader
@@ -57,7 +56,7 @@ class RedditReader:
 
         logger.info(f"Initialized RedditReader (max_retries={max_retries})")
 
-    def load_data(self, subreddit: str, limit: Optional[int] = None) -> list[Document]:
+    def load_data(self, subreddit: str, limit: int | None = None) -> list[Document]:
         """Load posts and comments from subreddit.
 
         Args:
@@ -84,7 +83,7 @@ class RedditReader:
         )
 
         # Retry logic
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for attempt in range(self.max_retries):
             try:
                 # Load posts from subreddit

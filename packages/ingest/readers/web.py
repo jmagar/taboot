@@ -6,7 +6,6 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 
 import logging
 import time
-from typing import Optional
 
 from llama_index.core import Document
 from llama_index.readers.web import FireCrawlWebReader
@@ -72,7 +71,7 @@ class WebReader:
             time.sleep(sleep_time)
         self._last_request_time = time.time()
 
-    def load_data(self, url: str, limit: Optional[int] = None) -> list[Document]:
+    def load_data(self, url: str, limit: int | None = None) -> list[Document]:
         """Load documents from URL with optional limit.
 
         Args:
@@ -114,7 +113,7 @@ class WebReader:
         )
 
         # Retry logic with exponential backoff
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for attempt in range(self.max_retries):
             try:
                 docs = reader.load_data(url=url)

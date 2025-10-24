@@ -4,7 +4,6 @@ Tests GitHub repository ingestion via CLI.
 Following TDD methodology (RED-GREEN-REFACTOR).
 """
 
-import pytest
 from typer.testing import CliRunner
 
 from apps.cli.main import app

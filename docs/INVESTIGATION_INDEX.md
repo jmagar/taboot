@@ -84,7 +84,7 @@ This directory contains comprehensive investigation reports on the data ingestio
 
 ### Production Code Gap: 99.6%
 
-```
+```text
 Expected: ~5500+ LOC
 Actual:   ~21 LOC (FastAPI stub app.py only)
 Gap:      99.6%
@@ -121,39 +121,47 @@ Gap:      99.6%
 ## Implementation Roadmap
 
 ### Phase 1: Foundation (1–2 weeks)
+
 - Implement core domain models
 - Define ports/interfaces
 - Create test fixtures
 
 ### Phase 2: Ingest Adapters (1–2 weeks)
+
 - Normalizer (HTML → Markdown)
 - Chunker (semantic, token-based)
 - Firecrawl adapter
 
 ### Phase 3: Tier A Extraction (1 week)
+
 - Deterministic extractors
 - Neo4j batch writer
 - Benchmarking (target: 50 pages/sec)
 
 ### Phase 4: Tier B Extraction (1–2 weeks)
+
 - spaCy pipeline
 - Entity ruler + matchers
 - Window selection
 
 ### Phase 5: Tier C & Orchestration (2 weeks)
+
 - LLM integration (Ollama)
 - Batching & caching
 - Tier routing
 
 ### Phase 6: API & CLI (1 week)
+
 - Routes for ingestion/extraction/query
 - CLI commands
 
 ### Phase 7: Tests (1–2 weeks)
+
 - Unit + integration tests
 - Target: ≥85% coverage
 
 ### Phase 8: Performance Tuning (2–3 weeks)
+
 - Benchmark all tiers
 - Validate targets
 - Optimization
@@ -166,7 +174,7 @@ Gap:      99.6%
 
 ### Layering (Strict)
 
-```
+```text
 apps (API, CLI, MCP)
     ↓
 adapters (ingest, extraction, graph, vector, retrieval)
@@ -178,7 +186,7 @@ core (domain models, use-cases, ports)
 
 ### Data Flow (Clean)
 
-```
+```text
 Sources (11+) → Ingestion → Extraction (3-tier) → Retrieval → Answers
                     ↓
                   Qdrant
@@ -263,11 +271,11 @@ Sources (11+) → Ingestion → Extraction (3-tier) → Retrieval → Answers
 → See both reports, then reference:
 - `specs/001-taboot-v2-rag-platform/plan.md` — Implementation plan
 - `packages/extraction/docs/EXTRACTION_SPEC.md` — Tier details
-- `docs/ARCHITECTURE.md` — System architecture
+- `ARCHITECTURE.md` — System architecture
 
 ### For Setting Up Development
 → See:
-- `README.md` — Quick start (docker-compose)
+- `../README.md` — Quick start (docker-compose)
 - `.env.example` — Configuration template
 - `pyproject.toml` — Dependencies and uv workspace
 
@@ -294,7 +302,7 @@ Sources (11+) → Ingestion → Extraction (3-tier) → Retrieval → Answers
 
 ## Project Summary
 
-**Taboot v2** is a **well-designed but entirely unimplemented greenfield Doc-to-Graph RAG platform.** 
+**Taboot v2** is a **well-designed but entirely unimplemented greenfield Doc-to-Graph RAG platform.**
 
 The project has:
 - Excellent architecture and layering discipline
@@ -306,13 +314,13 @@ The path forward is clear: implement according to the provided roadmap in phases
 
 ---
 
-**Report Generated:** 2025-10-20  
-**Investigation Repository:** `/home/jmagar/code/taboot`  
+**Report Generated:** 2025-10-20
+**Investigation Repository:** `[REPO_PATH]`
 **Branch:** `001-taboot-v2-rag-platform`
 
 **Quick Navigation:**
 - [Full Investigation Report](PIPELINE_INVESTIGATION_REPORT.md)
 - [Maturity Summary](PIPELINE_MATURITY_SUMMARY.md)
-- [Architecture Overview](docs/ARCHITECTURE.md)
+- [Architecture Overview](ARCHITECTURE.md)
 - [Extraction Specification](packages/extraction/docs/EXTRACTION_SPEC.md)
-- [README](README.md)
+- [README](../README.md)

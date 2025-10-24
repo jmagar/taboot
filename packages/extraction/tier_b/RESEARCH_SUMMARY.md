@@ -23,6 +23,7 @@ Research conducted on spaCy 3.8+ (latest as of May 2025) for Taboot v2 Tier B ex
 ## 1. Entity Ruler Setup
 
 ### Overview
+
 EntityRuler adds rule-based named entity recognition using pattern dictionaries. Internally uses Trie-based matcher for efficient pattern matching.
 
 ### Performance
@@ -31,14 +32,16 @@ EntityRuler adds rule-based named entity recognition using pattern dictionaries.
 - **Pattern Overhead:** <5-10% for <10k patterns
 
 ### Pattern Types
+
 1. **Phrase patterns:** Exact string matches
 2. **Token patterns:** Attribute-based matches (REGEX, POS, ENT_TYPE)
 
 ### Technical Entity Patterns
+
 ```python
 patterns = [
     # IP addresses (single token in spaCy)
-    {"label": "IP", "pattern": [{"TEXT": {"REGEX": r"^(?:25[0-5]|...)\.(?:...){{3}}$"}}]},
+    {"label": "IP", "pattern": [{"TEXT": {"REGEX": r"^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$"}}]},
 
     # Service names
     {"label": "SERVICE", "pattern": "nginx"},
@@ -48,7 +51,7 @@ patterns = [
     {"label": "HOST", "pattern": [{"TEXT": {"REGEX": r"^[a-z0-9][a-z0-9-]*\.local$"}}]},
 
     # Ports
-    {"label": "PORT", "pattern": [{"TEXT": {"REGEX": r"^(?:[1-9]\d{0,3}|...)$"}}]},
+    {"label": "PORT", "pattern": [{"TEXT": {"REGEX": r"^(?:[1-9]\d{0,3}|[1-5]\d{4}|6[0-4]\d{3}|65[0-4]\d{2}|655[0-2]\d|6553[0-5])$"}}]},
 
     # Endpoints
     {"label": "ENDPOINT", "pattern": [{"TEXT": {"REGEX": r"^/(?:[a-z0-9_-]+/?)+$"}}]}
@@ -56,18 +59,21 @@ patterns = [
 ```
 
 ### Implementation Notes
+
 - **Add BEFORE ner:** Use `nlp.add_pipe("entity_ruler", before="ner")`
 - **Overwrite entities:** Set `overwrite_ents=True` to replace statistical predictions
 - **Tokenization:** IP addresses remain single tokens (192.168.1.1)
 
 ### Code Location
-`/home/jmagar/code/taboot/packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md` - Section 1
+
+`packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md` - Section 1
 
 ---
 
 ## 2. Dependency Matchers
 
 ### Overview
+
 DependencyMatcher matches patterns in dependency parse trees using Semgrex operators. Requires pretrained parser component.
 
 ### Performance
@@ -75,6 +81,7 @@ DependencyMatcher matches patterns in dependency parse trees using Semgrex opera
 - **Memory:** Same as base model (~500MB)
 
 ### Semgrex Operators
+
 - `>`: Direct child (head → dependent)
 - `<`: Direct parent (dependent → head)
 - `>>`: Descendant (transitive)
@@ -83,6 +90,7 @@ DependencyMatcher matches patterns in dependency parse trees using Semgrex opera
 ### Relationship Patterns
 
 #### DEPENDS_ON Pattern
+
 ```python
 [
     {"RIGHT_ID": "verb", "RIGHT_ATTRS": {"LEMMA": {"IN": ["depend", "require"]}}},
@@ -94,9 +102,11 @@ DependencyMatcher matches patterns in dependency parse trees using Semgrex opera
      "RIGHT_ATTRS": {"DEP": "pobj", "ENT_TYPE": "SERVICE"}}
 ]
 ```
+
 **Matches:** "nginx depends on postgres"
 
 #### ROUTES_TO Pattern
+
 ```python
 [
     {"RIGHT_ID": "verb", "RIGHT_ATTRS": {"LEMMA": {"IN": ["route", "proxy"]}}},
@@ -108,9 +118,11 @@ DependencyMatcher matches patterns in dependency parse trees using Semgrex opera
      "RIGHT_ATTRS": {"DEP": "pobj", "ENT_TYPE": {"IN": ["HOST", "IP"]}}}
 ]
 ```
+
 **Matches:** "traefik routes traffic to backend.local"
 
 #### BINDS_PORT Pattern
+
 ```python
 [
     {"RIGHT_ID": "verb", "RIGHT_ATTRS": {"LEMMA": {"IN": ["bind", "listen"]}}},
@@ -122,9 +134,11 @@ DependencyMatcher matches patterns in dependency parse trees using Semgrex opera
      "RIGHT_ATTRS": {"DEP": "pobj", "ENT_TYPE": "PORT"}}
 ]
 ```
+
 **Matches:** "nginx binds to port 8080"
 
 #### EXPOSES_ENDPOINT Pattern
+
 ```python
 [
     {"RIGHT_ID": "verb", "RIGHT_ATTRS": {"LEMMA": {"IN": ["expose", "provide"]}}},
@@ -134,9 +148,11 @@ DependencyMatcher matches patterns in dependency parse trees using Semgrex opera
      "RIGHT_ATTRS": {"DEP": "dobj", "ENT_TYPE": "ENDPOINT"}}
 ]
 ```
+
 **Matches:** "API exposes /health endpoint"
 
 ### Span Extraction
+
 ```python
 # Extract source and target with character offsets
 subject = tokens[1]  # From pattern order
@@ -150,16 +166,19 @@ span = {
 ```
 
 ### Code Location
-`/home/jmagar/code/taboot/packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md` - Section 2
+
+`packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md` - Section 2
 
 ---
 
 ## 3. Sentence Classification
 
 ### Overview
+
 Classify sentences as TECHNICAL (Tier B-worthy) vs SKIP (generic prose). Two approaches: rule-based (fast) or trained (accurate).
 
 ### Approach A: Rule-Based (Recommended)
+
 - **Throughput:** 200-300 sent/sec
 - **Accuracy:** 85-90%
 - **Training:** None required
@@ -178,21 +197,25 @@ patterns = [
 ```
 
 ### Approach B: Trained TextCategorizer
+
 - **Throughput:** 50-100 sent/sec (CPU), 100-150 sent/sec (GPU)
 - **Accuracy:** 90-95%
 - **Training:** Required (labeled dataset)
 
 ### Recommendation
+
 **Use rule-based for Tier B** to meet ≥200 sent/sec target. Reserve trained classifier for Tier C if higher accuracy needed.
 
 ### Code Location
-`/home/jmagar/code/taboot/packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md` - Section 3
+
+`packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md` - Section 3
 
 ---
 
 ## 4. Batch Processing Optimization
 
 ### Overview
+
 `nlp.pipe()` enables efficient batch processing with internal batching. Critical for meeting performance targets.
 
 ### Optimal Batch Sizes
@@ -204,12 +227,14 @@ patterns = [
 | Long Articles | >2000 chars | 100-500 | 1 | 1000-2000 |
 
 ### Taboot Configuration
+
 - **Document Type:** Technical docs (500-2000 chars)
 - **Batch Size:** 1000
 - **n_process:** 1 (sufficient with batching)
 - **Expected:** 200-350 sentences/sec
 
 ### Usage
+
 ```python
 # Automatic batch size
 docs = list(nlp.pipe(texts, batch_size=1000))
@@ -219,6 +244,7 @@ docs = list(nlp.pipe(texts, batch_size=1000, n_process=4))
 ```
 
 ### Performance Tips
+
 1. **Disable unused components:** `nlp.load(model, disable=["lemmatizer"])`
 2. **Short texts:** Increase batch_size (2000-5000)
 3. **Long texts:** Decrease batch_size (100-500)
@@ -226,6 +252,7 @@ docs = list(nlp.pipe(texts, batch_size=1000, n_process=4))
 5. **Memory-constrained:** Lower batch_size to avoid OOM
 
 ### Benchmarking
+
 ```python
 def benchmark_pipeline(nlp, texts, batch_sizes=[100, 500, 1000, 2000, 5000]):
     for batch_size in batch_sizes:
@@ -238,13 +265,15 @@ def benchmark_pipeline(nlp, texts, batch_sizes=[100, 500, 1000, 2000, 5000]):
 ```
 
 ### Code Location
-`/home/jmagar/code/taboot/packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md` - Section 4
+
+`packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md` - Section 4
 
 ---
 
 ## 5. Caching & Dead Letter Queue
 
 ### Overview
+
 Cache spaCy results in Redis keyed by deterministic content hash. Implement DLQ for failed extractions with retry strategy.
 
 ### Performance
@@ -253,7 +282,8 @@ Cache spaCy results in Redis keyed by deterministic content hash. Implement DLQ 
 - **Speedup:** 10-50x on repeated content
 
 ### Cache Keys
-```
+
+```text
 extraction:{content_hash} → extraction result (TTL: 7d)
 extraction:meta:{content_hash} → metadata (version, timestamp)
 dlq:extraction:{content_hash} → failed extraction (TTL: 30d)
@@ -262,6 +292,7 @@ dlq:failed:{content_hash} → permanently failed (max retries exceeded)
 ```
 
 ### Content Hashing
+
 ```python
 import hashlib
 
@@ -271,6 +302,7 @@ def hash_content(content: str) -> str:
 ```
 
 ### Cache Implementation
+
 ```python
 class SpacyExtractionCache:
     def __init__(self, redis_url: str, ttl_days: int = 7, extractor_version: str = "1.0.0"):
@@ -304,6 +336,7 @@ class SpacyExtractionCache:
 ```
 
 ### DLQ Implementation
+
 ```python
 def add_to_dlq(self, content: str, error: Exception, max_retries: int = 3) -> bool:
     """Add failed extraction to DLQ. Returns False if max retries exceeded."""
@@ -331,6 +364,7 @@ def add_to_dlq(self, content: str, error: Exception, max_retries: int = 3) -> bo
 ```
 
 ### Retry Strategy
+
 ```python
 def retry_dlq_items(nlp, cache, batch_size=100) -> Dict[str, int]:
     """Retry failed extractions from DLQ."""
@@ -351,19 +385,22 @@ def retry_dlq_items(nlp, cache, batch_size=100) -> Dict[str, int]:
 ```
 
 ### Benefits
+
 1. **Reproducibility:** Deterministic hashing ensures same content = same hash
 2. **Version Control:** Extractor version in metadata enables cache invalidation
 3. **Resilience:** DLQ ensures zero data loss on transient failures
 4. **Performance:** <5ms cache hits enable high-throughput pipelines
 
 ### Code Location
-`/home/jmagar/code/taboot/packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md` - Section 5
+
+`packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md` - Section 5
 
 ---
 
 ## 6. Complete Integration
 
 ### TierBExtractor Class
+
 ```python
 class TierBExtractor:
     """
@@ -412,7 +449,8 @@ class TierBExtractor:
 ```
 
 ### Pipeline Flow
-```
+
+```text
 Input: List[str] (documents)
   ↓
 1. Check cache (Redis)
@@ -431,7 +469,8 @@ Output: List[Dict] (entities, relationships, technical_sentences)
 ```
 
 ### Code Location
-`/home/jmagar/code/taboot/packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md` - Section 6
+
+`packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md` - Section 6
 
 ---
 
@@ -467,6 +506,7 @@ Output: List[Dict] (entities, relationships, technical_sentences)
 ## Recommendations
 
 ### Model Selection
+
 ✅ **Use en_core_web_md for Tier B**
 - Meets ≥200 sent/sec target on CPU
 - Lower memory footprint (~800MB peak)
@@ -478,6 +518,7 @@ Output: List[Dict] (entities, relationships, technical_sentences)
 - Reserve for Tier C if higher accuracy needed
 
 ### Configuration
+
 ```python
 extractor = TierBExtractor(
     model="en_core_web_md",           # CPU-optimized
@@ -489,6 +530,7 @@ extractor = TierBExtractor(
 ```
 
 ### Pipeline Optimization
+
 1. **Disable unused components:** Lemmatizer, NER (if using EntityRuler)
 2. **Enable caching:** 10-50x speedup on repeated content
 3. **Implement DLQ:** Zero data loss on transient failures
@@ -497,7 +539,8 @@ extractor = TierBExtractor(
 6. **Monitor performance:** Track sentences/sec, cache hit rate, DLQ size
 
 ### Integration with Tier A/C
-```
+
+```text
 Tier A (Deterministic)
   ↓ sections, tier_a_entities
 Tier B (spaCy)
@@ -512,6 +555,7 @@ Neo4j Graph
 ## Memory & Hardware Notes
 
 ### RTX 4070 Specifications
+
 - **GPU Memory:** 12GB VRAM
 - **System RAM:** 32GB recommended
 - **CUDA:** Required for en_core_web_trf (not recommended)
@@ -523,6 +567,7 @@ Neo4j Graph
 - **GPU:** Not required (CPU-optimized)
 
 ### en_core_web_trf Memory Profile
+
 - **Loaded:** ~1GB
 - **Batch (1000 docs):** +1GB
 - **Peak:** ~2-3GB
@@ -538,6 +583,7 @@ Neo4j Graph
 ## Testing & Validation
 
 ### Unit Tests
+
 ```python
 def test_entity_extraction():
     """Test entity ruler extracts technical entities."""
@@ -579,6 +625,7 @@ def test_performance_target():
 ```
 
 ### Integration Test
+
 ```python
 def test_tier_a_b_c_flow():
     """Test complete Tier A → B → C flow."""
@@ -602,28 +649,32 @@ def test_tier_a_b_c_flow():
 ## Sources & Citations
 
 ### Official Documentation
-1. **spaCy API Documentation:** https://spacy.io/api
-2. **spaCy Usage - Rule-based Matching:** https://spacy.io/usage/rule-based-matching
-3. **spaCy Usage - Processing Pipelines:** https://spacy.io/usage/processing-pipelines
-4. **spaCy Facts & Figures:** https://spacy.io/usage/facts-figures
-5. **DependencyMatcher API:** https://spacy.io/api/dependencymatcher
-6. **EntityRuler API:** https://spacy.io/api/entityruler
-7. **Span API:** https://spacy.io/api/span
+
+1. **spaCy API Documentation:** <https://spacy.io/api>
+2. **spaCy Usage - Rule-based Matching:** <https://spacy.io/usage/rule-based-matching>
+3. **spaCy Usage - Processing Pipelines:** <https://spacy.io/usage/processing-pipelines>
+4. **spaCy Facts & Figures:** <https://spacy.io/usage/facts-figures>
+5. **DependencyMatcher API:** <https://spacy.io/api/dependencymatcher>
+6. **EntityRuler API:** <https://spacy.io/api/entityruler>
+7. **Span API:** <https://spacy.io/api/span>
 
 ### Performance Research
-8. **GitHub Discussion #9451:** Sizing and controlling GPU memory for training
-9. **GitHub Discussion #9932:** When does a GPU Matter?
-10. **GitHub Issue #9858:** 5-6x slower performance between v2 and v3
-11. **GitHub Discussion #13194:** spaCy high memory consumption issue
-12. **Blog: "The Spacy DependencyMatcher"** by Mark Neumann - https://markneumann.xyz/blog/dependency-matcher
+
+1. **GitHub Discussion #9451:** Sizing and controlling GPU memory for training
+2. **GitHub Discussion #9932:** When does a GPU Matter?
+3. **GitHub Issue #9858:** 5-6x slower performance between v2 and v3
+4. **GitHub Discussion #13194:** spaCy high memory consumption issue
+5. **Blog: "The Spacy DependencyMatcher"** by Mark Neumann - <https://markneumann.xyz/blog/dependency-matcher>
 
 ### Best Practices
-13. **Medium: "Geared Spacy: Building NLP pipeline in RedisGears"** by Alex Mikhalev
-14. **Azure Docs:** Best practices for Redis caching - Microsoft Learn
-15. **AWS Blog:** Optimize Redis Client Performance for Amazon ElastiCache
-16. **Stack Overflow:** Multiple Q&A on spaCy optimization patterns
+
+1. **Medium: "Geared Spacy: Building NLP pipeline in RedisGears"** by Alex Mikhalev
+2. **Azure Docs:** Best practices for Redis caching - Microsoft Learn
+3. **AWS Blog:** Optimize Redis Client Performance for Amazon ElastiCache
+4. **Stack Overflow:** Multiple Q&A on spaCy optimization patterns
 
 ### Recent Updates
+
 - **spaCy Version:** 3.8+ (released May 2025)
 - **Current Status:** Actively maintained open-source project
 - **Model Updates:** en_core_web_md optimized for CPU performance
@@ -649,6 +700,7 @@ def test_tier_a_b_c_flow():
 - [ ] Deploy to extraction worker container
 
 ### Performance Monitoring
+
 - **Metrics to track:**
   - Sentences/sec (target: ≥200)
   - Cache hit rate (target: >80% after warmup)
@@ -657,6 +709,7 @@ def test_tier_a_b_c_flow():
   - p95 latency (target: <500ms per doc)
 
 ### Future Optimizations
+
 1. **Pattern tuning:** Refine entity patterns based on actual data
 2. **Dependency patterns:** Add more relationship types (RUNS, MENTIONS)
 3. **GPU evaluation:** Test en_core_web_trf if accuracy issues arise
@@ -674,8 +727,8 @@ def test_tier_a_b_c_flow():
 **Performance Target:** ≥200 sentences/sec ✅ **ACHIEVED**
 
 **Full Implementation Guide:**
-`/home/jmagar/code/taboot/packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md`
+`packages/extraction/tier_b/SPACY_PATTERNS_GUIDE.md`
 
 **Project Documentation:**
-`/home/jmagar/code/taboot/CLAUDE.md`
-`/home/jmagar/code/taboot/packages/extraction/CLAUDE.md`
+`CLAUDE.md`
+`packages/extraction/CLAUDE.md`

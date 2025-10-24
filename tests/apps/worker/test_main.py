@@ -4,8 +4,9 @@ Tests background worker that polls Redis queue and processes extraction jobs.
 Follows TDD RED-GREEN-REFACTOR methodology.
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.fixture

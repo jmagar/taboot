@@ -9,11 +9,9 @@ import pytest
 from qdrant_client.http import models
 from qdrant_client.http.exceptions import UnexpectedResponse
 
-from packages.vector.client import QdrantConnectionError, QdrantVectorClient
+from packages.vector.qdrant_client import QdrantConnectionError, QdrantVectorClient
 from packages.vector.collections import (
-    create_collection,
     load_collection_config,
-    CollectionCreationError,
 )
 
 
@@ -37,7 +35,7 @@ class TestCollectionCreation:
     @pytest.fixture
     def client(self, mock_qdrant_client: Mock) -> QdrantVectorClient:
         """Create QdrantVectorClient with mocked dependencies."""
-        with patch("packages.vector.client.QdrantClient", return_value=mock_qdrant_client):
+        with patch("packages.vector.qdrant_client.QdrantClient", return_value=mock_qdrant_client):
             return QdrantVectorClient(
                 url="http://localhost:6333",
                 collection_name="documents",

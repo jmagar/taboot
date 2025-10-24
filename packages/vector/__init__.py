@@ -7,7 +7,7 @@ Provides:
 - Hybrid search and reranking capabilities
 """
 
-from packages.vector.client import QdrantConnectionError, QdrantVectorClient
+from packages.vector.qdrant_client import QdrantConnectionError, QdrantVectorClient
 from packages.vector.collections import (
     CollectionCreationError,
     create_collection,

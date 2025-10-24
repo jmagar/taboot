@@ -81,8 +81,8 @@ Total: 56/56 tests PASSING
 1. `packages/graph/client.py` - Neo4j driver with connection pooling
 2. `packages/vector/client.py` - Qdrant client with collection management
 3. `packages/common/health.py` - Service health check utilities
-4. `tests/packages/graph/test_neo4j_client.py` - Neo4j client tests
-5. `tests/packages/vector/test_qdrant_client.py` - Qdrant client tests
+4. `tests/packages/graph/test_client.py` - Neo4j client tests
+5. `tests/packages/vector/test_client.py` - Qdrant client tests
 6. `tests/packages/common/test_health.py` - Health check tests
 
 ### Implementation Highlights
@@ -128,7 +128,7 @@ uv run pytest --cov=packages tests/
 **T010 Completed**: Neo4j client with connection pooling
 
 **Files Created**:
-1. `/home/jmagar/code/taboot/packages/graph/client.py` - Neo4j driver client with:
+1. `packages/graph/client.py` - Neo4j driver client with:
    - Connection pooling via Neo4j GraphDatabase driver
    - Health check method with fail-safe error handling
    - Session context manager for query execution
@@ -136,7 +136,7 @@ uv run pytest --cov=packages tests/
    - JSON structured logging with correlation ID tracking
    - Full type hints (mypy strict mode compliant)
 
-2. `/home/jmagar/code/taboot/tests/packages/graph/test_client.py` - Comprehensive test suite:
+2. `tests/packages/graph/test_client.py` - Comprehensive test suite:
    - 15 unit tests covering all client functionality
    - Connection management tests
    - Health check tests (success/failure/not-connected cases)
@@ -154,7 +154,7 @@ uv run pytest --cov=packages tests/
 **T012 Completed**: Health check utilities for all services
 
 **Files Created**:
-1. `/home/jmagar/code/taboot/packages/common/health.py` - Service health checks:
+1. `packages/common/health.py` - Service health checks:
    - `check_neo4j_health()` - Neo4j bolt connection verification
    - `check_qdrant_health()` - Qdrant /readiness endpoint
    - `check_redis_health()` - Redis ping check
@@ -165,7 +165,7 @@ uv run pytest --cov=packages tests/
    - `check_system_health()` - Aggregate check for all services (concurrent)
    - `SystemHealthStatus` TypedDict for type-safe health responses
 
-2. `/home/jmagar/code/taboot/tests/packages/common/test_health.py` - Complete test coverage:
+2. `tests/packages/common/test_health.py` - Complete test coverage:
    - 18 unit tests covering all health check functions
    - Tests for healthy states (200 responses, successful connections)
    - Tests for unhealthy states (errors, timeouts, bad status codes)
@@ -193,7 +193,7 @@ Continue Phase 2: Neo4j client tests (T013-T014) and Qdrant client (T011, T015-T
 **T021 Completed**: Qdrant collection creation tests
 
 **Files Created**:
-1. `/home/jmagar/code/taboot/tests/packages/vector/test_collections.py` - Collection creation test suite:
+1. `tests/packages/vector/test_collections.py` - Collection creation test suite:
    - 11 unit tests covering collection creation functionality
    - TestCollectionCreation class (6 tests):
      * test_collection_config_loads_correctly - Verifies JSON config loads
@@ -248,7 +248,7 @@ Continue Phase 3 (US4): T022 (collections.py loader) or T019 (Neo4j constraint t
 **T026 Completed**: Init CLI command implementation
 
 **Files Created**:
-1. `/home/jmagar/code/taboot/apps/cli/commands/init.py` - Complete init workflow orchestration:
+1. `apps/cli/commands/init.py` - Complete init workflow orchestration:
    - `init_command()` - Main entry point for `taboot init` command
    - `create_neo4j_constraints()` - Creates all Neo4j constraints and indexes from GRAPH_SCHEMA.md
    - `create_qdrant_collections()` - Creates Qdrant collections with proper vector configuration
@@ -261,7 +261,7 @@ Continue Phase 3 (US4): T022 (collections.py loader) or T019 (Neo4j constraint t
      5. Report success or failure with clear messaging
 
 **Files Modified**:
-1. `/home/jmagar/code/taboot/apps/cli/main.py` - Updated init() to call init_command from commands module
+1. `apps/cli/main.py` - Updated init() to call init_command from commands module
 
 **Implementation Details**:
 - Follows TDD GREEN phase: All 9 tests from T025 now pass (was 2/9, now 9/9)
@@ -305,7 +305,7 @@ Continue Phase 3 (US4): T022 (collections.py loader) or T019 (Neo4j constraint t
 **T025 Completed**: Init CLI command tests
 
 **Files Created**:
-1. `/home/jmagar/code/taboot/tests/apps/cli/test_init.py` - Comprehensive CLI test suite:
+1. `tests/apps/cli/test_init.py` - Comprehensive CLI test suite:
    - 9 unit tests covering all init command scenarios
    - Test for command registration and availability
    - Test for calling all initialization functions (Neo4j, Qdrant, PostgreSQL)
@@ -356,7 +356,7 @@ Continue Phase 3 (US4): T022 (collections.py loader) or T019 (Neo4j constraint t
 **T019 Completed**: Write tests for Neo4j constraint creation
 
 **Files Created**:
-1. `/home/jmagar/code/taboot/tests/packages/graph/test_constraints.py` - Comprehensive test suite for constraint creation:
+1. `tests/packages/graph/test_constraints.py` - Comprehensive test suite for constraint creation:
    - `test_constraint_creation_loads_cypher_file_correctly` - Verifies loading of neo4j-constraints.cypher
    - `test_constraint_creation_executes_in_neo4j` - Verifies constraints are executed in Neo4j
    - `test_constraint_creation_handles_errors` - Verifies error handling and ConstraintCreationError
@@ -366,7 +366,7 @@ Continue Phase 3 (US4): T022 (collections.py loader) or T019 (Neo4j constraint t
    - `test_constraint_creation_with_correlation_id` - Verifies correlation ID logging
 
 **Files Modified**:
-1. `/home/jmagar/code/taboot/tests/conftest.py` - Added missing integer fields (reranker_batch_size, ollama_port) to test_config fixture
+1. `tests/conftest.py` - Added missing integer fields (reranker_batch_size, ollama_port) to test_config fixture
 
 **Implementation Details**:
 - 7 comprehensive unit tests following TDD RED phase
@@ -391,7 +391,7 @@ Continue Phase 3 (US4): T022 (collections.py loader) or T019 (Neo4j constraint t
 **T023 Completed**: Write tests for PostgreSQL schema creation
 
 **Files Created**:
-1. `/home/jmagar/code/taboot/tests/packages/common/test_db_schema.py` - Comprehensive test suite for PostgreSQL schema creation:
+1. `tests/packages/common/test_db_schema.py` - Comprehensive test suite for PostgreSQL schema creation:
    - `test_load_schema_file_success` - Verifies loading of postgresql-schema.sql file
    - `test_load_schema_file_not_found` - Verifies FileNotFoundError when file doesn't exist
    - `test_create_schema_executes_sql` - Verifies SQL execution via database connection

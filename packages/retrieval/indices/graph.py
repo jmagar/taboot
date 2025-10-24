@@ -1,6 +1,5 @@
 """PropertyGraphIndex implementation over Neo4j."""
 
-from typing import Optional
 from llama_index.core import PropertyGraphIndex
 from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
 

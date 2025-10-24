@@ -1,7 +1,7 @@
 """Retrieval settings configuration for embeddings, LLM, and search parameters."""
 
 import os
-from typing import List
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -58,7 +58,7 @@ class RetrievalSettings(BaseSettings):
         le=3,
         description="Maximum hops for graph traversal"
     )
-    relationship_priority: List[str] = Field(
+    relationship_priority: list[str] = Field(
         default=["DEPENDS_ON", "ROUTES_TO", "BINDS", "EXPOSES_ENDPOINT", "MENTIONS"],
         description="Priority order for relationship types in graph traversal"
     )

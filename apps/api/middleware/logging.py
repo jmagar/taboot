@@ -12,7 +12,7 @@ Conforms to observability requirements in docs/OBSERVABILITY.md.
 
 import logging
 import time
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 from uuid import uuid4
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -80,7 +80,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             response.headers["X-Request-ID"] = request_id
             return response
 
-        except Exception as e:
+        except Exception:
             # Calculate elapsed time
             elapsed_ms = (time.perf_counter_ns() - start_ns) // 1_000_000
 

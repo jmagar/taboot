@@ -4,14 +4,11 @@ Implements GET /documents with filtering and pagination.
 """
 
 import logging
-import os
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
 
-from packages.core.use_cases.list_documents import DocumentListResponse, ListDocumentsUseCase
-from packages.schemas.models import Document, ExtractionState, SourceType
+from packages.core.use_cases.list_documents import DocumentListResponse
+from packages.schemas.models import ExtractionState, SourceType
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +19,10 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 def list_documents(
     limit: int = Query(default=10, ge=1, le=100, description="Maximum documents to return"),
     offset: int = Query(default=0, ge=0, description="Number of documents to skip (pagination)"),
-    source_type: Optional[str] = Query(
+    source_type: str | None = Query(
         default=None, description="Filter by source type (web, github, etc.)"
     ),
-    extraction_state: Optional[str] = Query(
+    extraction_state: str | None = Query(
         default=None, description="Filter by extraction state (pending, completed, etc.)"
     ),
 ) -> DocumentListResponse:
@@ -49,7 +46,7 @@ def list_documents(
     """
     try:
         # Parse and validate filters
-        source_type_enum: Optional[SourceType] = None
+        source_type_enum: SourceType | None = None
         if source_type:
             try:
                 source_type_enum = SourceType(source_type)
@@ -61,7 +58,7 @@ def list_documents(
                     f"Valid values: {', '.join(valid_values)}",
                 ) from None
 
-        extraction_state_enum: Optional[ExtractionState] = None
+        extraction_state_enum: ExtractionState | None = None
         if extraction_state:
             try:
                 extraction_state_enum = ExtractionState(extraction_state)
@@ -75,7 +72,7 @@ def list_documents(
 
         # Import database client and document store
         from packages.common.db_schema import get_postgres_client
-        from packages.common.postgres_document_store import PostgresDocumentStore
+        from packages.clients.postgres_document_store import PostgresDocumentStore
 
         # Get PostgreSQL connection
         conn = get_postgres_client()

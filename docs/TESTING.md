@@ -202,7 +202,7 @@ def test_neo4j_write_and_read():
 # tests/conftest.py (pytest discovers automatically)
 import pytest
 from packages.graph.client import Neo4jClient
-from packages.vector.client import QdrantClient
+from packages.vector.qdrant_client import QdrantClient
 
 @pytest.fixture(scope="session")
 def neo4j_client():

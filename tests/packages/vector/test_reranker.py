@@ -1,6 +1,7 @@
 """Tests for reranking with Qwen3-Reranker-0.6B."""
 
 import pytest
+
 from packages.vector.reranker import Reranker
 
 

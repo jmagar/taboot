@@ -911,23 +911,23 @@ RETURN DISTINCT dep.name;
 ## 9. References & Further Reading
 
 ### Official Neo4j Documentation
-- **Cypher Manual (Constraints):** https://neo4j.com/docs/cypher-manual/current/constraints/
-- **Cypher Manual (Indexes):** https://neo4j.com/docs/cypher-manual/current/indexes/
-- **Python Driver Manual:** https://neo4j.com/docs/python-manual/current/
-- **APOC Documentation:** https://neo4j.com/docs/apoc/current/
+- [Cypher Manual (Constraints)](https://neo4j.com/docs/cypher-manual/current/constraints/)
+- [Cypher Manual (Indexes)](https://neo4j.com/docs/cypher-manual/current/indexes/)
+- [Python Driver Manual](https://neo4j.com/docs/python-manual/current/)
+- [APOC Documentation](https://neo4j.com/docs/apoc/current/)
 
 ### Key Blog Posts & Articles
-- **5 Tips for Fast Batched Updates:** https://medium.com/neo4j/5-tips-tricks-for-fast-batched-updates-of-graph-structures-with-neo4j-and-cypher-73c7f693c8cc
-- **Understanding MERGE:** https://neo4j.com/developer/kb/understanding-how-merge-works/
-- **Neo4j 4.3 Relationship Indexes:** https://neo4j.com/blog/developer/neo4j-4-3-blog-series-relationship-indexes/
-- **Microservices with Neo4j:** https://neo4j.com/blog/nodes/fixing-microservices-architecture-graphconnect/
+- [5 Tips for Fast Batched Updates](https://medium.com/neo4j/5-tips-tricks-for-fast-batched-updates-of-graph-structures-with-neo4j-and-cypher-73c7f693c8cc)
+- [Understanding MERGE](https://neo4j.com/developer/kb/understanding-how-merge-works/)
+- [Neo4j 4.3 Relationship Indexes](https://neo4j.com/blog/developer/neo4j-4-3-blog-series-relationship-indexes/)
+- [Microservices with Neo4j](https://neo4j.com/blog/nodes/fixing-microservices-architecture-graphconnect/)
 
 ### Performance Benchmarks
-- **Best Practices for Large Updates:** https://neo4j.com/blog/nodes/nodes-2019-best-practices-to-make-large-updates-in-neo4j/
-- **Neo4j Performance Guide:** https://neo4j-guide.com/neo4j-slow-write-performance/
+- [Best Practices for Large Updates](https://neo4j.com/blog/nodes/nodes-2019-best-practices-to-make-large-updates-in-neo4j/)
+- [Neo4j Performance Guide](https://neo4j-guide.com/neo4j-slow-write-performance/)
 
 ### Status Codes (Error Handling)
-- **Neo4j Status Codes:** https://neo4j.com/docs/status-codes/current/
+- [Neo4j Status Codes](https://neo4j.com/docs/status-codes/current/)
 
 ---
 

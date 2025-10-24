@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from apps.api.deps.auth import verify_api_key
-
 from packages.core.use_cases.query import execute_query
 
 logger = logging.getLogger(__name__)

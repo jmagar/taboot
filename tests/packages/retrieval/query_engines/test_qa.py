@@ -1,6 +1,7 @@
 """Tests for QA query engine with citations and latency tracking."""
 
 import pytest
+
 from packages.retrieval.query_engines.qa import QAQueryEngine
 
 

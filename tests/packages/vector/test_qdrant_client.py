@@ -1,12 +1,13 @@
 """Unit tests for Qdrant client."""
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.exceptions import UnexpectedResponse
 
-from packages.vector.client import QdrantVectorClient, QdrantConnectionError
+from packages.vector.qdrant_client import QdrantConnectionError, QdrantVectorClient
 
 
 class TestQdrantVectorClient:
@@ -20,7 +21,7 @@ class TestQdrantVectorClient:
     @pytest.fixture
     def client(self, mock_qdrant_client: Mock) -> QdrantVectorClient:
         """Create QdrantVectorClient with mocked dependencies."""
-        with patch("packages.vector.client.QdrantClient", return_value=mock_qdrant_client):
+        with patch("packages.vector.qdrant_client.QdrantClient", return_value=mock_qdrant_client):
             return QdrantVectorClient(
                 url="http://localhost:6333",
                 collection_name="test_collection",
@@ -29,7 +30,7 @@ class TestQdrantVectorClient:
 
     def test_init_creates_client(self, mock_qdrant_client: Mock) -> None:
         """Test client initialization."""
-        with patch("packages.vector.client.QdrantClient", return_value=mock_qdrant_client):
+        with patch("packages.vector.qdrant_client.QdrantClient", return_value=mock_qdrant_client):
             client = QdrantVectorClient(
                 url="http://localhost:6333",
                 collection_name="test_collection",

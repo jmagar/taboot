@@ -5,7 +5,6 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 """
 
 import logging
-from typing import Optional
 
 from llama_index.core import Document
 from llama_index.readers.google import GmailReader as LlamaGmailReader
@@ -50,7 +49,7 @@ class GmailReader:
         )
 
     def load_data(
-        self, query: str = "", limit: Optional[int] = None
+        self, query: str = "", limit: int | None = None
     ) -> list[Document]:
         """Load email messages from Gmail.
 
@@ -71,7 +70,7 @@ class GmailReader:
         reader = LlamaGmailReader(credentials_path=self.credentials_path)
 
         # Retry logic
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for attempt in range(self.max_retries):
             try:
                 # Load messages

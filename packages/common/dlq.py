@@ -5,7 +5,7 @@ Redis-based DLQ with exponential backoff retry mechanism.
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from redis import asyncio as redis
@@ -41,8 +41,11 @@ class DeadLetterQueue:
         self.base_delay_seconds = base_delay_seconds
 
         logger.info(
-            f"Initialized DeadLetterQueue (max_retries={max_retries}, "
-            f"base_delay={base_delay_seconds}s)"
+            "Initialized DeadLetterQueue",
+            extra={
+                "max_retries": max_retries,
+                "base_delay_seconds": base_delay_seconds,
+            },
         )
 
     async def send_to_dlq(
@@ -62,7 +65,7 @@ class DeadLetterQueue:
         dlq_entry = {
             **job_data,
             "error": error,
-            "failed_at": datetime.now(timezone.utc).isoformat(),
+            "failed_at": datetime.now(UTC).isoformat(),
         }
 
         # Convert to JSON
@@ -72,7 +75,8 @@ class DeadLetterQueue:
         await self.redis_client.lpush(queue_name, entry_json)
 
         logger.warning(
-            f"Sent job to DLQ: {job_data.get('doc_id', 'unknown')} - {error}"
+            "Sent job to DLQ",
+            extra={"doc_id": job_data.get("doc_id", "unknown"), "error": error},
         )
 
     async def increment_retry_count(self, job_id: str) -> int:
@@ -84,10 +88,11 @@ class DeadLetterQueue:
         Returns:
             Current retry count after increment.
         """
-        key = f"retry_count:{job_id}"
         count = await self.redis_client.hincrby("retry_counts", job_id, 1)
 
-        logger.debug(f"Incremented retry count for {job_id}: {count}")
+        logger.debug(
+            "Incremented retry count", extra={"job_id": job_id, "count": count}
+        )
 
         return count
 
@@ -121,8 +126,13 @@ class DeadLetterQueue:
         should_retry = current_count < self.max_retries
 
         logger.debug(
-            f"Retry check for {job_id}: count={current_count}, "
-            f"max={self.max_retries}, should_retry={should_retry}"
+            "Retry check",
+            extra={
+                "job_id": job_id,
+                "count": current_count,
+                "max": self.max_retries,
+                "should_retry": should_retry,
+            },
         )
 
         return should_retry
@@ -145,7 +155,8 @@ class DeadLetterQueue:
         delay = self.base_delay_seconds * (2 ** (retry_count - 1))
 
         logger.debug(
-            f"Calculated backoff delay for retry {retry_count}: {delay}s"
+            "Calculated backoff delay",
+            extra={"retry_count": retry_count, "delay_s": delay},
         )
 
         return delay
@@ -158,7 +169,7 @@ class DeadLetterQueue:
         """
         await self.redis_client.hdel("retry_counts", job_id)
 
-        logger.debug(f"Cleared retry count for {job_id}")
+        logger.debug("Cleared retry count", extra={"job_id": job_id})
 
 
 # Export public API

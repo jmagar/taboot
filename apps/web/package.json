@@ -1,0 +1,42 @@
+{
+  "name": "@taboot/web",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf .next .turbo node_modules",
+    "dev": "next dev --turbopack",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix",
+    "start": "next start"
+  },
+  "prettier": "@taboot/prettier-config",
+  "dependencies": {
+    "@hookform/resolvers": "catalog:web",
+    "@tanstack/react-query": "catalog:web",
+    "@types/qrcode": "catalog:web",
+    "@taboot/auth": "workspace:*",
+    "@taboot/ui": "workspace:*",
+    "@taboot/utils": "workspace:*",
+    "lucide-react": "catalog:web",
+    "next": "catalog:web",
+    "next-themes": "catalog:web",
+    "qrcode": "catalog:web",
+    "react": "catalog:web",
+    "react-dom": "catalog:web",
+    "react-hook-form": "catalog:web",
+    "sonner": "catalog:web"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:dev",
+    "@types/react": "catalog:web",
+    "@types/react-dom": "catalog:web",
+    "@taboot/eslint-config": "workspace:^",
+    "@taboot/prettier-config": "workspace:*",
+    "@taboot/typescript-config": "workspace:*",
+    "eslint": "catalog:eslint",
+    "typescript": "catalog:dev"
+  }
+}

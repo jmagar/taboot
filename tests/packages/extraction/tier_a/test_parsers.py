@@ -1,6 +1,5 @@
 """Tests for Tier A deterministic parsers (code blocks, tables, YAML/JSON)."""
 
-import pytest
 from packages.extraction.tier_a.parsers import (
     parse_code_blocks,
     parse_tables,

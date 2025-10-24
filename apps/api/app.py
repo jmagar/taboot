@@ -107,6 +107,7 @@ async def health() -> dict:
     """
     from fastapi import status as http_status
     from fastapi.responses import JSONResponse
+
     from packages.common.health import check_system_health
 
     health_status = await check_system_health()

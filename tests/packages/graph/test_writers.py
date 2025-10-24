@@ -1,7 +1,9 @@
 """Tests for batched Neo4j writers."""
 
+from unittest.mock import AsyncMock, Mock
+
 import pytest
-from unittest.mock import Mock, AsyncMock
+
 from packages.graph.writers import BatchedGraphWriter
 
 

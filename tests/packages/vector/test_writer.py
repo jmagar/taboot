@@ -1,7 +1,7 @@
 """Unit tests for Qdrant writer."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 import pytest
@@ -9,7 +9,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
 from packages.schemas.models import Chunk, SourceType
-from packages.vector.writer import QdrantWriter, QdrantWriteError
+from packages.vector.writer import QdrantWriteError, QdrantWriter
 
 
 class TestQdrantWriter:
@@ -35,7 +35,7 @@ class TestQdrantWriter:
         """Create a sample Chunk for testing."""
         doc_id = uuid.uuid4()
         chunk_id = uuid.uuid4()
-        ingested_at = datetime.now(timezone.utc)
+        ingested_at = datetime.now(UTC)
 
         return Chunk(
             chunk_id=chunk_id,
@@ -142,7 +142,7 @@ class TestQdrantWriter:
                 token_count=10 + i,
                 source_url=f"https://example.com/doc{i}",
                 source_type=SourceType.WEB,
-                ingested_at=int(datetime.now(timezone.utc).timestamp()),
+                ingested_at=int(datetime.now(UTC).timestamp()),
                 tags=[f"tag{i}"],
             )
             chunks.append(chunk)
@@ -226,7 +226,7 @@ class TestQdrantWriter:
                 token_count=10,
                 source_url="https://example.com/doc",
                 source_type=SourceType.WEB,
-                ingested_at=int(datetime.now(timezone.utc).timestamp()),
+                ingested_at=int(datetime.now(UTC).timestamp()),
                 tags=[],
             )
             chunks.append(chunk)
@@ -262,7 +262,7 @@ class TestQdrantWriter:
             token_count=10,
             source_url="https://example.com/doc",
             source_type=SourceType.WEB,
-            ingested_at=int(datetime.now(timezone.utc).timestamp()),
+            ingested_at=int(datetime.now(UTC).timestamp()),
             tags=None,  # Optional field missing
         )
         embedding = [0.1] * 1024

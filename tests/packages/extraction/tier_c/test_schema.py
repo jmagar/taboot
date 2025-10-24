@@ -2,7 +2,8 @@
 
 import pytest
 from pydantic import ValidationError
-from packages.extraction.tier_c.schema import Triple, ExtractionResult
+
+from packages.extraction.tier_c.schema import ExtractionResult, Triple
 
 
 class TestTriple:

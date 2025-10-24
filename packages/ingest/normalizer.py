@@ -7,7 +7,6 @@ Per research.md: Use readability/justext for boilerplate removal.
 import logging
 import re
 from html.parser import HTMLParser
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +22,9 @@ class _MarkdownConverter(HTMLParser):
         self.in_code = False
         self.in_pre = False
         self.skip_tag = False
-        self.heading_level: Optional[int] = None
+        self.heading_level: int | None = None
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         """Handle opening HTML tags."""
         tag = tag.lower()
 

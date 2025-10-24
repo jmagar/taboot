@@ -2,8 +2,8 @@
 
 import pytest
 from typer.testing import CliRunner
-from apps.cli.main import app
 
+from apps.cli.main import app
 
 runner = CliRunner()
 

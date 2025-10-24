@@ -247,7 +247,7 @@ def extract_entities_batch(
 ## 2. Dependency Matchers for Relationship Extraction
 
 ### Overview
-DependencyMatcher matches patterns in dependency parse trees using Semgrex operators. Requires pretrained parser (sets `Token.dep` and `Token.head`).
+DependencyMatcher matches patterns in dependency parse trees using Semgrex operators. Requires a pretrained parser (sets `Token.dep` and `Token.head`).
 
 ### Pattern Structure
 - **Dictionary List:** Each dict describes a token and its relation to others
@@ -1808,7 +1808,8 @@ def tier_b_integration_example():
 ## Integration Points
 
 ### Tier A → Tier B Flow
-```
+
+```json
 Tier A Output: {
   "doc_id": "...",
   "sections": [...],
@@ -1827,7 +1828,8 @@ Tier B Process:
 ```
 
 ### Tier B → Tier C Flow
-```
+
+```json
 Tier B Output: {
   "entities": [...],
   "technical_sentences": [...],

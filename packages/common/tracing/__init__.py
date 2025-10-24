@@ -7,7 +7,7 @@ as specified in FR-035.
 
 import uuid
 from contextvars import ContextVar
-from typing import Any
+from types import TracebackType
 
 # Context variable for storing the current correlation ID
 _correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
@@ -108,11 +108,18 @@ class TracingContext:
         self.correlation_id = set_correlation_id(self.correlation_id)
         return self.correlation_id
 
-    def __exit__(self, *args: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         """Exit the context and restore the previous correlation ID.
 
         Args:
-            *args: Exception information (ignored).
+            exc_type: Exception type if an exception was raised.
+            exc: Exception instance if an exception was raised.
+            tb: Traceback if an exception was raised.
         """
         if self.previous_id is None:
             clear_correlation_id()
@@ -162,10 +169,10 @@ def build_trace_chain(
 
 # Export public API
 __all__ = [
-    "generate_correlation_id",
-    "set_correlation_id",
-    "get_correlation_id",
-    "clear_correlation_id",
     "TracingContext",
     "build_trace_chain",
+    "clear_correlation_id",
+    "generate_correlation_id",
+    "get_correlation_id",
+    "set_correlation_id",
 ]

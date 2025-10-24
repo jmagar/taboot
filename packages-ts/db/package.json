@@ -1,0 +1,28 @@
+{
+  "name": "@taboot/db",
+  "version": "0.0.1",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist generated .turbo node_modules",
+    "db:deploy": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev --skip-generate",
+    "db:reset": "prisma migrate reset --force",
+    "db:push": "prisma db push",
+    "format": "prisma format"
+  },
+  "prettier": "@taboot/prettier-config",
+  "dependencies": {
+    "@prisma/client": "catalog:core"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:dev",
+    "@taboot/typescript-config": "workspace:*",
+    "prisma": "catalog:core",
+    "typescript": "catalog:dev"
+  }
+}

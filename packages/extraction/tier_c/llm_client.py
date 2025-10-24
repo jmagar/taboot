@@ -11,7 +11,7 @@ except ImportError:
     ollama = None  # type: ignore
     AsyncClient = None  # type: ignore
 
-from packages.extraction.tier_c.schema import ExtractionResult, Triple
+from packages.extraction.tier_c.schema import ExtractionResult
 
 
 class TierCLLMClient:

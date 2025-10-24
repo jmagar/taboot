@@ -1,6 +1,5 @@
 """Tests for PostgreSQL client connection."""
 
-import pytest
 from packages.common.db_schema import get_postgres_client
 
 

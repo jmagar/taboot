@@ -392,6 +392,7 @@ ORDER BY i.name
 ## Validation Queries
 
 ### Find Orphaned Nodes
+
 ```cypher
 MATCH (n)
 WHERE NOT EXISTS { (n)-[]-() }
@@ -400,6 +401,7 @@ ORDER BY label, name
 ```
 
 ### Find Nodes Missing Temporal Tracking
+
 ```cypher
 MATCH (n)
 WHERE NOT any(obs IN n.observations WHERE obs CONTAINS 'created_at:' OR obs CONTAINS 'modified_at:')
@@ -409,6 +411,7 @@ LIMIT 10
 ```
 
 ### Find Relationships Missing Temporal Tracking
+
 ```cypher
 MATCH (a)-[r]->(b)
 WHERE r.created_at IS NULL
@@ -420,6 +423,7 @@ LIMIT 10
 ```
 
 ### Find Duplicate Relationships
+
 ```cypher
 MATCH (a)-[r]->(b)
 WITH a, type(r) as rel_type, b, count(*) as cnt
@@ -429,6 +433,7 @@ ORDER BY cnt DESC
 ```
 
 ### Verify Entity Counts
+
 ```cypher
 MATCH (n)
 RETURN labels(n)[0] as entity_type, count(*) as count

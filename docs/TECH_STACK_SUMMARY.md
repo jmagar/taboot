@@ -394,24 +394,24 @@ When running `/speckit.plan`, provide:
 
 ---
 
-## File Paths (Absolute)
+## File Paths (Repository-Relative)
 
 | Component | Path |
 |-----------|------|
-| Core layer | `/home/jmagar/code/taboot/packages/core/` |
-| Ingestion adapter | `/home/jmagar/code/taboot/packages/ingest/` |
-| Extraction adapter | `/home/jmagar/code/taboot/packages/extraction/` |
-| Graph adapter | `/home/jmagar/code/taboot/packages/graph/` |
-| Vector adapter | `/home/jmagar/code/taboot/packages/vector/` |
-| Retrieval adapter | `/home/jmagar/code/taboot/packages/retrieval/` |
-| Schemas layer | `/home/jmagar/code/taboot/packages/schemas/` |
-| Common utilities | `/home/jmagar/code/taboot/packages/common/` |
-| FastAPI app | `/home/jmagar/code/taboot/apps/api/` |
-| Typer CLI | `/home/jmagar/code/taboot/apps/cli/` |
-| MCP server | `/home/jmagar/code/taboot/apps/mcp/` |
-| Compose stack | `/home/jmagar/code/taboot/docker-compose.yaml` |
-| Configuration | `/home/jmagar/code/taboot/.env.example` |
-| Architecture docs | `/home/jmagar/code/taboot/docs/` |
+| Core layer | `packages/core/` |
+| Ingestion adapter | `packages/ingest/` |
+| Extraction adapter | `packages/extraction/` |
+| Graph adapter | `packages/graph/` |
+| Vector adapter | `packages/vector/` |
+| Retrieval adapter | `packages/retrieval/` |
+| Schemas layer | `packages/schemas/` |
+| Common utilities | `packages/common/` |
+| FastAPI app | `apps/api/` |
+| Typer CLI | `apps/cli/` |
+| MCP server | `apps/mcp/` |
+| Compose stack | `docker-compose.yaml` |
+| Configuration | `.env.example` |
+| Architecture docs | `docs/` |
 
 ---
 

@@ -172,7 +172,7 @@ services:
       OLLAMA_USE_MMAP: "true"
       OLLAMA_MAX_QUEUE: "20000"
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/11434 && echo 'ok' || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -187,7 +187,7 @@ services:
     ports:
       - "${PLAYWRIGHT_PORT:-3000}:3000"
     healthcheck:
-      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/3000' || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -256,8 +256,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
       - .:/app
-      - ~/.ssh:/home/taboot/.ssh:ro
-      - ~/.ssh/config:/home/taboot/.ssh/config:ro
+      - ${HOME}/.ssh:/home/taboot/.ssh:ro
     command: ["uvicorn", "apps.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "${TABOOT_HTTP_PORT:-8000}:8000"
@@ -279,9 +278,50 @@ services:
       retries: 3
       start_period: 20s
 
+  taboot-web:
+    <<: *common-base
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+      target: development
+    container_name: taboot-web
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "${TABOOT_WEB_PORT:-3000}:3000"
+    depends_on:
+      taboot-app:
+        condition: service_healthy
+    command: ["pnpm", "dev", "--filter", "@taboot/web"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
   # taboot-worker: Extraction worker (spaCy Tier B + LLM Tier C)
-  # Disabled until extraction pipeline implementation is complete
-  # To enable, uncomment below and implement packages/extraction/ services
+  #
+  # Status: Disabled until extraction pipeline implementation is complete.
+  #
+  # To enable:
+  #   1. Uncomment the entire taboot-worker section below
+  #   2. Ensure packages/extraction/ contains Tier B (spaCy) and Tier C (LLM)
+  #   3. Build the worker image: docker compose build taboot-worker
+  #   4. Start: docker compose up taboot-worker
+  #   5. Dependencies (listed below) must all be healthy before worker starts
+  #
+  # Depends on: taboot-cache, taboot-vectors, taboot-graph, taboot-embed,
+  #            taboot-rerank, taboot-db
+  #
+  # See: docs/WORKER_SETUP.md for configuration details
   #
   # taboot-worker:
   #   <<: *common-base

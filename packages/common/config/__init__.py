@@ -8,8 +8,12 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic import Field, HttpUrl, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+_ENV_LOADED = False
 
 
 def _is_running_in_container() -> bool:
@@ -42,6 +46,52 @@ def _is_running_in_container() -> bool:
     return False
 
 
+def _resolve_env_file() -> str | None:
+    """Locate the .env file regardless of the current working directory.
+
+    Preference order:
+        1. TABOOT_ENV_FILE environment variable (explicit override)
+        2. Current working directory (common for local runs)
+        3. Ancestors of this file (covers package execution within Docker)
+    """
+    override = os.getenv("TABOOT_ENV_FILE")
+    if override:
+        override_path = Path(override).expanduser()
+        if override_path.is_file():
+            return str(override_path)
+
+    cwd_candidate = Path.cwd() / ".env"
+    if cwd_candidate.is_file():
+        return str(cwd_candidate)
+
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / ".env"
+        if candidate.is_file():
+            return str(candidate)
+
+    return None
+
+
+_DEFAULT_ENV_FILE = _resolve_env_file()
+
+
+def ensure_env_loaded() -> None:
+    """Load environment variables from disk exactly once."""
+    global _ENV_LOADED
+
+    if _ENV_LOADED:
+        return
+
+    env_path = _DEFAULT_ENV_FILE or _resolve_env_file()
+    if env_path:
+        load_dotenv(env_path, override=False)
+
+    _ENV_LOADED = True
+
+
+ensure_env_loaded()
+
+
 class TeiConfig(BaseSettings):
     """Configuration block for Text Embeddings Inference service."""
 
@@ -67,7 +117,7 @@ class TabootConfig(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_DEFAULT_ENV_FILE,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -241,4 +291,4 @@ def get_config() -> TabootConfig:
 
 
 # Export convenience accessors
-__all__ = ["TabootConfig", "TeiConfig", "get_config"]
+__all__ = ["TabootConfig", "TeiConfig", "ensure_env_loaded", "get_config"]

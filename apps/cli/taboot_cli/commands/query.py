@@ -14,8 +14,12 @@ console = Console()
 
 def query_command(
     question: str = typer.Argument(..., help="Question to answer"),
-    sources: str | None = typer.Option(None, help="Comma-separated source types (e.g., web,docker_compose)"),
-    after: str | None = typer.Option(None, help="Filter by ingestion date (ISO format: 2025-10-15)"),
+    sources: str | None = typer.Option(
+        None, help="Comma-separated source types (e.g., web,docker_compose)"
+    ),
+    after: str | None = typer.Option(
+        None, help="Filter by ingestion date (ISO format: 2025-10-15)"
+    ),
     top_k: int = typer.Option(20, help="Number of candidates from vector search"),
     qdrant_url: str | None = typer.Option(None, help="Qdrant URL (default from env)"),
     neo4j_uri: str | None = typer.Option(None, help="Neo4j URI (default from env)"),
@@ -47,26 +51,30 @@ def query_command(
             console.print(f"[red]Error:[/red] Invalid date format: {after}")
             raise typer.Exit(1) from None
 
-    # Get config from environment
-    qdrant_url = qdrant_url or os.getenv("QDRANT_URL", "http://localhost:6333")
-    neo4j_uri = neo4j_uri or os.getenv("NEO4J_URI", "bolt://localhost:7687")
-    neo4j_user = os.getenv("NEO4J_USER", "neo4j")
-    neo4j_password = os.getenv("NEO4J_PASSWORD", "changeme")
-    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    # Get config from environment - ensure all required strings are non-None
+    resolved_qdrant_url: str = (
+        qdrant_url if qdrant_url is not None else os.getenv("QDRANT_URL") or "http://localhost:6333"
+    )
+    resolved_neo4j_uri: str = (
+        neo4j_uri if neo4j_uri is not None else os.getenv("NEO4J_URI") or "bolt://localhost:7687"
+    )
+    neo4j_user: str = os.getenv("NEO4J_USER") or "neo4j"
+    neo4j_password: str = os.getenv("NEO4J_PASSWORD") or "changeme"
+    ollama_url: str = os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434"
 
     try:
         # Execute query
         with console.status("[bold green]Retrieving and synthesizing answer..."):
             result = execute_query(
                 query=question,
-                qdrant_url=qdrant_url,
-                neo4j_uri=neo4j_uri,
+                qdrant_url=resolved_qdrant_url,
+                neo4j_uri=resolved_neo4j_uri,
                 neo4j_username=neo4j_user,
                 neo4j_password=neo4j_password,
                 ollama_base_url=ollama_url,
                 top_k=top_k,
                 source_types=source_types,
-                after=after_date
+                after=after_date,
             )
 
         if not result:
@@ -82,7 +90,9 @@ def query_command(
         breakdown = result.get("latency_breakdown", {})
         latency_str = f"[dim]Total: {latency_ms}ms"
         if breakdown:
-            latency_str += f" (retrieval: {breakdown.get('retrieval_ms', 0)}ms, synthesis: {breakdown.get('synthesis_ms', 0)}ms)"
+            retrieval_ms = breakdown.get("retrieval_ms", 0)
+            synthesis_ms = breakdown.get("synthesis_ms", 0)
+            latency_str += f" (retrieval: {retrieval_ms}ms, synthesis: {synthesis_ms}ms)"
         latency_str += "[/dim]"
         console.print(latency_str)
 

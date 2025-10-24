@@ -17,7 +17,8 @@ const errorMessages: Record<
     description: string;
     buttons?: {
       text: string;
-      href: string;
+      href?: string;
+      action?: 'go-back' | 'navigate';
       variant: 'link' | 'default' | 'outline' | 'destructive' | 'secondary' | 'ghost';
       icon: React.ElementType;
     }[];
@@ -32,12 +33,14 @@ const errorMessages: Record<
       {
         text: 'Back to Sign In',
         href: '/sign-in',
+        action: 'navigate',
         variant: 'default',
         icon: ArrowLeftIcon,
       },
       {
         text: 'Go to Home',
         href: '/',
+        action: 'navigate',
         variant: 'outline',
         icon: HomeIcon,
       },
@@ -52,12 +55,14 @@ const errorMessages: Record<
       {
         text: 'Back to Sign In',
         href: '/sign-in',
+        action: 'navigate',
         variant: 'default',
         icon: ArrowLeftIcon,
       },
       {
         text: 'Go to Home',
         href: '/',
+        action: 'navigate',
         variant: 'outline',
         icon: HomeIcon,
       },
@@ -70,15 +75,16 @@ const errorMessages: Record<
     buttons: [
       {
         text: 'Go Back',
-        href: 'go-back', // this is handled specially
+        action: 'go-back',
         variant: 'default',
         icon: ArrowLeftIcon,
       },
       {
         text: 'Back to Home',
         href: '/',
+        action: 'navigate',
         variant: 'outline',
-        icon: ArrowLeftIcon,
+        icon: HomeIcon,
       },
     ],
   },
@@ -109,36 +115,43 @@ function ErrorPageContent() {
         {/* Action Buttons */}
         <div className="flex flex-col gap-3 sm:flex-row">
           {buttons?.map((button) => {
-            const isGoBack = button.href === 'go-back';
-            return isGoBack ? (
-              <Button
-                key={button.text}
-                onClick={() => router.back()}
-                variant={button.variant}
-                size="lg"
-                className="cursor-pointer rounded-xl"
-                title={button.text}
-                aria-label={button.text}
-              >
-                <button.icon />
-                <span>{button.text}</span>
-              </Button>
-            ) : (
-              <Button
-                key={button.text}
-                asChild
-                variant={button.variant}
-                size="lg"
-                className="rounded-xl"
-                title={button.text}
-                aria-label={button.text}
-              >
-                <Link href={button.href}>
+            if (button.action === 'go-back') {
+              return (
+                <Button
+                  key={button.text}
+                  onClick={() => router.back()}
+                  variant={button.variant}
+                  size="lg"
+                  className="cursor-pointer rounded-xl"
+                  title={button.text}
+                  aria-label={button.text}
+                >
                   <button.icon />
                   <span>{button.text}</span>
-                </Link>
-              </Button>
-            );
+                </Button>
+              );
+            }
+
+            if (button.action === 'navigate' && button.href) {
+              return (
+                <Button
+                  key={button.text}
+                  asChild
+                  variant={button.variant}
+                  size="lg"
+                  className="rounded-xl"
+                  title={button.text}
+                  aria-label={button.text}
+                >
+                  <Link href={button.href}>
+                    <button.icon />
+                    <span>{button.text}</span>
+                  </Link>
+                </Button>
+              );
+            }
+
+            return null;
           })}
         </div>
       </div>
@@ -148,7 +161,11 @@ function ErrorPageContent() {
 
 export default function ErrorPage() {
   return (
-    <Suspense>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen w-full items-center justify-center">Loading...</div>
+      }
+    >
       <ErrorPageContent />
     </Suspense>
   );

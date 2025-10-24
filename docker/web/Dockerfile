@@ -5,6 +5,10 @@ FROM node:22-alpine AS base
 
 # Development stage - used for local development with hot reload
 FROM base AS development
+
+ARG PNPM_VERSION=9.12.3
+ARG TURBO_VERSION=2.1.3
+
 RUN apk update && apk upgrade
 RUN apk add --no-cache libc6-compat
 
@@ -12,9 +16,8 @@ RUN apk add --no-cache libc6-compat
 ENV PNPM_HOME="/root/.local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
-RUN npm install -g pnpm && \
-    pnpm config set global-bin-dir "$PNPM_HOME" && \
-    pnpm add -g turbo
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate && \
+    pnpm config set global-bin-dir "$PNPM_HOME"
 
 WORKDIR /app
 
@@ -37,6 +40,10 @@ CMD ["pnpm", "dev", "--filter", "@taboot/web"]
 
 # Builder stage - builds the production application
 FROM base AS builder
+
+ARG PNPM_VERSION=9.12.3
+ARG TURBO_VERSION=2.1.3
+
 RUN apk update && apk upgrade
 RUN apk add --no-cache libc6-compat
 
@@ -44,9 +51,8 @@ RUN apk add --no-cache libc6-compat
 ENV PNPM_HOME="/root/.local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
-RUN npm install -g pnpm && \
-    pnpm config set global-bin-dir "$PNPM_HOME" && \
-    pnpm add -g turbo
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate && \
+    pnpm config set global-bin-dir "$PNPM_HOME"
 
 WORKDIR /app
 
@@ -54,19 +60,22 @@ WORKDIR /app
 COPY . .
 
 # Prune workspace to only web app dependencies
-RUN turbo prune @taboot/web --docker
+RUN pnpm dlx turbo@${TURBO_VERSION} prune @taboot/web --docker
 
 # Installer stage - installs dependencies and builds
 FROM base AS installer
+
+ARG PNPM_VERSION=9.12.3
+ARG TURBO_VERSION=2.1.3
+
 RUN apk update && apk upgrade
 RUN apk add --no-cache libc6-compat
 
 ENV PNPM_HOME="/root/.local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
-RUN npm install -g pnpm && \
-    pnpm config set global-bin-dir "$PNPM_HOME" && \
-    pnpm add -g turbo
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate && \
+    pnpm config set global-bin-dir "$PNPM_HOME"
 
 WORKDIR /app
 
@@ -81,7 +90,7 @@ COPY --from=builder /app/out/full/ .
 RUN pnpm --filter @taboot/db db:generate || echo "No Prisma schema found, skipping..."
 
 # Build the application with Turbo
-RUN pnpm turbo build --filter=@taboot/web
+RUN pnpm dlx turbo@${TURBO_VERSION} build --filter=@taboot/web
 
 # Production runner stage
 FROM base AS production
@@ -102,5 +111,8 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD node -e "require('http').get('http://127.0.0.1:3000/api/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
 
 CMD ["node", "apps/web/server.js"]

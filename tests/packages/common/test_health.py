@@ -106,9 +106,7 @@ class TestQdrantHealth:
         """Test Qdrant health check when service times out."""
         with (
             patch("packages.common.health.get_config", return_value=mock_config),
-            patch(
-                "packages.common.health.httpx.AsyncClient.get", side_effect=TimeoutError()
-            ),
+            patch("packages.common.health.httpx.AsyncClient.get", side_effect=TimeoutError()),
         ):
             result = await check_qdrant_health()
             assert result is False
@@ -170,9 +168,7 @@ class TestTEIHealth:
         """Test TEI health check when service is unhealthy."""
         with (
             patch("packages.common.health.get_config", return_value=mock_config),
-            patch(
-                "packages.common.health.httpx.AsyncClient.get", side_effect=Exception("Failed")
-            ),
+            patch("packages.common.health.httpx.AsyncClient.get", side_effect=Exception("Failed")),
         ):
             result = await check_tei_health()
             assert result is False
@@ -200,9 +196,7 @@ class TestOllamaHealth:
         """Test Ollama health check when service is unhealthy."""
         with (
             patch("packages.common.health.get_config", return_value=mock_config),
-            patch(
-                "packages.common.health.httpx.AsyncClient.get", side_effect=Exception("Failed")
-            ),
+            patch("packages.common.health.httpx.AsyncClient.get", side_effect=Exception("Failed")),
         ):
             result = await check_ollama_health()
             assert result is False
@@ -230,9 +224,7 @@ class TestFirecrawlHealth:
         """Test Firecrawl health check when service is unhealthy."""
         with (
             patch("packages.common.health.get_config", return_value=mock_config),
-            patch(
-                "packages.common.health.httpx.AsyncClient.get", side_effect=Exception("Failed")
-            ),
+            patch("packages.common.health.httpx.AsyncClient.get", side_effect=Exception("Failed")),
         ):
             result = await check_firecrawl_health()
             assert result is False
@@ -260,9 +252,7 @@ class TestPlaywrightHealth:
         """Test Playwright health check when service is unhealthy."""
         with (
             patch("packages.common.health.get_config", return_value=mock_config),
-            patch(
-                "packages.common.health.httpx.AsyncClient.get", side_effect=Exception("Failed")
-            ),
+            patch("packages.common.health.httpx.AsyncClient.get", side_effect=Exception("Failed")),
         ):
             result = await check_playwright_health()
             assert result is False

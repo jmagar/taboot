@@ -5,6 +5,7 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 """
 
 import logging
+from typing import cast
 
 from llama_index.core import Document
 from llama_index.readers.reddit import RedditReader as LlamaRedditReader
@@ -87,8 +88,11 @@ class RedditReader:
         for attempt in range(self.max_retries):
             try:
                 # Load posts from subreddit
-                docs = reader.load_data(
-                    subreddits=[subreddit], search_keys=["hot"], post_limit=limit or 10
+                docs = cast(
+                    list[Document],
+                    reader.load_data(
+                        subreddits=[subreddit], search_keys=["hot"], post_limit=limit or 10
+                    ),
                 )
 
                 # Apply limit if specified
@@ -102,9 +106,7 @@ class RedditReader:
                     doc.metadata["source_type"] = "reddit"
                     doc.metadata["subreddit"] = subreddit
 
-                logger.info(
-                    f"Loaded {len(docs)} documents from r/{subreddit}"
-                )
+                logger.info(f"Loaded {len(docs)} documents from r/{subreddit}")
                 return docs
 
             except Exception as e:
@@ -116,9 +118,7 @@ class RedditReader:
                         f"Retrying in {backoff}s..."
                     )
                 else:
-                    logger.error(
-                        f"All {self.max_retries} attempts failed for r/{subreddit}: {e}"
-                    )
+                    logger.error(f"All {self.max_retries} attempts failed for r/{subreddit}: {e}")
 
         # All retries exhausted
         raise RedditReaderError(

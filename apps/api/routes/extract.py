@@ -7,13 +7,13 @@ Required by FR-045: API MUST provide extraction endpoints with job tracking.
 """
 
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from redis import asyncio as redis
 
-from apps.api.deps.auth import verify_api_key
-from packages.common.health import check_system_health
+from apps.api.deps import get_extract_use_case, get_status_use_case, verify_api_key
+from apps.api.schemas import ResponseEnvelope
 from packages.core.use_cases.extract_pending import ExtractPendingUseCase
 from packages.core.use_cases.get_status import (
     GetStatusUseCase,
@@ -22,11 +22,6 @@ from packages.core.use_cases.get_status import (
     ServiceHealth,
     SystemStatus,
 )
-from packages.extraction.orchestrator import ExtractionOrchestrator
-from packages.extraction.tier_a import parsers
-from packages.extraction.tier_a.patterns import EntityPatternMatcher
-from packages.extraction.tier_b.window_selector import WindowSelector
-from packages.extraction.tier_c.llm_client import TierCLLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -63,89 +58,17 @@ class SystemStatusResponse(BaseModel):
     metrics: MetricsSnapshot = Field(..., description="System metrics snapshot")
 
 
-def get_extract_use_case() -> ExtractPendingUseCase:
-    """Dependency factory for ExtractPendingUseCase.
-
-    Returns:
-        ExtractPendingUseCase: Configured use case instance.
-
-    Raises:
-        RuntimeError: If required dependencies cannot be initialized.
-    """
-    from packages.common.config import get_config
-
-    config = get_config()
-
-    try:
-        # Initialize Redis client (async)
-        redis_client = redis.from_url(config.redis_url, decode_responses=True)
-
-        # Initialize Tier A components
-        # Use parsers module directly (has parse_code_blocks, parse_tables functions)
-        tier_a_patterns = EntityPatternMatcher()
-
-        # Initialize Tier B window selector
-        window_selector = WindowSelector()
-
-        # Initialize Tier C LLM client
-        llm_client = TierCLLMClient(
-            model="qwen3:4b",
-            redis_client=redis_client,
-            batch_size=16,
-            temperature=0.0,
-        )
-
-        # Initialize ExtractionOrchestrator
-        orchestrator = ExtractionOrchestrator(
-            tier_a_parser=parsers,  # Module with parse_code_blocks, parse_tables functions
-            tier_a_patterns=tier_a_patterns,
-            window_selector=window_selector,
-            llm_client=llm_client,
-            redis_client=redis_client,
-        )
-
-        # Stub DocumentStore for now
-        # TODO: Replace with actual PostgreSQL adapter
-        from uuid import UUID
-
-        from packages.core.use_cases.extract_pending import DocumentStore
-        from packages.schemas.models import Document
-
-        class StubDocumentStore(DocumentStore):
-            """Stub DocumentStore for MVP."""
-
-            def query_pending(self, limit: int | None = None) -> list[Document]:
-                """Return empty list - no pending documents."""
-                return []
-
-            def get_content(self, doc_id: UUID) -> str:
-                """Return empty content."""
-                return ""
-
-            def update_document(self, document: Document) -> None:
-                """No-op update."""
-
-        document_store = StubDocumentStore()
-
-        return ExtractPendingUseCase(
-            orchestrator=orchestrator,
-            document_store=document_store,
-        )
-
-    except Exception as e:
-        logger.exception("Failed to initialize ExtractPendingUseCase: %s", e)
-        raise RuntimeError(f"Failed to initialize extraction dependencies: {e}") from e
-
-
 @router.post(
     "/pending",
-    response_model=ExtractionResponse,
+    response_model=ResponseEnvelope[ExtractionResponse],
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(verify_api_key)],
 )
 async def trigger_extraction(
     limit: int | None = Query(None, ge=1, description="Maximum documents to process"),
-) -> ExtractionResponse:
+    *,
+    use_case: Annotated[ExtractPendingUseCase, Depends(get_extract_use_case)],
+) -> ResponseEnvelope[ExtractionResponse]:
     """Trigger extraction for pending documents.
 
     Processes documents in PENDING extraction state through the multi-tier
@@ -169,54 +92,46 @@ async def trigger_extraction(
         >>> assert "failed" in data
     """
     try:
-        # Get use case and execute
-        use_case = get_extract_use_case()
         result = await use_case.execute(limit=limit)
-
-        # Return response
-        return ExtractionResponse(
+    except (ConnectionError, TimeoutError) as e:
+        # Service connectivity issues (Redis, Neo4j, Qdrant, PostgreSQL)
+        logger.exception("Service connection failed during extraction")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"External service unavailable: {str(e)}",
+        ) from e
+    except (KeyError, ValueError) as e:
+        # Data validation or integrity issues
+        logger.exception("Data validation error during extraction")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Data processing error: {str(e)}",
+        ) from e
+    except Exception as e:
+        # Unexpected errors - log with full context
+        logger.exception("Unexpected extraction pipeline error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during extraction",
+        ) from e
+    else:
+        payload = ExtractionResponse(
             processed=result["processed"],
             succeeded=result["succeeded"],
             failed=result["failed"],
         )
-
-    except Exception as e:
-        logger.exception("Extraction pipeline failed: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Extraction pipeline failed: {str(e)}",
-        ) from e
+        return ResponseEnvelope(data=payload, error=None)
 
 
-def get_status_use_case() -> GetStatusUseCase:
-    """Dependency factory for GetStatusUseCase.
-
-    Returns:
-        GetStatusUseCase: Configured use case instance.
-
-    Raises:
-        RuntimeError: If required dependencies cannot be initialized.
-    """
-    from packages.common.config import get_config
-
-    config = get_config()
-
-    try:
-        # Initialize Redis client (async)
-        redis_client = redis.from_url(config.redis_url, decode_responses=True)
-
-        return GetStatusUseCase(
-            redis_client=redis_client,
-            health_checker=check_system_health,
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to initialize GetStatusUseCase: {e}", exc_info=True)
-        raise RuntimeError(f"Failed to initialize status dependencies: {e}") from e
-
-
-@router.get("/status", response_model=SystemStatusResponse, status_code=status.HTTP_200_OK)
-async def get_extraction_status() -> SystemStatusResponse:
+@router.get(
+    "/status",
+    response_model=ResponseEnvelope[SystemStatusResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_extraction_status(
+    *,
+    use_case: Annotated[GetStatusUseCase, Depends(get_status_use_case)],
+) -> ResponseEnvelope[SystemStatusResponse]:
     """Get extraction system status.
 
     Returns current extraction system status including:
@@ -242,20 +157,27 @@ async def get_extraction_status() -> SystemStatusResponse:
     """
     try:
         # Get use case and execute
-        use_case = get_status_use_case()
         system_status: SystemStatus = await use_case.execute()
 
         # Return response
-        return SystemStatusResponse(
+        payload = SystemStatusResponse(
             overall_healthy=system_status.overall_healthy,
             services=system_status.services,
             queue_depth=system_status.queue_depth,
             metrics=system_status.metrics,
         )
-
+        return ResponseEnvelope(data=payload, error=None)
+    except (ConnectionError, TimeoutError) as e:
+        # Service connectivity issues (Redis, Neo4j, Qdrant, PostgreSQL)
+        logger.exception("Service connection failed during status check")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Cannot check system status: {str(e)}",
+        ) from e
     except Exception as e:
-        logger.error(f"Status aggregation failed: {e}", exc_info=True)
+        # Unexpected errors - log with full context
+        logger.exception("Unexpected error during status aggregation")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Status aggregation failed: {str(e)}",
+            detail="Internal server error during status check",
         ) from e

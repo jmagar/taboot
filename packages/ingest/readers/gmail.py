@@ -45,12 +45,11 @@ class GmailReader:
         self.max_retries = max_retries
 
         logger.info(
-            f"Initialized GmailReader (credentials_path={credentials_path}, max_retries={max_retries})"
+            f"Initialized GmailReader "
+            f"(credentials_path={credentials_path}, max_retries={max_retries})"
         )
 
-    def load_data(
-        self, query: str = "", limit: int | None = None
-    ) -> list[Document]:
+    def load_data(self, query: str = "", limit: int | None = None) -> list[Document]:
         """Load email messages from Gmail.
 
         Args:
@@ -66,17 +65,24 @@ class GmailReader:
         """
         logger.info(f"Loading Gmail messages (query: '{query}', limit: {limit})")
 
-        # Create reader
-        reader = LlamaGmailReader(credentials_path=self.credentials_path)
-
         # Retry logic
         last_error: Exception | None = None
         for attempt in range(self.max_retries):
             try:
-                # Load messages
-                docs = reader.load_data(query=query, max_results=limit or 10)
+                # Create reader with query and max_results
+                # GmailReader is a Pydantic model that takes these in __init__
+                # service=None will be auto-created from credentials.json
+                reader = LlamaGmailReader(
+                    query=query,
+                    max_results=limit or 10,
+                    service=None,
+                    results_per_page=None,
+                )
 
-                # Apply limit if specified
+                # Load messages (returns List[Document])
+                docs: list[Document] = list(reader.load_data())
+
+                # Apply limit if specified (in case max_results returned more)
                 if limit is not None:
                     docs = docs[:limit]
 

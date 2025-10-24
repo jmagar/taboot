@@ -111,14 +111,16 @@ class TestInitCommand:
             },
         }
 
-        with patch("apps.cli.commands.init.create_neo4j_constraints"):
-            with patch("apps.cli.commands.init.create_qdrant_collections"):
-                with patch("apps.cli.commands.init.create_postgresql_schema"):
-                    result = cli_runner.invoke(app, ["init"])
+        with (
+            patch("apps.cli.commands.init.create_neo4j_constraints"),
+            patch("apps.cli.commands.init.create_qdrant_collections"),
+            patch("apps.cli.commands.init.create_postgresql_schema"),
+        ):
+            result = cli_runner.invoke(app, ["init"])
 
-                    # Health check should be called first
-                    mock_check_health.assert_called_once()
-                    assert result.exit_code == 0
+            # Health check should be called first
+            mock_check_health.assert_called_once()
+            assert result.exit_code == 0
 
     @patch("apps.cli.commands.init.check_system_health")
     def test_init_fails_when_services_unhealthy(
@@ -313,9 +315,7 @@ class TestInitCommand:
         # Should contain success indicators
         output_lower = result.stdout.lower()
         assert (
-            "success" in output_lower
-            or "initialized" in output_lower
-            or "complete" in output_lower
+            "success" in output_lower or "initialized" in output_lower or "complete" in output_lower
         )
 
         # Should mention key components that were initialized

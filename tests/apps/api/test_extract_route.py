@@ -53,9 +53,7 @@ class TestPostExtractPendingEndpoint:
 
         Expected to FAIL initially (endpoint not implemented yet).
         """
-        with patch(
-            "apps.api.routes.extract.get_extract_use_case"
-        ) as mock_get_use_case:
+        with patch("apps.api.routes.extract.get_extract_use_case") as mock_get_use_case:
             mock_use_case = AsyncMock()
             mock_use_case.execute.return_value = {
                 "processed": 5,
@@ -80,9 +78,7 @@ class TestPostExtractPendingEndpoint:
 
         Expected to FAIL initially (endpoint not implemented yet).
         """
-        with patch(
-            "apps.api.routes.extract.get_extract_use_case"
-        ) as mock_get_use_case:
+        with patch("apps.api.routes.extract.get_extract_use_case") as mock_get_use_case:
             mock_use_case = AsyncMock()
             mock_use_case.execute.return_value = {
                 "processed": 10,
@@ -102,9 +98,7 @@ class TestPostExtractPendingEndpoint:
 
         Expected to FAIL initially (endpoint not implemented yet).
         """
-        with patch(
-            "apps.api.routes.extract.get_extract_use_case"
-        ) as mock_get_use_case:
+        with patch("apps.api.routes.extract.get_extract_use_case") as mock_get_use_case:
             mock_use_case = AsyncMock()
             mock_use_case.execute.return_value = {
                 "processed": 0,
@@ -119,9 +113,7 @@ class TestPostExtractPendingEndpoint:
             # Verify use case was called with limit=None
             mock_use_case.execute.assert_called_once_with(limit=None)
 
-    def test_extract_pending_validates_limit_positive(
-        self, client: TestClient
-    ) -> None:
+    def test_extract_pending_validates_limit_positive(self, client: TestClient) -> None:
         """Test that limit must be a positive integer.
 
         Expected to FAIL initially (endpoint not implemented yet).
@@ -138,9 +130,7 @@ class TestPostExtractPendingEndpoint:
 
         Expected to FAIL initially (endpoint not implemented yet).
         """
-        with patch(
-            "apps.api.routes.extract.get_extract_use_case"
-        ) as mock_get_use_case:
+        with patch("apps.api.routes.extract.get_extract_use_case") as mock_get_use_case:
             mock_use_case = AsyncMock()
             mock_use_case.execute.side_effect = RuntimeError("Database connection failed")
             mock_get_use_case.return_value = mock_use_case
@@ -151,16 +141,12 @@ class TestPostExtractPendingEndpoint:
             data = response.json()
             assert "detail" in data or "error" in data
 
-    def test_extract_pending_response_includes_all_fields(
-        self, client: TestClient
-    ) -> None:
+    def test_extract_pending_response_includes_all_fields(self, client: TestClient) -> None:
         """Test that response includes all required fields: processed, succeeded, failed.
 
         Expected to FAIL initially (endpoint not implemented yet).
         """
-        with patch(
-            "apps.api.routes.extract.get_extract_use_case"
-        ) as mock_get_use_case:
+        with patch("apps.api.routes.extract.get_extract_use_case") as mock_get_use_case:
             mock_use_case = AsyncMock()
             mock_use_case.execute.return_value = {
                 "processed": 15,
@@ -199,9 +185,7 @@ class TestGetExtractStatusEndpoint:
         assert response.status_code != 404
         assert response.status_code != 405
 
-    def test_extract_status_returns_200_with_stub_data(
-        self, client: TestClient
-    ) -> None:
+    def test_extract_status_returns_200_with_stub_data(self, client: TestClient) -> None:
         """Test that GET /extract/status returns 200 with stub status data."""
         from packages.core.use_cases.get_status import (
             MetricsSnapshot,

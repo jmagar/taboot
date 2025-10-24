@@ -3,7 +3,6 @@
 Top-level system status display showing health of all services.
 """
 
-
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -53,7 +52,8 @@ async def status_command(
             message = "" if healthy else "Service unavailable"
 
             if verbose:
-                # TODO: Add actual detailed metrics per service
+                # TODO(#4): Add detailed metrics (latency, throughput, errors) per service
+                # Planned: Query service-specific health endpoints and aggregate stats
                 details_str = "Connected" if healthy else "Disconnected"
                 table.add_row(service_name, status_display, message, details_str)
             else:
@@ -70,4 +70,4 @@ async def status_command(
         raise
     except Exception as e:
         console.print(f"[red]Error retrieving status: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e

@@ -1,6 +1,7 @@
 """QA query engine with retrieval, synthesis, and citation formatting."""
 
 import time
+from dataclasses import dataclass
 from typing import Any
 
 from llama_index.llms.ollama import Ollama
@@ -9,54 +10,49 @@ from packages.retrieval.context.prompts import format_source_list, get_qa_prompt
 from packages.retrieval.retrievers.hybrid import HybridRetriever
 
 
+@dataclass
+class QAConfig:
+    """Configuration for QA query engine."""
+
+    qdrant_url: str
+    qdrant_collection: str
+    neo4j_uri: str
+    neo4j_username: str
+    neo4j_password: str
+    ollama_base_url: str = "http://localhost:11434"
+    llm_model: str = "qwen3:4b"
+    llm_temperature: float = 0.0
+    tei_embedding_url: str | None = None
+
+
 class QAQueryEngine:
     """Query engine with hybrid retrieval and citation formatting."""
 
-    def __init__(
-        self,
-        qdrant_url: str,
-        qdrant_collection: str,
-        neo4j_uri: str,
-        neo4j_username: str,
-        neo4j_password: str,
-        ollama_base_url: str = "http://localhost:11434",
-        llm_model: str = "qwen3:4b",
-        llm_temperature: float = 0.0,
-        tei_embedding_url: str | None = None
-    ):
-        """
-        Initialize QA query engine.
+    def __init__(self, config: QAConfig) -> None:
+        """Initialize QA query engine.
 
         Args:
-            qdrant_url: Qdrant server URL
-            qdrant_collection: Qdrant collection name
-            neo4j_uri: Neo4j connection URI
-            neo4j_username: Neo4j username
-            neo4j_password: Neo4j password
-            ollama_base_url: Ollama API URL
-            llm_model: LLM model name
-            llm_temperature: Temperature for synthesis
-            tei_embedding_url: TEI API URL for query embedding
+            config: QA configuration object
+
         """
-        self.qdrant_url = qdrant_url
-        self.neo4j_uri = neo4j_uri
+        self.config = config
 
         # Initialize hybrid retriever
         self.retriever = HybridRetriever(
-            qdrant_url=qdrant_url,
-            qdrant_collection=qdrant_collection,
-            neo4j_uri=neo4j_uri,
-            neo4j_username=neo4j_username,
-            neo4j_password=neo4j_password,
-            tei_embedding_url=tei_embedding_url
+            qdrant_url=config.qdrant_url,
+            qdrant_collection=config.qdrant_collection,
+            neo4j_uri=config.neo4j_uri,
+            neo4j_username=config.neo4j_username,
+            neo4j_password=config.neo4j_password,
+            tei_embedding_url=config.tei_embedding_url,
         )
 
         # Initialize LLM
         self.llm = Ollama(
-            base_url=ollama_base_url,
-            model=llm_model,
-            temperature=llm_temperature,
-            context_window=4096  # Limit KV cache to reasonable size (avoid 36GB allocation)
+            base_url=config.ollama_base_url,
+            model=config.llm_model,
+            temperature=config.llm_temperature,
+            context_window=4096,  # Limit KV cache to reasonable size (avoid 36GB allocation)
         )
 
         self.prompt_template = get_qa_prompt_template()
@@ -66,10 +62,9 @@ class QAQueryEngine:
         question: str,
         top_k: int = 20,
         rerank_top_n: int = 5,
-        source_types: list[str] | None = None
+        source_types: list[str] | None = None,
     ) -> dict[str, Any]:
-        """
-        Execute query with retrieval and synthesis.
+        """Execute query with retrieval and synthesis.
 
         Args:
             question: User question
@@ -79,6 +74,7 @@ class QAQueryEngine:
 
         Returns:
             Query response with answer, sources, and latency breakdown
+
         """
         start_time = time.time()
         latency_breakdown = {}
@@ -89,7 +85,7 @@ class QAQueryEngine:
             query=question,
             top_k=top_k,
             rerank_top_n=rerank_top_n,
-            source_types=source_types
+            source_types=source_types,
         )
         latency_breakdown["retrieval_ms"] = int((time.time() - retrieval_start) * 1000)
 
@@ -103,7 +99,7 @@ class QAQueryEngine:
         synthesis_start = time.time()
         prompt = self.prompt_template.format(
             context_str=context,
-            query_str=question
+            query_str=question,
         )
 
         response = self.llm.complete(prompt)
@@ -122,7 +118,7 @@ class QAQueryEngine:
             "latency_ms": total_latency_ms,
             "latency_breakdown": latency_breakdown,
             "vector_count": len(retrieval_results[0]["vector_results"]) if retrieval_results else 0,
-            "graph_count": len(retrieval_results[0]["graph_results"]) if retrieval_results else 0
+            "graph_count": len(retrieval_results[0]["graph_results"]) if retrieval_results else 0,
         }
 
     def _build_context(self, retrieval_results: list[dict[str, Any]]) -> str:
@@ -140,14 +136,14 @@ class QAQueryEngine:
             section = chunk.get("section", "")
 
             context_parts.append(
-                f"[{idx}] ({source_url} - {section}):\n{content}\n"
+                f"[{idx}] ({source_url} - {section}):\n{content}\n",
             )
 
         return "\n".join(context_parts)
 
     def _extract_sources(
         self,
-        retrieval_results: list[dict[str, Any]]
+        retrieval_results: list[dict[str, Any]],
     ) -> list[tuple[str, str]]:
         """Extract (title, url) tuples from results."""
         if not retrieval_results:

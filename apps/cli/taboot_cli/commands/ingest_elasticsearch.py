@@ -7,7 +7,10 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
+from packages.clients.postgres_document_store import PostgresDocumentStore
 from packages.common.config import get_config
+from packages.common.db_schema import get_postgres_client
+from packages.core.use_cases.ingest_elasticsearch import IngestElasticsearchUseCase
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
 from packages.ingest.normalizer import Normalizer
@@ -17,12 +20,16 @@ from packages.vector.writer import QdrantWriter
 console = Console()
 logger = logging.getLogger(__name__)
 
+# Default Elasticsearch query to match all documents
+DEFAULT_QUERY = '{"match_all": {}}'
+
 
 def ingest_elasticsearch_command(
     index: Annotated[str, typer.Argument(..., help="Elasticsearch index name")],
-    query: Annotated[str, typer.Option("--query", "-q", help="JSON query DSL")] = '{"match_all": {}}',
+    query: Annotated[str, typer.Option("--query", "-q", help="JSON query DSL")] = DEFAULT_QUERY,
     limit: Annotated[
-        int | None, typer.Option("--limit", "-l", help="Maximum number of documents to ingest")
+        int | None,
+        typer.Option("--limit", "-l", help="Maximum number of documents to ingest"),
     ] = None,
 ) -> None:
     """Ingest Elasticsearch documents into the knowledge graph.
@@ -33,7 +40,15 @@ def ingest_elasticsearch_command(
     """
     try:
         config = get_config()
-        limit_str = f"limit: {limit}" if limit else "no limit"
+
+        # Validate Elasticsearch URL is configured
+        if not config.elasticsearch_url:
+            console.print(
+                "[red]✗ Elasticsearch URL not configured. Set ELASTICSEARCH_URL in .env[/red]"
+            )
+            raise typer.Exit(code=1)
+
+        limit_str = f"limit: {limit}" if limit is not None else "no limit"
         console.print(f"[yellow]Starting Elasticsearch ingestion: {index} ({limit_str})[/yellow]")
 
         # Parse query JSON
@@ -43,6 +58,7 @@ def ingest_elasticsearch_command(
             console.print(f"[red]✗ Invalid JSON query: {e}[/red]")
             raise typer.Exit(code=1) from e
 
+        # Initialize dependencies
         elasticsearch_reader = ElasticsearchReader(
             endpoint=config.elasticsearch_url,
             index=index,
@@ -54,28 +70,42 @@ def ingest_elasticsearch_command(
             url=config.qdrant_url,
             collection_name=config.collection_name,
         )
+        pg_conn = get_postgres_client()
+        document_store = PostgresDocumentStore(pg_conn)
 
-        console.print("[yellow]Loading documents from Elasticsearch...[/yellow]")
-        docs = elasticsearch_reader.load_data(query=query_dict, limit=limit)
-        console.print(f"[green]✓ Loaded {len(docs)} documents[/green]")
+        try:
+            # Create and execute use case
+            use_case = IngestElasticsearchUseCase(
+                elasticsearch_reader=elasticsearch_reader,
+                normalizer=normalizer,
+                chunker=chunker,
+                embedder=embedder,
+                qdrant_writer=qdrant_writer,
+                document_store=document_store,
+                collection_name=config.collection_name,
+                index=index,
+            )
 
-        console.print("Normalizing...")
-        normalized_docs = [normalizer.normalize(doc.text) for doc in docs]
+            # Display progress
+            console.print("[yellow]Loading documents from Elasticsearch...[/yellow]")
+            stats = use_case.execute(query=query_dict, limit=limit)
 
-        console.print("Chunking...")
-        all_chunks = []
-        for norm_doc in normalized_docs:
-            all_chunks.extend(chunker.chunk(norm_doc))
-        console.print(f"[green]✓ Created {len(all_chunks)} chunks[/green]")
+            # Display results
+            console.print(
+                f"[green]✓ Processed {stats['docs_processed']} documents, "
+                f"created {stats['chunks_created']} chunks[/green]"
+            )
+            console.print("[green]✓ Elasticsearch ingestion complete![/green]")
 
-        console.print("Generating embeddings...")
-        embeddings = embedder.embed_texts([chunk.text for chunk in all_chunks])
+        finally:
+            # Ensure all resources are closed
+            document_store.close()
+            pg_conn.close()
 
-        console.print("Writing to Qdrant...")
-        qdrant_writer.upsert_batch(chunks=all_chunks, embeddings=embeddings)
-        console.print("[green]✓ Elasticsearch ingestion complete![/green]")
-
-    except Exception as e:
+    except ValueError as e:
+        console.print(f"[yellow]⚠ {e}[/yellow]")
+        raise typer.Exit(code=0) from None
+    except Exception:
         logger.exception("Elasticsearch ingestion failed")
-        console.print(f"[red]✗ Elasticsearch ingestion failed: {e}[/red]")
-        raise typer.Exit(code=1) from e
+        console.print("[red]✗ Elasticsearch ingestion failed[/red]")
+        raise typer.Exit(code=1) from None

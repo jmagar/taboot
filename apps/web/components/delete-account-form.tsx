@@ -37,14 +37,12 @@ import { deleteAccountSchema } from '@taboot/utils/schemas';
 import { DeleteAccountFormValues } from '@taboot/utils/types';
 import { AlertCircle, Lock, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 export function DeleteAccountForm() {
   const [showDialog, setShowDialog] = useState(false);
-  const router = useRouter();
   const { data: hasPassword, isLoading: checkingPassword } = useHasPassword();
 
   const form = useForm<DeleteAccountFormValues>({
@@ -72,9 +70,6 @@ export function DeleteAccountForm() {
       toast.success('Account deleted successfully');
       setShowDialog(false);
       form.reset();
-
-      // Redirect to goodbye page
-      router.push('/goodbye');
     },
     onError: (error: Error) => {
       console.error('Error deleting account:', error);

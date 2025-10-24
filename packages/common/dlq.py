@@ -3,12 +3,15 @@
 Redis-based DLQ with exponential backoff retry mechanism.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from redis import asyncio as redis
+if TYPE_CHECKING:
+    from redis.asyncio import Redis
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +28,7 @@ class DeadLetterQueue:
 
     def __init__(
         self,
-        redis_client: redis.Redis,
+        redis_client: Redis[bytes],
         max_retries: int = 3,
         base_delay_seconds: int = 2,
     ) -> None:
@@ -88,11 +91,10 @@ class DeadLetterQueue:
         Returns:
             Current retry count after increment.
         """
-        count = await self.redis_client.hincrby("retry_counts", job_id, 1)
+        count_result = await self.redis_client.hincrby("retry_counts", job_id, 1)
+        count = int(count_result)
 
-        logger.debug(
-            "Incremented retry count", extra={"job_id": job_id, "count": count}
-        )
+        logger.debug("Incremented retry count", extra={"job_id": job_id, "count": count})
 
         return count
 
@@ -152,7 +154,7 @@ class DeadLetterQueue:
         Returns:
             Delay in seconds before next retry.
         """
-        delay = self.base_delay_seconds * (2 ** (retry_count - 1))
+        delay = int(self.base_delay_seconds * (2 ** (retry_count - 1)))
 
         logger.debug(
             "Calculated backoff delay",

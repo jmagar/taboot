@@ -15,7 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 def extract_reprocess_command(
-    since: Annotated[str, typer.Option("--since", help="Reprocess documents from this period (e.g., '7d', '30d')")],
+    since: Annotated[
+        str,
+        typer.Option("--since", help="Reprocess documents from this period (e.g., '7d', '30d')"),
+    ],
 ) -> None:
     """Reprocess documents with updated extractors.
 
@@ -30,25 +33,41 @@ def extract_reprocess_command(
     Raises:
         typer.Exit: Exit with code 1 if reprocessing fails.
     """
-    try:
-        # Parse since period
-        if not since.endswith("d"):
-            console.print(f"[red]✗ Invalid period format: {since}[/red]")
-            console.print("[yellow]Expected format: '7d', '30d', etc.[/yellow]")
-            raise typer.Exit(code=1)
 
-        days = int(since[:-1])
+    def _parse_since(spec: str) -> datetime:
+        """Parse period specification into datetime.
+
+        Args:
+            spec: Period specification (e.g., '7d', '30d').
+
+        Returns:
+            Datetime representing the start of the period.
+
+        Raises:
+            typer.BadParameter: If period format is invalid.
+        """
+        if not spec.endswith("d"):
+            raise typer.BadParameter("Expected format like '7d' or '30d'.")
+        try:
+            days = int(spec[:-1])
+        except ValueError as err:
+            raise typer.BadParameter(f"Invalid number in period: {spec}") from err
         if days <= 0:
-            console.print(f"[red]✗ Period must be > 0 days: {since}[/red]")
-            raise typer.Exit(code=1)
+            raise typer.BadParameter("Period must be > 0.")
+        return datetime.now(UTC) - timedelta(days=days)
 
-        since_date = datetime.now(UTC) - timedelta(days=days)
+    try:
+        since_date = _parse_since(since)
+    except typer.BadParameter as err:
+        console.print(f"[red]✗ Invalid period: {err}[/red]")
+        raise typer.Exit(code=1) from err
 
+    try:
         console.print(f"[yellow]Reprocessing documents since {since_date.isoformat()}...[/yellow]")
 
         # Import and use ReprocessUseCase
-        from packages.common.db_schema import get_postgres_client
         from packages.clients.postgres_document_store import PostgresDocumentStore
+        from packages.common.db_schema import get_postgres_client
         from packages.core.use_cases.reprocess import ReprocessUseCase
 
         conn = get_postgres_client()
@@ -61,9 +80,6 @@ def extract_reprocess_command(
         finally:
             conn.close()
 
-    except ValueError as err:
-        console.print(f"[red]✗ Invalid period: {err}[/red]")
-        raise typer.Exit(code=1) from err
     except Exception as err:
         logger.exception("Reprocessing failed")
         console.print(f"[red]✗ Reprocessing failed: {err}[/red]")

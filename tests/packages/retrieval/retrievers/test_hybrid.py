@@ -6,14 +6,14 @@ from packages.retrieval.retrievers.hybrid import HybridRetriever
 
 
 @pytest.mark.unit
-def test_hybrid_retriever_init():
+def test_hybrid_retriever_init() -> None:
     """Test HybridRetriever initialization."""
     retriever = HybridRetriever(
         qdrant_url="http://localhost:6333",
         qdrant_collection="test_documents",
         neo4j_uri="bolt://localhost:7687",
         neo4j_username="neo4j",
-        neo4j_password="test"
+        neo4j_password="test",
     )
 
     assert retriever.qdrant_url == "http://localhost:6333"
@@ -22,7 +22,7 @@ def test_hybrid_retriever_init():
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_hybrid_retriever_with_real_services(qdrant_client, neo4j_client):
+def test_hybrid_retriever_with_real_services(qdrant_client, neo4j_client) -> None:
     """Test hybrid retriever against real Qdrant and Neo4j."""
     retriever = HybridRetriever(
         qdrant_url="http://localhost:7000",  # Host port mapping
@@ -30,14 +30,12 @@ def test_hybrid_retriever_with_real_services(qdrant_client, neo4j_client):
         neo4j_uri="bolt://localhost:7687",
         neo4j_username="neo4j",
         neo4j_password="changeme",
-        tei_embedding_url="http://localhost:8080"  # Real TEI service
+        tei_embedding_url="http://localhost:8080",  # Real TEI service
     )
 
     # Test retrieval
     results = retriever.retrieve(
-        query="Which services expose port 8080?",
-        top_k=10,
-        max_graph_hops=2
+        query="Which services expose port 8080?", top_k=10, max_graph_hops=2
     )
 
     assert isinstance(results, list)

@@ -10,16 +10,19 @@ Implements the web ingestion workflow using IngestWebUseCase:
 This command is thin - all business logic is in packages/core/use_cases/ingest_web.py.
 """
 
+from __future__ import annotations
+
 import logging
+from contextlib import ExitStack
 from datetime import UTC, datetime
 from typing import Annotated
 
 import typer
 from rich.console import Console
 
+from packages.clients.postgres_document_store import PostgresDocumentStore
 from packages.common.config import get_config
 from packages.common.db_schema import get_postgres_client
-from packages.clients.postgres_document_store import PostgresDocumentStore
 from packages.core.use_cases.ingest_web import IngestWebUseCase
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
@@ -76,21 +79,28 @@ def ingest_web_command(
 
         web_reader = WebReader(
             firecrawl_url=config.firecrawl_api_url,
-            firecrawl_api_key=config.firecrawl_api_key,
+            firecrawl_api_key=config.firecrawl_api_key.get_secret_value(),
         )
         normalizer = Normalizer()
         chunker = Chunker()
-        embedder = Embedder(tei_url=config.tei_embedding_url)
-        qdrant_writer = QdrantWriter(
-            url=config.qdrant_url,
-            collection_name=config.collection_name,
-        )
 
-        # Create document store
-        pg_conn = get_postgres_client()
-        document_store = PostgresDocumentStore(pg_conn)
+        # Initialize resources with ExitStack to ensure cleanup
+        with ExitStack() as stack:
+            embedder = Embedder(tei_url=config.tei_embedding_url)
+            stack.callback(embedder.close)
 
-        try:
+            qdrant_writer = QdrantWriter(
+                url=config.qdrant_url,
+                collection_name=config.collection_name,
+            )
+            stack.callback(qdrant_writer.close)
+
+            pg_conn = get_postgres_client()
+            stack.callback(pg_conn.close)
+
+            document_store = PostgresDocumentStore(pg_conn)
+            stack.callback(document_store.close)
+
             # Create use case
             use_case = IngestWebUseCase(
                 web_reader=web_reader,
@@ -138,7 +148,7 @@ def ingest_web_command(
                         error_msg = error_entry.get("error", "Unknown error")
                         console.print(f"  - {error_msg}")
 
-                logger.exception("Ingestion failed for %s", url)
+                logger.error("Ingestion failed for %s", url)
                 raise typer.Exit(1)
 
             else:
@@ -147,10 +157,6 @@ def ingest_web_command(
                 console.print(f"[yellow]⚠ Unexpected job state: {job.state}[/yellow]")
                 logger.warning("Unexpected job state: %s", job.state)
                 raise typer.Exit(1)
-
-        finally:
-            # Clean up PostgreSQL connection
-            pg_conn.close()
 
     except typer.Exit:
         # Re-raise typer.Exit to preserve exit code
@@ -162,23 +168,33 @@ def ingest_web_command(
         raise typer.Exit(1) from e
 
 
-# Register docker-compose subcommand
-from apps.cli.commands.ingest_docker_compose import ingest_docker_compose_command
+def _register_subcommands() -> None:
+    """Register subcommands dynamically to avoid circular imports."""
+    # Register docker-compose subcommand
+    from taboot_cli.commands.ingest_docker_compose import (
+        ingest_docker_compose_command,
+    )
 
-app.command(name="docker-compose")(ingest_docker_compose_command)
+    app.command(name="docker-compose")(ingest_docker_compose_command)
 
-# Register external API subcommands
-from apps.cli.commands.ingest_elasticsearch import ingest_elasticsearch_command
-from apps.cli.commands.ingest_github import ingest_github_command
-from apps.cli.commands.ingest_gmail import ingest_gmail_command
-from apps.cli.commands.ingest_reddit import ingest_reddit_command
-from apps.cli.commands.ingest_youtube import ingest_youtube_command
+    # Register external API subcommands
+    from taboot_cli.commands.ingest_elasticsearch import (
+        ingest_elasticsearch_command,
+    )
+    from taboot_cli.commands.ingest_github import ingest_github_command
+    from taboot_cli.commands.ingest_gmail import ingest_gmail_command
+    from taboot_cli.commands.ingest_reddit import ingest_reddit_command
+    from taboot_cli.commands.ingest_youtube import ingest_youtube_command
 
-app.command(name="github")(ingest_github_command)
-app.command(name="reddit")(ingest_reddit_command)
-app.command(name="youtube")(ingest_youtube_command)
-app.command(name="gmail")(ingest_gmail_command)
-app.command(name="elasticsearch")(ingest_elasticsearch_command)
+    app.command(name="github")(ingest_github_command)
+    app.command(name="reddit")(ingest_reddit_command)
+    app.command(name="youtube")(ingest_youtube_command)
+    app.command(name="gmail")(ingest_gmail_command)
+    app.command(name="elasticsearch")(ingest_elasticsearch_command)
+
+
+# Register subcommands on module load
+_register_subcommands()
 
 
 # Export public API

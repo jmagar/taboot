@@ -108,7 +108,8 @@ class TierCLLMClient:
 
         prompt = f"""Extract knowledge triples from the following text.
 Return ONLY a JSON object with this exact format:
-{{"triples": [{{"subject": "entity1", "predicate": "RELATIONSHIP", "object": "entity2", "confidence": 0.9}}]}}
+{{"triples": [{{"subject": "entity1", "predicate": "RELATIONSHIP", "object": "entity2", \
+"confidence": 0.9}}]}}
 
 Text: {window}
 

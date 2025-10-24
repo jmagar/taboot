@@ -255,9 +255,12 @@ class TestIngestDockerComposeCommand:
         mock_reader_class.return_value = mock_reader
 
         # Mock Neo4j client and writer in a way that doesn't fail
-        with patch("apps.cli.commands.ingest_docker_compose.Neo4jClient"), patch(
-            "apps.cli.commands.ingest_docker_compose.BatchedGraphWriter"
-        ) as mock_writer_class:
+        with (
+            patch("apps.cli.commands.ingest_docker_compose.Neo4jClient"),
+            patch(
+                "apps.cli.commands.ingest_docker_compose.BatchedGraphWriter"
+            ) as mock_writer_class,
+        ):
             mock_writer = Mock()
             mock_writer.batch_write_nodes = AsyncMock(
                 return_value={"total_written": 3, "batches_executed": 1}

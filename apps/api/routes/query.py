@@ -2,8 +2,10 @@
 
 import logging
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from apps.api.deps.auth import verify_api_key
@@ -25,9 +27,7 @@ class QueryRequest(BaseModel):
     rerank_top_n: int = Field(
         default=5, ge=1, le=20, description="Number of chunks after reranking"
     )
-    source_types: list[str] | None = Field(
-        default=None, description="Filter by source types"
-    )
+    source_types: list[str] | None = Field(default=None, description="Filter by source types")
     after: datetime | None = Field(default=None, description="Filter by ingestion date")
 
 
@@ -42,8 +42,8 @@ class QueryResponse(BaseModel):
     graph_count: int
 
 
-@router.post("", response_model=QueryResponse, dependencies=[Depends(verify_api_key)])
-async def query_knowledge_base(request: QueryRequest) -> QueryResponse:
+@router.post("", response_model=dict[str, Any], dependencies=[Depends(verify_api_key)])
+async def query_knowledge_base(request: QueryRequest) -> dict[str, Any]:
     """Execute natural language query with hybrid retrieval.
 
     Args:
@@ -76,13 +76,14 @@ async def query_knowledge_base(request: QueryRequest) -> QueryResponse:
             f"http://localhost:{config.ollama_port}",
         )
 
-        result = execute_query(
+        result = await run_in_threadpool(
+            execute_query,
             query=request.question,
             qdrant_url=config.qdrant_url,
             qdrant_collection=config.collection_name,
             neo4j_uri=config.neo4j_uri,
             neo4j_username=config.neo4j_user,
-            neo4j_password=config.neo4j_password,
+            neo4j_password=config.neo4j_password.get_secret_value(),
             ollama_base_url=ollama_url,
             top_k=request.top_k,
             rerank_top_n=request.rerank_top_n,
@@ -102,7 +103,7 @@ async def query_knowledge_base(request: QueryRequest) -> QueryResponse:
             extra={"result_sources": len(result.get("sources", []))},
         )
 
-        return QueryResponse(**result)
+        return {"data": QueryResponse(**result), "error": None}
 
     except ValueError as e:
         logger.warning("Query validation failed", extra={"error": str(e)})

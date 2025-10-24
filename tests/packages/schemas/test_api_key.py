@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from packages.schemas.api_key import ApiKey
 
 
-def test_api_key_creation():
+def test_api_key_creation() -> None:
     """Test creating API key model."""
     now = datetime.now(UTC)
     api_key = ApiKey(
@@ -27,7 +27,7 @@ def test_api_key_creation():
     assert api_key.is_active is True
 
 
-def test_api_key_hash_validation():
+def test_api_key_hash_validation() -> None:
     """Test that key_hash must be 64 hex chars."""
     # Test with non-hex characters (64 chars but not hex)
     with pytest.raises(ValidationError, match="key_hash must be 64 hexadecimal"):

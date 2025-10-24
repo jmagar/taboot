@@ -27,4 +27,4 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["taboot_api"]
+packages = ["."]

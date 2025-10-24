@@ -11,12 +11,7 @@ from qdrant_client import QdrantClient
 def contracts_root() -> Path:
     """Root directory for contract files used across package tests."""
 
-    return (
-        Path(__file__).resolve().parents[2]
-        / "specs"
-        / "001-taboot-rag-platform"
-        / "contracts"
-    )
+    return Path(__file__).resolve().parents[2] / "specs" / "001-taboot-rag-platform" / "contracts"
 
 
 @pytest.fixture(scope="session")
@@ -52,7 +47,7 @@ def qdrant_client():
     if not any(c.name == "test_documents" for c in collections):
         client.create_collection(
             collection_name="test_documents",
-            vectors_config=VectorParams(size=1024, distance=Distance.COSINE)
+            vectors_config=VectorParams(size=1024, distance=Distance.COSINE),
         )
 
     yield client
@@ -62,9 +57,6 @@ def qdrant_client():
 @pytest.fixture(scope="session")
 def neo4j_client():
     """Real Neo4j driver for integration tests."""
-    driver = GraphDatabase.driver(
-        "bolt://localhost:7687",
-        auth=("neo4j", "changeme")
-    )
+    driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "changeme"))
     yield driver
     driver.close()

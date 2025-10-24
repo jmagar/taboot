@@ -1,9 +1,13 @@
 """Taboot CLI - Typer command-line interface for orchestrating RAG workflows."""
 
 import logging
+from typing import Literal
 
 import typer
 from rich.console import Console
+
+# Import command modules at top
+from taboot_cli.commands.ingest_web import app as ingest_app
 
 app = typer.Typer(
     name="taboot",
@@ -14,9 +18,7 @@ console = Console()
 logger = logging.getLogger(__name__)
 
 
-# Import and register ingest subcommand
-from taboot_cli.commands.ingest_web import app as ingest_app
-
+# Register ingest subcommand
 app.add_typer(ingest_app, name="ingest")
 
 # Create extract subcommand group
@@ -72,7 +74,7 @@ def extract_status_sync() -> None:
 
 @extract_app.command(name="reprocess")
 def extract_reprocess_sync(
-    since: str = typer.Option(..., "--since", help="Reprocess documents from period (e.g., '7d')")
+    since: str = typer.Option(..., "--since", help="Reprocess documents from period (e.g., '7d')"),
 ) -> None:
     """
     Reprocess documents with updated extractors.
@@ -93,9 +95,7 @@ app.add_typer(extract_app, name="extract")
 @app.command()
 def query(
     question: str = typer.Argument(..., help="Natural language question"),
-    sources: str | None = typer.Option(
-        None, help="Filter by source types (comma-separated)"
-    ),
+    sources: str | None = typer.Option(None, help="Filter by source types (comma-separated)"),
     after: str | None = typer.Option(None, help="Filter by date (YYYY-MM-DD)"),
     top_k: int = typer.Option(10, help="Number of results to retrieve"),
 ) -> None:
@@ -111,11 +111,12 @@ def query(
         6. Synthesis (Qwen3-4B) with inline citations
 
     Examples:
-        tabootquery "what changed in auth?"
-        tabootquery "docker compose services" --sources docker-compose,swag
-        tabootquery "recent updates" --after 2025-01-01 --top-k 20
+        taboot query "what changed in auth?"
+        taboot query "docker compose services" --sources docker-compose,swag
+        taboot query "recent updates" --after 2025-01-01 --top-k 20
     """
     from taboot_cli.commands.query import query_command
+
     query_command(question=question, sources=sources, after=after, top_k=top_k)
 
 
@@ -123,7 +124,8 @@ def query(
 def status(
     *,
     component: str | None = typer.Option(
-        default=None, help="Component to check (neo4j, qdrant, redis, tei, ollama, firecrawl, playwright)"
+        default=None,
+        help="Component to check (neo4j, qdrant, redis, tei, ollama, firecrawl, playwright)",
     ),
     verbose: bool = typer.Option(default=False, help="Show detailed metrics"),
 ) -> None:
@@ -196,7 +198,9 @@ graph_app = typer.Typer(name="graph", help="Execute Cypher queries against Neo4j
 @graph_app.command(name="query")
 def graph_query_sync(
     cypher: str = typer.Argument(..., help="Cypher query to execute"),
-    format: str = typer.Option("table", "--format", "-f", help="Output format (table or json)"),
+    output_format: Literal["table", "json"] = typer.Option(
+        "table", "--format", "-f", help="Output format (table or json)"
+    ),
 ) -> None:
     """
     Execute a raw Cypher query against the Neo4j knowledge graph.
@@ -205,12 +209,12 @@ def graph_query_sync(
 
     Examples:
         taboot graph query "MATCH (s:Service) RETURN s LIMIT 10"
-        taboot graph query "MATCH (s:Service)-[r]->(h:Host) RETURN s.name, type(r), h.hostname LIMIT 5"
+        taboot graph query "MATCH (s:Service)-[r]->(h:Host) RETURN s.name, type(r), h.hostname"
         taboot graph query "MATCH (n) RETURN count(n) as total_nodes" --format json
     """
     from taboot_cli.commands.graph import query_command
 
-    query_command(cypher=cypher, format=format)
+    query_command(cypher=cypher, output_format=output_format)
 
 
 # Register graph subcommand group
@@ -231,7 +235,7 @@ def init() -> None:
     Run this once after starting Docker services for the first time.
 
     Example:
-        tabootinit
+        taboot init
     """
     from taboot_cli.commands.init import init_command
 

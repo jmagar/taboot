@@ -13,7 +13,7 @@ runner = CliRunner()
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_status_command_with_real_services(docker_services_ready):
+def test_status_command_with_real_services(docker_services_ready) -> None:
     """Test status command against real running Docker services.
 
     This test requires Docker services to be running:
@@ -47,7 +47,7 @@ def test_status_command_with_real_services(docker_services_ready):
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_status_command_component_filter_with_real_services(docker_services_ready):
+def test_status_command_component_filter_with_real_services(docker_services_ready) -> None:
     """Test status command component filtering with real services."""
     result = runner.invoke(app, ["status", "--component", "neo4j"])
 
@@ -65,7 +65,7 @@ def test_status_command_component_filter_with_real_services(docker_services_read
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_status_command_verbose_with_real_services(docker_services_ready):
+def test_status_command_verbose_with_real_services(docker_services_ready) -> None:
     """Test status command verbose mode with real services."""
     result = runner.invoke(app, ["status", "--verbose"])
 
@@ -81,7 +81,7 @@ def test_status_command_verbose_with_real_services(docker_services_ready):
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_status_command_handles_unhealthy_services_gracefully(docker_services_ready):
+def test_status_command_handles_unhealthy_services_gracefully(docker_services_ready) -> None:
     """Test status command handles mix of healthy and unhealthy services.
 
     Note: This test verifies graceful handling even when some services
@@ -99,7 +99,7 @@ def test_status_command_handles_unhealthy_services_gracefully(docker_services_re
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_status_command_invalid_component_with_real_services(docker_services_ready):
+def test_status_command_invalid_component_with_real_services(docker_services_ready) -> None:
     """Test status command with invalid component name."""
     result = runner.invoke(app, ["status", "--component", "nonexistent"])
 

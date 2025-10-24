@@ -14,14 +14,14 @@ from packages.schemas.models import Document, ExtractionState, SourceType
 
 
 @pytest.fixture
-def mock_db_client():
+def mock_db_client() -> None:
     """Mock database client for querying documents."""
     client = AsyncMock()
     return client
 
 
 @pytest.fixture
-def sample_documents():
+def sample_documents() -> None:
     """Sample documents for testing."""
     now = datetime.now(UTC)
     return [
@@ -56,7 +56,7 @@ def sample_documents():
 
 
 @pytest.mark.asyncio
-async def test_list_documents_no_filters(mock_db_client, sample_documents):
+async def test_list_documents_no_filters(mock_db_client, sample_documents) -> None:
     """Test listing all documents without filters.
 
     RED phase: This test will fail because ListDocumentsUseCase doesn't exist yet.
@@ -79,7 +79,7 @@ async def test_list_documents_no_filters(mock_db_client, sample_documents):
 
 
 @pytest.mark.asyncio
-async def test_list_documents_filter_by_source_type(mock_db_client, sample_documents):
+async def test_list_documents_filter_by_source_type(mock_db_client, sample_documents) -> None:
     """Test filtering documents by source_type.
 
     RED phase: Will fail until implementation exists.
@@ -102,7 +102,7 @@ async def test_list_documents_filter_by_source_type(mock_db_client, sample_docum
 
 
 @pytest.mark.asyncio
-async def test_list_documents_filter_by_extraction_state(mock_db_client, sample_documents):
+async def test_list_documents_filter_by_extraction_state(mock_db_client, sample_documents) -> None:
     """Test filtering documents by extraction_state.
 
     RED phase: Will fail until implementation exists.
@@ -114,9 +114,7 @@ async def test_list_documents_filter_by_extraction_state(mock_db_client, sample_
     mock_db_client.count_documents = AsyncMock(return_value=len(pending_docs))
 
     use_case = ListDocumentsUseCase(db_client=mock_db_client)
-    result = await use_case.execute(
-        limit=10, offset=0, extraction_state=ExtractionState.PENDING
-    )
+    result = await use_case.execute(limit=10, offset=0, extraction_state=ExtractionState.PENDING)
 
     assert result.total == 1
     assert len(result.documents) == 1
@@ -127,7 +125,7 @@ async def test_list_documents_filter_by_extraction_state(mock_db_client, sample_
 
 
 @pytest.mark.asyncio
-async def test_list_documents_combined_filters(mock_db_client, sample_documents):
+async def test_list_documents_combined_filters(mock_db_client, sample_documents) -> None:
     """Test filtering by both source_type and extraction_state.
 
     RED phase: Will fail until implementation exists.
@@ -157,7 +155,7 @@ async def test_list_documents_combined_filters(mock_db_client, sample_documents)
 
 
 @pytest.mark.asyncio
-async def test_list_documents_pagination(mock_db_client, sample_documents):
+async def test_list_documents_pagination(mock_db_client, sample_documents) -> None:
     """Test pagination with limit and offset.
 
     RED phase: Will fail until implementation exists.
@@ -181,7 +179,7 @@ async def test_list_documents_pagination(mock_db_client, sample_documents):
 
 
 @pytest.mark.asyncio
-async def test_list_documents_empty_result(mock_db_client):
+async def test_list_documents_empty_result(mock_db_client) -> None:
     """Test listing when no documents match filters.
 
     RED phase: Will fail until implementation exists.

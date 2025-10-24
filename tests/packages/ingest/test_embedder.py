@@ -20,7 +20,7 @@ class TestEmbedder:
         embedder = Embedder(tei_url="http://taboot-embed:80")
 
         # Mock the HTTP client to return a valid response
-        with patch.object(embedder, '_client') as mock_client:
+        with patch.object(embedder, "_client") as mock_client:
             mock_response = Mock()
             mock_response.json.return_value = [[0.1] * 1024]  # 1024-dim vector
             mock_response.raise_for_status = Mock()
@@ -41,7 +41,7 @@ class TestEmbedder:
 
         texts = [f"Document {i}" for i in range(10)]
 
-        with patch.object(embedder, '_client') as mock_client:
+        with patch.object(embedder, "_client") as mock_client:
             mock_response = Mock()
             # Return 10 vectors of 1024 dimensions each
             mock_response.json.return_value = [[0.1] * 1024 for _ in range(10)]
@@ -59,7 +59,7 @@ class TestEmbedder:
 
         embedder = Embedder(tei_url="http://taboot-embed:80")
 
-        with patch.object(embedder, '_client') as mock_client:
+        with patch.object(embedder, "_client") as mock_client:
             mock_response = Mock()
             mock_response.json.return_value = [[0.1] * 1024]
             mock_response.raise_for_status = Mock()
@@ -106,7 +106,7 @@ class TestEmbedder:
         # Create 20 texts (should be split into 3 batches: 8, 8, 4)
         texts = [f"Text {i}" for i in range(20)]
 
-        with patch.object(embedder, '_client') as mock_client:
+        with patch.object(embedder, "_client") as mock_client:
             mock_response = Mock()
             # Mock will be called multiple times for batches
             mock_response.json.side_effect = [
@@ -128,7 +128,7 @@ class TestEmbedder:
 
         embedder = Embedder(tei_url="http://taboot-embed:80")
 
-        with patch.object(embedder, '_client') as mock_client:
+        with patch.object(embedder, "_client") as mock_client:
             mock_response = Mock()
             mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
                 "500 Server Error", request=Mock(), response=Mock()
@@ -144,7 +144,7 @@ class TestEmbedder:
 
         embedder = Embedder(tei_url="http://taboot-embed:80")
 
-        with patch.object(embedder, '_client') as mock_client:
+        with patch.object(embedder, "_client") as mock_client:
             mock_response = Mock()
             # Return wrong dimension (768 instead of 1024)
             mock_response.json.return_value = [[0.1] * 768]
@@ -160,7 +160,7 @@ class TestEmbedder:
 
         embedder = Embedder(tei_url="http://taboot-embed:80")
 
-        with patch.object(embedder, '_client') as mock_client:
+        with patch.object(embedder, "_client") as mock_client:
             embedder.close()
             mock_client.close.assert_called_once()
 
@@ -168,12 +168,17 @@ class TestEmbedder:
         """Test that Embedder works as a context manager."""
         from packages.ingest.embedder import Embedder
 
-        with Embedder(tei_url="http://taboot-embed:80") as embedder:
-            with patch.object(embedder, '_client') as mock_client:
-                mock_response = Mock()
-                mock_response.json.return_value = [[0.1] * 1024]
-                mock_response.raise_for_status = Mock()
-                mock_client.post.return_value = mock_response
+        with (
+            Embedder(tei_url="http://taboot-embed:80") as embedder,
+            patch.object(
+                embedder,
+                "_client",
+            ) as mock_client,
+        ):
+            mock_response = Mock()
+            mock_response.json.return_value = [[0.1] * 1024]
+            mock_response.raise_for_status = Mock()
+            mock_client.post.return_value = mock_response
 
-                result = embedder.embed_texts(["Test"])
-                assert len(result) == 1
+            result = embedder.embed_texts(["Test"])
+            assert len(result) == 1

@@ -229,9 +229,20 @@ class TailscaleReader:
             logger.debug(f"Fetching devices from {url}")
             response = requests.get(url, headers=headers, timeout=API_TIMEOUT_SECONDS)
             response.raise_for_status()
-            data = response.json()
+            data: dict[str, Any] = response.json()
 
-            devices = data.get("devices", [])
+            devices_raw: list[Any] = data.get("devices", [])
+            # Validate that devices is a list of dicts
+            if not isinstance(devices_raw, list):
+                raise TailscaleAPIError(f"Expected 'devices' to be a list, got {type(devices_raw)}")
+
+            devices: list[dict[str, Any]] = []
+            for device in devices_raw:
+                if not isinstance(device, dict):
+                    logger.warning(f"Skipping non-dict device entry: {type(device)}")
+                    continue
+                devices.append(device)
+
             logger.info(f"Fetched {len(devices)} devices from Tailscale API")
             return devices
 

@@ -2,7 +2,7 @@
 
 ## Application Structure
 
-```
+```text
 apps/api/
 ├── app.py                    # Main FastAPI app + lifespan + middleware
 ├── middleware/
@@ -26,7 +26,7 @@ apps/api/
 
 ## Configuration Flow
 
-```
+```text
 .env (from .env.example)
     ↓
 packages/common/config/__init__.py (TabootConfig)
@@ -38,7 +38,7 @@ Used in routes and lifespan
 
 ## Startup Sequence
 
-```
+```text
 1. uvicorn apps.api.app:app
 2. lifespan.__enter__()
    - Get config
@@ -50,7 +50,7 @@ Used in routes and lifespan
 
 ## Request Flow
 
-```
+```text
 HTTP Request
     ↓
 RequestLoggingMiddleware
@@ -136,7 +136,7 @@ Response
 
 ## Health Check Logic
 
-```
+```text
 GET /health
     ↓
 check_system_health() (concurrent)
@@ -317,13 +317,13 @@ open http://localhost:8000/docs
 
 | What | Where |
 |------|-------|
-| Main app | `/home/jmagar/code/taboot/apps/api/app.py` |
-| Middleware | `/home/jmagar/code/taboot/apps/api/middleware/logging.py` |
-| Routes | `/home/jmagar/code/taboot/apps/api/routes/*.py` |
-| Config | `/home/jmagar/code/taboot/packages/common/config/__init__.py` |
-| Health checks | `/home/jmagar/code/taboot/packages/common/health.py` |
-| Docker build | `/home/jmagar/code/taboot/docker/app/Dockerfile` |
-| Compose service | `/home/jmagar/code/taboot/docker-compose.yaml` (line 247) |
-| Test config | `/home/jmagar/code/taboot/tests/apps/api/conftest.py` |
-| Environment | `/home/jmagar/code/taboot/.env.example` |
+| Main app | `apps/api/app.py` |
+| Middleware | `apps/api/middleware/logging.py` |
+| Routes | `apps/api/routes/*.py` |
+| Config | `packages/common/config/__init__.py` |
+| Health checks | `packages/common/health.py` |
+| Docker build | `docker/app/Dockerfile` |
+| Compose service | `docker-compose.yaml` (line 247) |
+| Test config | `tests/apps/api/conftest.py` |
+| Environment | `.env.example` |
 

@@ -9,11 +9,11 @@ class TestDependencyMatcher:
     """Test relationship extraction (DEPENDS_ON, ROUTES_TO)."""
 
     @pytest.fixture
-    def matcher(self):
+    def matcher(self) -> None:
         """Create dependency matcher instance."""
         return DependencyMatcher()
 
-    def test_extract_depends_on_relationship(self, matcher):
+    def test_extract_depends_on_relationship(self, matcher) -> None:
         """Test extracting DEPENDS_ON relationships."""
         text = "The api-service depends on postgres and redis."
 
@@ -22,7 +22,7 @@ class TestDependencyMatcher:
         depends_on = [r for r in relationships if r["type"] == "DEPENDS_ON"]
         assert len(depends_on) >= 1
 
-    def test_extract_routes_to_relationship(self, matcher):
+    def test_extract_routes_to_relationship(self, matcher) -> None:
         """Test extracting ROUTES_TO relationships."""
         text = "nginx routes requests to api-service on port 8080."
 
@@ -31,7 +31,7 @@ class TestDependencyMatcher:
         routes_to = [r for r in relationships if r["type"] == "ROUTES_TO"]
         assert len(routes_to) >= 1
 
-    def test_extract_connects_to_relationship(self, matcher):
+    def test_extract_connects_to_relationship(self, matcher) -> None:
         """Test extracting CONNECTS_TO relationships."""
         text = "The application connects to database at server01:5432."
 
@@ -40,12 +40,12 @@ class TestDependencyMatcher:
         connects_to = [r for r in relationships if r["type"] == "CONNECTS_TO"]
         assert len(connects_to) >= 1
 
-    def test_empty_text_returns_empty(self, matcher):
+    def test_empty_text_returns_empty(self, matcher) -> None:
         """Test empty text returns empty list."""
         relationships = matcher.extract_relationships("")
         assert relationships == []
 
-    def test_text_without_relationships(self, matcher):
+    def test_text_without_relationships(self, matcher) -> None:
         """Test text without relationships."""
         text = "This is just plain text."
         relationships = matcher.extract_relationships(text)

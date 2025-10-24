@@ -9,10 +9,10 @@ import pytest
 from qdrant_client.http import models
 from qdrant_client.http.exceptions import UnexpectedResponse
 
-from packages.vector.qdrant_client import QdrantConnectionError, QdrantVectorClient
 from packages.vector.collections import (
     load_collection_config,
 )
+from packages.vector.qdrant_client import QdrantConnectionError, QdrantVectorClient
 
 
 @pytest.fixture
@@ -90,9 +90,10 @@ class TestCollectionCreation:
         assert isinstance(hnsw_config, models.HnswConfigDiff)
         assert hnsw_config.m == collection_config["hnsw_config"]["m"]
         assert hnsw_config.ef_construct == collection_config["hnsw_config"]["ef_construct"]
-        assert hnsw_config.full_scan_threshold == collection_config["hnsw_config"][
-            "full_scan_threshold"
-        ]
+        assert (
+            hnsw_config.full_scan_threshold
+            == collection_config["hnsw_config"]["full_scan_threshold"]
+        )
         assert hnsw_config.on_disk == collection_config["hnsw_config"]["on_disk"]
 
         # Verify optimizers config matches JSON spec
@@ -122,12 +123,9 @@ class TestCollectionCreation:
         # Verify WAL config matches JSON spec
         wal_config = call_args[1]["wal_config"]
         assert isinstance(wal_config, models.WalConfigDiff)
+        assert wal_config.wal_capacity_mb == collection_config["wal_config"]["wal_capacity_mb"]
         assert (
-            wal_config.wal_capacity_mb == collection_config["wal_config"]["wal_capacity_mb"]
-        )
-        assert (
-            wal_config.wal_segments_ahead
-            == collection_config["wal_config"]["wal_segments_ahead"]
+            wal_config.wal_segments_ahead == collection_config["wal_config"]["wal_segments_ahead"]
         )
 
     def test_create_collection_error_handling_on_failure(

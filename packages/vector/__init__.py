@@ -7,13 +7,13 @@ Provides:
 - Hybrid search and reranking capabilities
 """
 
-from packages.vector.qdrant_client import QdrantConnectionError, QdrantVectorClient
 from packages.vector.collections import (
     CollectionCreationError,
     create_collection,
     create_qdrant_collections,
     load_collection_config,
 )
+from packages.vector.qdrant_client import QdrantConnectionError, QdrantVectorClient
 from packages.vector.writer import QdrantWriteError, QdrantWriter
 
 __all__ = [

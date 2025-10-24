@@ -101,7 +101,10 @@ class Neo4jClient:
 
             self._driver = GraphDatabase.driver(
                 self._config.neo4j_uri,
-                auth=(self._config.neo4j_user, self._config.neo4j_password),
+                auth=(
+                    self._config.neo4j_user,
+                    self._config.neo4j_password.get_secret_value(),
+                ),
             )
 
             # Verify connectivity and target database immediately (fail early)

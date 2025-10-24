@@ -3,8 +3,10 @@
 import hashlib
 import json
 import logging
+from typing import TYPE_CHECKING
 
-import redis.asyncio as redis
+if TYPE_CHECKING:
+    from redis.asyncio import Redis
 
 from packages.schemas.api_key import ApiKey
 
@@ -18,7 +20,7 @@ class ApiKeyStore:
     Key format: "api_key:{key_hash}" -> JSON serialized ApiKey
     """
 
-    def __init__(self, redis_client: redis.Redis) -> None:
+    def __init__(self, redis_client: "Redis[bytes]") -> None:
         """Initialize with Redis client.
 
         Args:
@@ -60,7 +62,7 @@ class ApiKeyStore:
             return False
 
         # Parse and check active status
-        api_key_data = json.loads(value)
+        api_key_data = json.loads(value.decode("utf-8"))
         is_active = api_key_data.get("is_active", False)
 
         if not is_active:
@@ -85,7 +87,7 @@ class ApiKeyStore:
         if not value:
             return None
 
-        return ApiKey.model_validate_json(value)
+        return ApiKey.model_validate_json(value.decode("utf-8"))
 
 
 __all__ = ["ApiKeyStore"]

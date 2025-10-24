@@ -145,9 +145,7 @@ class TestIngestWebCommand:
         mock_use_case_instance = mock_use_case.return_value
         mock_use_case_instance.execute.return_value = mock_job
 
-        result = cli_runner.invoke(
-            app, ["ingest", "web", "https://example.com", "--limit", "20"]
-        )
+        result = cli_runner.invoke(app, ["ingest", "web", "https://example.com", "--limit", "20"])
 
         # Should succeed
         assert result.exit_code == 0

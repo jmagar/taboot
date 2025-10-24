@@ -46,7 +46,9 @@ class GithubReader:
 
         logger.info(f"Initialized GithubReader (max_retries={max_retries})")
 
-    def load_data(self, repo: str, limit: int | None = None, branch: str | None = None) -> list[Document]:
+    def load_data(
+        self, repo: str, limit: int | None = None, branch: str | None = None
+    ) -> list[Document]:
         """Load documents from GitHub repository.
 
         Args:
@@ -65,9 +67,7 @@ class GithubReader:
             raise ValueError("repository cannot be empty")
 
         if "/" not in repo or repo.count("/") != 1:
-            raise ValueError(
-                f"Invalid repository format: {repo}. Expected 'owner/repo'"
-            )
+            raise ValueError(f"Invalid repository format: {repo}. Expected 'owner/repo'")
 
         owner, repo_name = repo.split("/")
         logger.info(f"Loading data from GitHub repo {repo} (limit: {limit})")
@@ -130,9 +130,7 @@ class GithubReader:
                     f"Retrying in {backoff}s..."
                 )
             else:
-                logger.error(
-                    f"All {self.max_retries} attempts failed for {repo}: {last_error}"
-                )
+                logger.error(f"All {self.max_retries} attempts failed for {repo}: {last_error}")
 
         # All retries exhausted
         raise GithubReaderError(
@@ -159,9 +157,9 @@ class GithubReader:
                 response = client.get(url, headers=headers)
                 response.raise_for_status()
                 data = response.json()
-                default_branch = data.get("default_branch")
+                default_branch: str | None = data.get("default_branch")
 
-                if default_branch:
+                if default_branch and isinstance(default_branch, str):
                     logger.info(f"Detected default branch: {default_branch}")
                     return default_branch
                 else:

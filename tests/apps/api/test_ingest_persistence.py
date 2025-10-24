@@ -9,12 +9,12 @@ from apps.api.app import app
 
 
 @pytest.fixture
-def client():
+def client() -> None:
     """Create test client."""
     return TestClient(app)
 
 
-def test_job_persists_across_requests(client, postgres_conn):
+def test_job_persists_across_requests(client, postgres_conn) -> None:
     """Test that jobs persist in database, not memory."""
     # Create job
     response = client.post(

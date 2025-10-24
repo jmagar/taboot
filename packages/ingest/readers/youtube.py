@@ -86,9 +86,7 @@ class YoutubeReader:
                         f"Retrying in {backoff}s..."
                     )
                 else:
-                    logger.error(
-                        f"All {self.max_retries} attempts failed: {e}"
-                    )
+                    logger.error(f"All {self.max_retries} attempts failed: {e}")
 
         # All retries exhausted
         raise YoutubeReaderError(

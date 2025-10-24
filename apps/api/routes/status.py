@@ -7,11 +7,13 @@ Required by FR-046: API MUST provide system status endpoints with health checks.
 """
 
 import logging
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from redis import asyncio as redis
 
+from apps.api.deps.auth import verify_api_key
 from packages.common.health import check_system_health
 from packages.core.use_cases.get_status import (
     GetStatusUseCase,
@@ -66,11 +68,16 @@ def get_status_use_case() -> GetStatusUseCase:
 
     except Exception as e:
         logger.exception("Failed to initialize GetStatusUseCase")
-        raise RuntimeError(f"Failed to initialize status dependencies: {e!s}") from e
+        raise RuntimeError("Failed to initialize status dependencies") from e
 
 
-@router.get("", response_model=SystemStatusResponse, status_code=status.HTTP_200_OK)
-async def get_system_status() -> SystemStatusResponse:
+@router.get(
+    "",
+    response_model=dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(verify_api_key)],
+)
+async def get_system_status() -> dict[str, Any]:
     """Get overall system status.
 
     Returns current system status including:
@@ -80,15 +87,18 @@ async def get_system_status() -> SystemStatusResponse:
     - System metrics snapshot
 
     Returns:
-        SystemStatusResponse: Complete system status.
+        Response envelope with system status data or error.
 
     Raises:
         HTTPException: 500 if status aggregation fails.
 
     Example:
-        >>> response = client.get("/status")
+        >>> response = client.get("/status", headers={"X-API-Key": "test-key"})
         >>> assert response.status_code == 200
-        >>> data = response.json()
+        >>> envelope = response.json()
+        >>> assert "data" in envelope
+        >>> assert "error" in envelope
+        >>> data = envelope["data"]
         >>> assert "overall_healthy" in data
         >>> assert "services" in data
         >>> assert "queue_depth" in data
@@ -99,17 +109,20 @@ async def get_system_status() -> SystemStatusResponse:
         use_case = get_status_use_case()
         system_status: SystemStatus = await use_case.execute()
 
-        # Return response
-        return SystemStatusResponse(
+        # Build response data
+        status_data = SystemStatusResponse(
             overall_healthy=system_status.overall_healthy,
             services=system_status.services,
             queue_depth=system_status.queue_depth,
             metrics=system_status.metrics,
         )
 
+        # Return success envelope
+        return {"data": status_data.model_dump(), "error": None}
+
     except Exception as e:
         logger.exception("Status aggregation failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Status aggregation failed: {e!s}",
+            detail="Status aggregation failed",
         ) from e

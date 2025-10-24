@@ -1,0 +1,35 @@
+{
+  "name": "@taboot/api-client",
+  "version": "0.4.0",
+  "private": true,
+  "exports": {
+    ".": {
+      "default": "./dist/index.js",
+      "types": "./src/index.ts"
+    },
+    "./types": {
+      "default": "./dist/types/index.js",
+      "types": "./src/types/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo node_modules",
+    "dev": "tsc --build --watch",
+    "generate:types": "openapi-typescript http://localhost:8000/openapi.json -o src/types/api.ts",
+    "lint": "eslint . --max-warnings 0"
+  },
+  "prettier": "@taboot/prettier-config",
+  "dependencies": {
+    "zod": "catalog:core"
+  },
+  "devDependencies": {
+    "@taboot/eslint-config": "workspace:^",
+    "@taboot/prettier-config": "workspace:*",
+    "@taboot/typescript-config": "workspace:*",
+    "@types/node": "catalog:dev",
+    "openapi-typescript": "catalog:dev",
+    "typescript": "catalog:dev"
+  }
+}

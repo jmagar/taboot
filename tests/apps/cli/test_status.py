@@ -14,24 +14,11 @@ runner = CliRunner()
 
 
 @pytest.mark.unit
-def test_status_command_exists():
+def test_status_command_exists() -> None:
     """Test that status command is callable and not NotImplementedError."""
-    with patch("apps.cli.commands.status.check_system_health", new_callable=AsyncMock) as mock_health:
-        mock_health.return_value = {
-            "healthy": True,
-            "services": {"neo4j": True, "qdrant": True, "redis": True, "tei": True, "ollama": True, "firecrawl": True, "playwright": True}
-        }
-
-        result = runner.invoke(app, ["status"])
-
-        assert "NotImplementedError" not in result.stdout
-        assert result.exit_code == 0
-
-
-@pytest.mark.unit
-def test_status_command_uses_real_health_checks():
-    """Test status command calls real health check functions."""
-    with patch("apps.cli.commands.status.check_system_health", new_callable=AsyncMock) as mock_health:
+    with patch(
+        "apps.cli.commands.status.check_system_health", new_callable=AsyncMock
+    ) as mock_health:
         mock_health.return_value = {
             "healthy": True,
             "services": {
@@ -42,7 +29,32 @@ def test_status_command_uses_real_health_checks():
                 "ollama": True,
                 "firecrawl": True,
                 "playwright": True,
-            }
+            },
+        }
+
+        result = runner.invoke(app, ["status"])
+
+        assert "NotImplementedError" not in result.stdout
+        assert result.exit_code == 0
+
+
+@pytest.mark.unit
+def test_status_command_uses_real_health_checks() -> None:
+    """Test status command calls real health check functions."""
+    with patch(
+        "apps.cli.commands.status.check_system_health", new_callable=AsyncMock
+    ) as mock_health:
+        mock_health.return_value = {
+            "healthy": True,
+            "services": {
+                "neo4j": True,
+                "qdrant": True,
+                "redis": True,
+                "tei": True,
+                "ollama": True,
+                "firecrawl": True,
+                "playwright": True,
+            },
         }
 
         result = runner.invoke(app, ["status"])
@@ -54,12 +66,14 @@ def test_status_command_uses_real_health_checks():
 
 
 @pytest.mark.unit
-def test_status_command_with_component_filter():
+def test_status_command_with_component_filter() -> None:
     """Test status command with --component flag filters output."""
-    with patch("apps.cli.commands.status.check_system_health", new_callable=AsyncMock) as mock_health:
+    with patch(
+        "apps.cli.commands.status.check_system_health", new_callable=AsyncMock
+    ) as mock_health:
         mock_health.return_value = {
             "healthy": True,
-            "services": {"neo4j": True, "qdrant": True, "redis": True}
+            "services": {"neo4j": True, "qdrant": True, "redis": True},
         }
 
         result = runner.invoke(app, ["status", "--component", "neo4j"])
@@ -71,13 +85,12 @@ def test_status_command_with_component_filter():
 
 
 @pytest.mark.unit
-def test_status_command_with_verbose_flag():
+def test_status_command_with_verbose_flag() -> None:
     """Test status command with --verbose shows detailed info."""
-    with patch("apps.cli.commands.status.check_system_health", new_callable=AsyncMock) as mock_health:
-        mock_health.return_value = {
-            "healthy": True,
-            "services": {"neo4j": True}
-        }
+    with patch(
+        "apps.cli.commands.status.check_system_health", new_callable=AsyncMock
+    ) as mock_health:
+        mock_health.return_value = {"healthy": True, "services": {"neo4j": True}}
 
         result = runner.invoke(app, ["status", "--verbose"])
 
@@ -87,13 +100,12 @@ def test_status_command_with_verbose_flag():
 
 
 @pytest.mark.unit
-def test_status_command_handles_unhealthy_service():
+def test_status_command_handles_unhealthy_service() -> None:
     """Test status command displays unhealthy services with error messages."""
-    with patch("apps.cli.commands.status.check_system_health", new_callable=AsyncMock) as mock_health:
-        mock_health.return_value = {
-            "healthy": False,
-            "services": {"neo4j": False, "qdrant": True}
-        }
+    with patch(
+        "apps.cli.commands.status.check_system_health", new_callable=AsyncMock
+    ) as mock_health:
+        mock_health.return_value = {"healthy": False, "services": {"neo4j": False, "qdrant": True}}
 
         result = runner.invoke(app, ["status"])
 
@@ -104,9 +116,11 @@ def test_status_command_handles_unhealthy_service():
 
 
 @pytest.mark.unit
-def test_status_command_handles_errors_gracefully():
+def test_status_command_handles_errors_gracefully() -> None:
     """Test status command handles exceptions during status check."""
-    with patch("apps.cli.commands.status.check_system_health", new_callable=AsyncMock) as mock_health:
+    with patch(
+        "apps.cli.commands.status.check_system_health", new_callable=AsyncMock
+    ) as mock_health:
         mock_health.side_effect = Exception("Status check failed")
 
         result = runner.invoke(app, ["status"])
@@ -117,7 +131,7 @@ def test_status_command_handles_errors_gracefully():
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_status_command_with_real_services():
+def test_status_command_with_real_services() -> None:
     """Test status command against real running services.
 
     Note: Requires services running. May fail if services unavailable.

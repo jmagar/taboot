@@ -5,15 +5,44 @@ Orchestrates the complete extraction pipeline with state management in Redis.
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Protocol
 from uuid import UUID, uuid4
+
+from redis.asyncio import Redis
 
 from packages.extraction.tier_a.patterns import EntityPatternMatcher
 from packages.extraction.tier_b.window_selector import WindowSelector
 from packages.extraction.tier_c.llm_client import TierCLLMClient
+from packages.extraction.types import CodeBlock, ExtractionWindow, Table
 from packages.schemas.models import ExtractionJob, ExtractionState
 
 logger = logging.getLogger(__name__)
+
+
+class TierAParser(Protocol):
+    """Protocol for Tier A parser with deterministic extraction methods."""
+
+    def parse_code_blocks(self, content: str) -> list[CodeBlock]:
+        """Extract fenced code blocks from markdown content.
+
+        Args:
+            content: Markdown text content.
+
+        Returns:
+            list[CodeBlock]: List of code blocks with language and code.
+        """
+        ...
+
+    def parse_tables(self, content: str) -> list[Table]:
+        """Extract markdown tables from content.
+
+        Args:
+            content: Markdown text content.
+
+        Returns:
+            list[Table]: List of tables with headers and rows.
+        """
+        ...
 
 
 class ExtractionOrchestrator:
@@ -34,11 +63,11 @@ class ExtractionOrchestrator:
 
     def __init__(
         self,
-        tier_a_parser: Any,
+        tier_a_parser: TierAParser,
         tier_a_patterns: EntityPatternMatcher,
         window_selector: WindowSelector,
         llm_client: TierCLLMClient,
-        redis_client: Any,
+        redis_client: Redis,
     ) -> None:
         """Initialize ExtractionOrchestrator.
 
@@ -203,14 +232,14 @@ class ExtractionOrchestrator:
 
         return triple_count
 
-    async def _run_tier_b(self, content: str) -> list[dict[str, Any]]:
+    async def _run_tier_b(self, content: str) -> list[ExtractionWindow]:
         """Run Tier B spaCy NLP extraction to select micro-windows.
 
         Args:
             content: Document text content.
 
         Returns:
-            list[dict[str, Any]]: Selected windows for Tier C processing.
+            list[ExtractionWindow]: Selected windows for Tier C processing.
         """
         # Use window selector to create micro-windows
         windows = self.window_selector.select_windows(content)
@@ -219,7 +248,7 @@ class ExtractionOrchestrator:
 
         return windows
 
-    async def _run_tier_c(self, windows: list[dict[str, Any]]) -> int:
+    async def _run_tier_c(self, windows: list[ExtractionWindow]) -> int:
         """Run Tier C LLM extraction on windows.
 
         Args:

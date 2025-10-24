@@ -8,9 +8,9 @@ import { ThemeProvider as NextThemesProvider } from 'next-themes';
 import * as React from 'react';
 import { Toaster } from 'sonner';
 
-const queryClient = new QueryClient();
-
 export function Providers({ children }: { children: React.ReactNode }) {
+  const [queryClient] = React.useState(() => new QueryClient());
+
   return (
     <NextThemesProvider
       attribute="class"

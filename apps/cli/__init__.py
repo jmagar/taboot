@@ -1,0 +1,1 @@
+"""Taboot CLI application shell."""

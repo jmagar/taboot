@@ -9,11 +9,13 @@ Returns partial data on failures (fail-fast within each component, but continue)
 """
 
 import logging
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
-from redis import asyncio as redis
+
+if TYPE_CHECKING:
+    from redis.asyncio import Redis
 
 from packages.common.health import SystemHealthStatus
 
@@ -97,8 +99,8 @@ class GetStatusUseCase:
 
     def __init__(
         self,
-        redis_client: redis.Redis,
-        health_checker: Callable[[], Any],
+        redis_client: "Redis[bytes]",
+        health_checker: Callable[[], Awaitable[SystemHealthStatus]],
     ) -> None:
         """Initialize GetStatusUseCase with dependencies.
 

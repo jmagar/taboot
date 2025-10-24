@@ -1,5 +1,6 @@
 import os
 from functools import lru_cache
+from typing import cast
 
 import torch
 from fastapi import FastAPI, HTTPException
@@ -9,15 +10,11 @@ from sentence_transformers import CrossEncoder
 
 class RerankRequest(BaseModel):
     query: str = Field(..., description="User query text.")
-    documents: list[str] = Field(
-        ..., description="Candidate documents ordered arbitrarily."
-    )
+    documents: list[str] = Field(..., description="Candidate documents ordered arbitrarily.")
 
 
 class RerankResponse(BaseModel):
-    scores: list[float] = Field(
-        ..., description="Score per document (aligned with input order)."
-    )
+    scores: list[float] = Field(..., description="Score per document (aligned with input order).")
     ranking: list[int] = Field(
         ...,
         description="Indices into the input list sorted from highest to lowest score.",
@@ -38,11 +35,14 @@ def load_model() -> CrossEncoder:
     preferred_device = os.getenv("RERANKER_DEVICE", "auto").lower()
     device = _resolve_device("cuda" if preferred_device == "auto" else preferred_device)
     max_length = int(os.getenv("MAX_LENGTH", "512"))
-    model = CrossEncoder(
-        model_id,
-        device=device,
-        max_length=max_length,
-        default_activation_function=None,
+    model = cast(
+        CrossEncoder,
+        CrossEncoder(
+            model_id,
+            device=device,
+            max_length=max_length,
+            default_activation_function=None,
+        ),
     )
     return model
 
@@ -72,4 +72,3 @@ def rerank(request: RerankRequest) -> RerankResponse:
     scores_list = scores.tolist() if isinstance(scores, torch.Tensor) else list(scores)
     ranking = sorted(range(len(scores_list)), key=lambda idx: scores_list[idx], reverse=True)
     return RerankResponse(scores=scores_list, ranking=ranking)
-

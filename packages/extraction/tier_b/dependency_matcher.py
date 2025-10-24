@@ -10,7 +10,7 @@ class DependencyMatcher:
     Identifies DEPENDS_ON, ROUTES_TO, CONNECTS_TO relationships.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize dependency matcher with relationship patterns."""
         self.patterns = self._build_patterns()
 
@@ -23,15 +23,14 @@ class DependencyMatcher:
         return {
             "DEPENDS_ON": re.compile(
                 r"(\w+(?:\-\w+)*)\s+(?:depends?\s+on|requires?|needs?)\s+(\w+(?:\-\w+)*)",
-                re.IGNORECASE
+                re.IGNORECASE,
             ),
             "ROUTES_TO": re.compile(
                 r"(\w+)\s+(?:routes?|forwards?|proxies?)\s+(?:requests?\s+)?(?:to\s+)?(\w+(?:\-\w+)*)",
-                re.IGNORECASE
+                re.IGNORECASE,
             ),
             "CONNECTS_TO": re.compile(
-                r"(\w+(?:\-\w+)*)\s+(?:connects?\s+to|links?\s+to)\s+(\w+(?:\-\w+)*)",
-                re.IGNORECASE
+                r"(\w+(?:\-\w+)*)\s+(?:connects?\s+to|links?\s+to)\s+(\w+(?:\-\w+)*)", re.IGNORECASE
             ),
         }
 
@@ -58,11 +57,13 @@ class DependencyMatcher:
                 source = match.group(1)
                 target = match.group(2)
 
-                relationships.append({
-                    "type": rel_type,
-                    "source": source,
-                    "target": target,
-                    "span": match.group(),
-                })
+                relationships.append(
+                    {
+                        "type": rel_type,
+                        "source": source,
+                        "target": target,
+                        "span": match.group(),
+                    }
+                )
 
         return relationships

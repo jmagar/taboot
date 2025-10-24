@@ -125,8 +125,7 @@ class QdrantWriter:
         for i, emb in enumerate(embeddings):
             if len(emb) != 1024:
                 raise ValueError(
-                    f"All embeddings must be 1024-dimensional, "
-                    f"got {len(emb)} at index {i}"
+                    f"All embeddings must be 1024-dimensional, got {len(emb)} at index {i}"
                 )
 
         correlation_id = str(uuid.uuid4())

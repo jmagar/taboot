@@ -45,7 +45,7 @@ class BatchedGraphWriter:
             RETURN count(n) AS created_count
             """
 
-            result = await self.client.execute_query(query, {"nodes": batch})
+            _ = await self.client.execute_query(query, {"nodes": batch})
             total_written += len(batch)
             batches_executed += 1
 
@@ -91,7 +91,7 @@ class BatchedGraphWriter:
             RETURN count(r) AS created_count
             """
 
-            result = await self.client.execute_query(query, {"rels": batch})
+            _ = await self.client.execute_query(query, {"rels": batch})
             total_written += len(batch)
             batches_executed += 1
 

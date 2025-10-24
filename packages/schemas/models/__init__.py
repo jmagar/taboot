@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 # ========== Enums ==========
 
@@ -126,9 +126,7 @@ class Document(BaseModel):
         default=None, max_length=64, description="Extractor version tag (semver)"
     )
     updated_at: datetime = Field(..., description="UTC timestamp of last update")
-    metadata: dict[str, Any] | None = Field(
-        default=None, description="Arbitrary key-value pairs"
-    )
+    metadata: dict[str, Any] | None = Field(default=None, description="Arbitrary key-value pairs")
 
     @field_validator("content_hash")
     @classmethod
@@ -158,12 +156,8 @@ class Chunk(BaseModel):
 
     chunk_id: UUID = Field(..., description="Chunk UUID (Qdrant point ID)")
     doc_id: UUID = Field(..., description="Foreign key to Document")
-    content: str = Field(
-        ..., min_length=1, max_length=4096, description="Chunk text content"
-    )
-    section: str | None = Field(
-        default=None, max_length=512, description="Heading/path context"
-    )
+    content: str = Field(..., min_length=1, max_length=4096, description="Chunk text content")
+    section: str | None = Field(default=None, max_length=512, description="Heading/path context")
     position: int = Field(..., ge=0, description="Offset in document (0-indexed)")
     token_count: int = Field(..., ge=1, le=512, description="Token count in chunk")
 
@@ -171,9 +165,7 @@ class Chunk(BaseModel):
     source_url: str = Field(..., description="Copied from Document")
     source_type: SourceType = Field(..., description="Copied from Document")
     ingested_at: int = Field(..., description="Unix timestamp from Document")
-    tags: list[str] | None = Field(
-        default=None, description="Optional tags for filtering"
-    )
+    tags: list[str] | None = Field(default=None, description="Optional tags for filtering")
 
 
 class IngestionJob(BaseModel):
@@ -190,14 +182,10 @@ class IngestionJob(BaseModel):
     state: JobState = Field(..., description="Job state enum")
     created_at: datetime = Field(..., description="Job creation timestamp")
     started_at: datetime | None = Field(default=None, description="Job start timestamp")
-    completed_at: datetime | None = Field(
-        default=None, description="Job completion timestamp"
-    )
+    completed_at: datetime | None = Field(default=None, description="Job completion timestamp")
     pages_processed: int = Field(..., ge=0, description="Count of pages/documents ingested")
     chunks_created: int = Field(..., ge=0, description="Count of chunks created")
-    errors: list[dict[str, Any]] | None = Field(
-        default=None, description="Array of error objects"
-    )
+    errors: list[dict[str, Any]] | None = Field(default=None, description="Array of error objects")
 
 
 class ExtractionWindow(BaseModel):
@@ -216,9 +204,7 @@ class ExtractionWindow(BaseModel):
     llm_latency_ms: int | None = Field(
         default=None, ge=0, description="LLM inference time (tier C only)"
     )
-    cache_hit: bool | None = Field(
-        default=None, description="LLM response cached (tier C only)"
-    )
+    cache_hit: bool | None = Field(default=None, description="LLM response cached (tier C only)")
     processed_at: datetime = Field(..., description="Processing timestamp")
     extraction_version: str | None = Field(
         default=None, max_length=64, description="Extractor version tag"
@@ -238,8 +224,6 @@ class ExtractionWindow(BaseModel):
         Raises:
             ValueError: If processed_at is in the future.
         """
-        from datetime import timezone
-
         now = datetime.now(UTC)
         if v > now:
             raise ValueError("processed_at cannot be in the future")
@@ -259,9 +243,7 @@ class ExtractionJob(BaseModel):
     tier_b_windows: int = Field(..., ge=0, description="Windows selected by Tier B")
     tier_c_triples: int = Field(..., ge=0, description="Triples from Tier C")
     started_at: datetime | None = Field(default=None, description="Job start timestamp")
-    completed_at: datetime | None = Field(
-        default=None, description="Job completion timestamp"
-    )
+    completed_at: datetime | None = Field(default=None, description="Job completion timestamp")
     retry_count: int = Field(..., ge=0, le=3, description="Retry attempts (max 3)")
     errors: dict[str, Any] | None = Field(default=None, description="Error log")
 
@@ -282,8 +264,6 @@ class ExtractionJob(BaseModel):
         if v is None:
             return v
 
-        from datetime import timezone
-
         now = datetime.now(UTC)
         if v > now:
             raise ValueError("started_at cannot be in the future")
@@ -291,7 +271,9 @@ class ExtractionJob(BaseModel):
 
     @field_validator("completed_at")
     @classmethod
-    def validate_completed_at_after_started(cls, v: datetime | None, info) -> datetime | None:
+    def validate_completed_at_after_started(
+        cls, v: datetime | None, info: ValidationInfo
+    ) -> datetime | None:
         """Validate that completed_at is after started_at.
 
         Args:
@@ -348,9 +330,7 @@ class Host(GraphNodeBase):
     """
 
     hostname: str = Field(..., min_length=1, max_length=256, description="Hostname (unique)")
-    ip_addresses: list[str] | None = Field(
-        default=None, description="Array of IP addresses"
-    )
+    ip_addresses: list[str] | None = Field(default=None, description="Array of IP addresses")
     os: str | None = Field(default=None, max_length=128, description="Operating system")
     location: str | None = Field(default=None, max_length=256, description="Location")
 
@@ -376,9 +356,7 @@ class Proxy(GraphNodeBase):
 
     name: str = Field(..., min_length=1, max_length=256, description="Proxy name (unique)")
     proxy_type: ProxyType = Field(..., description="Proxy type enum")
-    config_path: str | None = Field(
-        default=None, max_length=512, description="Config file path"
-    )
+    config_path: str | None = Field(default=None, max_length=512, description="Config file path")
 
 
 class Endpoint(GraphNodeBase):
@@ -391,12 +369,8 @@ class Endpoint(GraphNodeBase):
     service: str = Field(..., max_length=256, description="Foreign key to Service.name")
     method: HttpMethod = Field(..., description="HTTP method enum")
     path: str = Field(..., min_length=1, max_length=512, description="URL path pattern")
-    auth: str | None = Field(
-        default=None, max_length=128, description="Authentication method"
-    )
-    rate_limit: int | None = Field(
-        default=None, ge=0, description="Requests per minute"
-    )
+    auth: str | None = Field(default=None, max_length=128, description="Authentication method")
+    rate_limit: int | None = Field(default=None, ge=0, description="Requests per minute")
 
 
 # ========== Export all models ==========

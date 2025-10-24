@@ -34,9 +34,7 @@ class EntityPatternMatcher:
         # Escape special regex chars and join with |
         escaped_patterns = [re.escape(p) for p in sorted_patterns]
         pattern_str = "|".join(escaped_patterns)
-        self._compiled_patterns[entity_type] = re.compile(
-            pattern_str, re.IGNORECASE
-        )
+        self._compiled_patterns[entity_type] = re.compile(pattern_str, re.IGNORECASE)
 
     def find_matches(self, text: str) -> list[dict[str, Any]]:
         """Find all pattern matches in text.
@@ -62,18 +60,17 @@ class EntityPatternMatcher:
                 start, end = match.span()
 
                 # Skip if this position was already matched (handle overlaps)
-                if any(
-                    start >= s and end <= e
-                    for s, e in seen_positions
-                ):
+                if any(start >= s and end <= e for s, e in seen_positions):
                     continue
 
-                matches.append({
-                    "entity_type": entity_type,
-                    "text": match.group(),
-                    "start": start,
-                    "end": end,
-                })
+                matches.append(
+                    {
+                        "entity_type": entity_type,
+                        "text": match.group(),
+                        "start": start,
+                        "end": end,
+                    }
+                )
                 seen_positions.add((start, end))
 
         # Sort by start position

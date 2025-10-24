@@ -4,6 +4,7 @@ Implements `taboot list documents` with filtering and pagination.
 """
 
 import logging
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -16,14 +17,30 @@ logger = logging.getLogger(__name__)
 
 
 def list_documents_command(
-    limit: int = typer.Option(10, "--limit", "-l", help="Maximum documents to show"),
-    offset: int = typer.Option(0, "--offset", "-o", help="Number of documents to skip (pagination)"),
-    source_type: str | None = typer.Option(
-        None, "--source-type", "-s", help="Filter by source type (web, github, etc.)"
-    ),
-    extraction_state: str | None = typer.Option(
-        None, "--extraction-state", "-e", help="Filter by extraction state (pending, completed, etc.)"
-    ),
+    limit: Annotated[
+        int, typer.Option("--limit", "-l", min=1, max=1000, help="Maximum documents to show")
+    ] = 10,
+    offset: Annotated[
+        int, typer.Option("--offset", "-o", min=0, help="Number of documents to skip (pagination)")
+    ] = 0,
+    source_type: Annotated[
+        SourceType | None,
+        typer.Option(
+            "--source-type",
+            "-s",
+            case_sensitive=False,
+            help="Filter by source type (web, github, etc.)",
+        ),
+    ] = None,
+    extraction_state: Annotated[
+        ExtractionState | None,
+        typer.Option(
+            "--extraction-state",
+            "-e",
+            case_sensitive=False,
+            help="Filter by extraction state (pending, completed, etc.)",
+        ),
+    ] = None,
 ) -> None:
     """
     List ingested documents with optional filters and pagination.
@@ -44,35 +61,11 @@ def list_documents_command(
     console.print("\n[bold blue]Listing documents[/bold blue]")
     console.print(
         f"[dim]Filters: limit={limit}, offset={offset}, "
-        f"source_type={source_type}, extraction_state={extraction_state}[/dim]\n"
+        f"source_type={source_type.value if source_type else None}, "
+        f"extraction_state={extraction_state.value if extraction_state else None}[/dim]\n"
     )
 
     try:
-        # Parse and validate filters
-        source_type_enum: SourceType | None = None
-        if source_type:
-            try:
-                source_type_enum = SourceType(source_type)
-            except ValueError:
-                valid_values = ", ".join([s.value for s in SourceType])
-                console.print(
-                    f"[red]Error:[/red] Invalid source_type '{source_type}'. "
-                    f"Valid values: {valid_values}"
-                )
-                raise typer.Exit(1) from None
-
-        extraction_state_enum: ExtractionState | None = None
-        if extraction_state:
-            try:
-                extraction_state_enum = ExtractionState(extraction_state)
-            except ValueError:
-                valid_values = ", ".join([e.value for e in ExtractionState])
-                console.print(
-                    f"[red]Error:[/red] Invalid extraction_state '{extraction_state}'. "
-                    f"Valid values: {valid_values}"
-                )
-                raise typer.Exit(1) from None
-
         # Import use case and dependencies
         import asyncio
 
@@ -83,55 +76,61 @@ def list_documents_command(
             ListDocumentsUseCase,
         )
 
-        # Get PostgreSQL client and create adapter
-        db_conn = get_postgres_client()
-        db_client = PostgresDocumentsClient(db_conn)
+        # Get PostgreSQL client and create adapter with proper cleanup
+        db_conn = None
+        try:
+            db_conn = get_postgres_client()
+            db_client = PostgresDocumentsClient(db_conn)
 
-        # Execute use case
-        async def _execute() -> DocumentListResponse:
-            use_case = ListDocumentsUseCase(db_client=db_client)
-            return await use_case.execute(
-                limit=limit,
-                offset=offset,
-                source_type=source_type_enum,
-                extraction_state=extraction_state_enum,
-            )
+            # Execute use case
+            async def _execute() -> DocumentListResponse:
+                use_case = ListDocumentsUseCase(db_client=db_client)
+                return await use_case.execute(
+                    limit=limit,
+                    offset=offset,
+                    source_type=source_type,
+                    extraction_state=extraction_state,
+                )
 
-        result = asyncio.run(_execute())
+            result = asyncio.run(_execute())
 
-        # Display results
-        if not result.documents:
-            console.print("[yellow]No documents found matching filters.[/yellow]")
-            return
+            # Display results
+            if not result.documents:
+                console.print("[yellow]No documents found matching filters.[/yellow]")
+                return
 
-        # Create rich table
-        table = Table(title=f"Documents ({len(result.documents)} of {result.total} total)")
-        table.add_column("Doc ID", style="cyan", no_wrap=True)
-        table.add_column("Source Type", style="green")
-        table.add_column("Source URL", style="blue", max_width=50)
-        table.add_column("State", style="magenta")
-        table.add_column("Ingested At", style="yellow")
+            # Create rich table
+            table = Table(title=f"Documents ({len(result.documents)} of {result.total} total)")
+            table.add_column("Doc ID", style="cyan", no_wrap=True)
+            table.add_column("Source Type", style="green")
+            table.add_column("Source URL", style="blue", max_width=50)
+            table.add_column("State", style="magenta")
+            table.add_column("Ingested At", style="yellow")
 
-        for doc in result.documents:
-            table.add_row(
-                str(doc.doc_id)[:8] + "...",  # Shortened UUID
-                doc.source_type.value,
-                doc.source_url[:47] + "..." if len(doc.source_url) > 50 else doc.source_url,
-                doc.extraction_state.value,
-                doc.ingested_at.strftime("%Y-%m-%d %H:%M"),
-            )
+            for doc in result.documents:
+                table.add_row(
+                    str(doc.doc_id)[:8] + "...",  # Shortened UUID
+                    doc.source_type.value,
+                    doc.source_url[:47] + "..." if len(doc.source_url) > 50 else doc.source_url,
+                    doc.extraction_state.value,
+                    doc.ingested_at.strftime("%Y-%m-%d %H:%M"),
+                )
 
-        console.print(table)
+            console.print(table)
 
-        # Show pagination info
-        if result.total > result.limit:
-            pages = (result.total + result.limit - 1) // result.limit
-            current_page = (result.offset // result.limit) + 1
-            console.print(
-                f"\n[dim]Page {current_page} of {pages} "
-                f"(showing {result.offset + 1}-{result.offset + len(result.documents)} "
-                f"of {result.total})[/dim]"
-            )
+            # Show pagination info
+            if result.total > result.limit:
+                pages = (result.total + result.limit - 1) // result.limit
+                current_page = (result.offset // result.limit) + 1
+                console.print(
+                    f"\n[dim]Page {current_page} of {pages} "
+                    f"(showing {result.offset + 1}-{result.offset + len(result.documents)} "
+                    f"of {result.total})[/dim]"
+                )
+        finally:
+            # Always close DB connection to prevent resource leaks
+            if db_conn is not None:
+                db_conn.close()
 
     except ValueError as e:
         console.print(f"[red]Error:[/red] {e}")

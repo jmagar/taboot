@@ -2,13 +2,15 @@
 
 Implements the SWAG reverse proxy config ingestion workflow:
 1. Accept config file/directory path
-2. Parse nginx config using SwagReader
-3. Extract Proxy nodes and ROUTES_TO relationships
-4. Write to Neo4j using batched graph writer
-5. Display progress and results
+2. Create SwagReader and GraphWriter adapters
+3. Call IngestSwagUseCase.execute() orchestration
+4. Display progress and results
 
 This command is thin - parsing logic is in packages/ingest/readers/swag.py,
-and graph operations use packages/graph/ adapters.
+graph operations use packages/graph/writers/swag_writer.py,
+and orchestration is in packages/core/use_cases/ingest_swag.py.
+
+Per CLAUDE.md architecture: Apps are thin I/O layers calling core use-cases.
 """
 
 import logging
@@ -18,7 +20,9 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
+from packages.core.use_cases.ingest_swag import IngestSwagError, IngestSwagUseCase
 from packages.graph.client import Neo4jClient, Neo4jConnectionError
+from packages.graph.writers.swag_writer import SwagGraphWriter
 from packages.ingest.readers.swag import SwagReader, SwagReaderError
 
 console = Console()
@@ -53,6 +57,7 @@ def ingest_swag_command(
         ✓ Parsed: 1 proxy, 5 routes
         ✓ Wrote 1 Proxy node to Neo4j
         ✓ Wrote 5 ROUTES_TO relationships to Neo4j
+        ✓ SWAG config ingestion completed successfully
 
     Raises:
         typer.Exit: Exit with code 1 if ingestion fails.
@@ -68,96 +73,56 @@ def ingest_swag_command(
         console.print(f"[yellow]Starting SWAG config ingestion: {config_path}[/yellow]")
         logger.info("Starting SWAG config ingestion: %s", config_path)
 
-        # Create SwagReader
-        reader = SwagReader(proxy_name=proxy_name)
+        # Create adapters
+        swag_reader = SwagReader(proxy_name=proxy_name)
 
-        # Parse config file
-        logger.info("Parsing config file: %s", config_path)
-        parsed = reader.parse_file(str(config_path))
-
-        proxies = parsed["proxies"]
-        routes = parsed["routes"]
-
-        console.print(f"[green]✓ Parsed: {len(proxies)} proxy, {len(routes)} routes[/green]")
-        logger.info("Parsed %s proxies and %s routes", len(proxies), len(routes))
-
-        # Connect to Neo4j
-        logger.info("Connecting to Neo4j")
         neo4j_client = Neo4jClient()
         neo4j_client.connect()
 
         try:
-            # Write Proxy nodes to Neo4j
-            with neo4j_client.session() as session:
-                # Write Proxy nodes
-                for proxy in proxies:
-                    query = """
-                    MERGE (p:Proxy {name: $name})
-                    SET p.proxy_type = $proxy_type,
-                        p.created_at = $created_at,
-                        p.updated_at = $updated_at,
-                        p.metadata = $metadata
-                    RETURN p
-                    """
-                    session.run(
-                        query,
-                        {
-                            "name": proxy.name,
-                            "proxy_type": proxy.proxy_type.value,
-                            "created_at": proxy.created_at.isoformat(),
-                            "updated_at": proxy.updated_at.isoformat(),
-                            "metadata": proxy.metadata or {},
-                        },
-                    )
+            graph_writer = SwagGraphWriter(neo4j_client, batch_size=2000)
 
-                console.print(f"[green]✓ Wrote {len(proxies)} Proxy node(s) to Neo4j[/green]")
-                logger.info("Wrote %s Proxy nodes to Neo4j", len(proxies))
+            # Create use-case and execute
+            use_case = IngestSwagUseCase(
+                swag_reader=swag_reader,
+                graph_writer=graph_writer,
+            )
 
-                # Write ROUTES_TO relationships
-                # First ensure Service nodes exist
-                services = {route["target_service"] for route in routes}
-                for service_name in services:
-                    query = """
-                    MERGE (s:Service {name: $name})
-                    RETURN s
-                    """
-                    session.run(query, {"name": service_name})
+            # Execute ingestion pipeline
+            logger.info("Executing SWAG ingestion use-case")
+            summary = use_case.execute(config_path)
 
-                # Now create ROUTES_TO relationships
-                for route in routes:
-                    query = """
-                    MATCH (p:Proxy {name: $proxy_name})
-                    MATCH (s:Service {name: $service_name})
-                    MERGE (p)-[r:ROUTES_TO]->(s)
-                    SET r.host = $host,
-                        r.path = $path,
-                        r.tls = $tls
-                    RETURN r
-                    """
-                    session.run(
-                        query,
-                        {
-                            "proxy_name": proxy_name,
-                            "service_name": route["target_service"],
-                            "host": route["host"],
-                            "path": route["path"],
-                            "tls": route["tls"],
-                        },
-                    )
+            # Display results
+            parse_stats = summary["parse_stats"]
+            console.print(
+                f"[green]✓ Parsed: {parse_stats['proxy_count']} proxy, "
+                f"{parse_stats['route_count']} routes[/green]"
+            )
 
+            console.print(
+                f"[green]✓ Wrote {summary['proxies_written']} Proxy node(s) to Neo4j[/green]"
+            )
+
+            console.print(
+                f"[green]✓ Wrote {summary['routes_written']} ROUTES_TO "
+                f"relationship(s) to Neo4j[/green]"
+            )
+
+            # Display batch statistics
+            write_stats = summary["write_stats"]
+            if write_stats:
                 console.print(
-                    f"[green]✓ Wrote {len(routes)} ROUTES_TO relationships to Neo4j[/green]"
+                    f"[dim]  (Batches: {write_stats.get('proxy_batches', 0)} proxies, "
+                    f"{write_stats.get('route_batches', 0)} routes)[/dim]"
                 )
-                logger.info("Wrote %s ROUTES_TO relationships to Neo4j", len(routes))
+
+            console.print("[green]✓ SWAG config ingestion completed successfully[/green]")
+            logger.info("SWAG config ingestion completed successfully")
 
         finally:
             # Always close Neo4j connection
             neo4j_client.close()
             logger.info("Closed Neo4j connection")
-
-        # Success message
-        console.print("[green]✓ SWAG config ingestion completed successfully[/green]")
-        logger.info("SWAG config ingestion completed successfully")
 
     except typer.Exit:
         # Re-raise typer.Exit to preserve exit code
@@ -172,15 +137,20 @@ def ingest_swag_command(
         console.print(f"[red]✗ Neo4j connection failed: {e}[/red]")
         logger.exception("Neo4j connection failed")
         raise typer.Exit(1) from None
-    except FileNotFoundError as e:
-        # Handle file not found errors
-        console.print(f"[red]✗ Config file not found: {e}[/red]")
-        logger.exception("Config file not found")
+    except IngestSwagError as e:
+        # Handle use-case errors
+        console.print(f"[red]✗ Ingestion failed: {e}[/red]")
+        logger.exception("Ingestion failed")
+        raise typer.Exit(1) from None
+    except ValueError as e:
+        # Handle validation errors
+        console.print(f"[red]✗ Invalid input: {e}[/red]")
+        logger.exception("Invalid input")
         raise typer.Exit(1) from None
     except Exception as e:
         # Catch any other errors and report them
-        console.print(f"[red]✗ Ingestion failed: {e}[/red]")
-        logger.exception("Ingestion failed")
+        console.print(f"[red]✗ Unexpected error: {e}[/red]")
+        logger.exception("Unexpected error during SWAG ingestion")
         raise typer.Exit(1) from None
 
 

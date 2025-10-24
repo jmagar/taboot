@@ -101,9 +101,7 @@ class TestConstraintCreation:
         mock_neo4j_driver.session.return_value = mock_context
 
         # Verify error is raised with proper message
-        with pytest.raises(
-            ConstraintCreationError, match="Failed to create Neo4j constraints"
-        ):
+        with pytest.raises(ConstraintCreationError, match="Failed to create Neo4j constraints"):
             create_constraints(mock_neo4j_driver)
 
     def test_constraint_creation_is_idempotent(
@@ -135,9 +133,7 @@ class TestConstraintCreation:
         # Session should have been called twice (once per create_constraints call)
         assert mock_neo4j_driver.session.call_count == 2
 
-    def test_constraint_file_path_resolution(
-        self, test_config: TabootConfig
-    ) -> None:
+    def test_constraint_file_path_resolution(self, test_config: TabootConfig) -> None:
         """Test that the constraint file path is resolved correctly.
 
         Verifies that the function:
@@ -157,9 +153,7 @@ class TestConstraintCreation:
         assert "contracts" in str(file_path)
         assert file_path.exists(), f"Constraint file not found at {file_path}"
 
-    def test_constraint_statements_parsed_correctly(
-        self, test_config: TabootConfig
-    ) -> None:
+    def test_constraint_statements_parsed_correctly(self, test_config: TabootConfig) -> None:
         """Test that Cypher statements are parsed from file correctly.
 
         Verifies that the parser:
@@ -221,7 +215,8 @@ class TestConstraintCreation:
         calls_with_corr_id = [
             call
             for call in mock_log_info.call_args_list
-            if len(call) > 1 and isinstance(call[1].get("extra"), dict)
+            if len(call) > 1
+            and isinstance(call[1].get("extra"), dict)
             and call[1].get("extra", {}).get("correlation_id") == "test-corr-456"
         ]
         assert len(calls_with_corr_id) > 0 or mock_log_info.call_count > 0

@@ -51,7 +51,7 @@ class TestDocumentModel:
     def test_document_requires_doc_id(self) -> None:
         """Test that doc_id is required."""
         with pytest.raises(ValidationError, match="doc_id"):
-            Document(
+            Document(  # type: ignore[call-arg]
                 source_url="https://example.com",
                 source_type=SourceType.WEB,
                 content_hash="a" * 64,
@@ -92,7 +92,7 @@ class TestDocumentModel:
             Document(
                 doc_id=uuid4(),
                 source_url="https://example.com",
-                source_type="invalid_type",  # Not a valid enum
+                source_type="invalid_type",  # type: ignore[arg-type]
                 content_hash="a" * 64,
                 ingested_at=datetime.now(UTC),
                 extraction_state=ExtractionState.PENDING,
@@ -108,7 +108,7 @@ class TestDocumentModel:
                 source_type=SourceType.WEB,
                 content_hash="a" * 64,
                 ingested_at=datetime.now(UTC),
-                extraction_state="invalid_state",  # Not a valid enum
+                extraction_state="invalid_state",  # type: ignore[arg-type]
                 updated_at=datetime.now(UTC),
             )
 
@@ -165,7 +165,7 @@ class TestChunkModel:
     def test_chunk_requires_chunk_id(self) -> None:
         """Test that chunk_id is required."""
         with pytest.raises(ValidationError, match="chunk_id"):
-            Chunk(
+            Chunk(  # type: ignore[call-arg]
                 doc_id=uuid4(),
                 content="Test content",
                 position=0,
@@ -280,7 +280,7 @@ class TestIngestionJobModel:
     def test_ingestion_job_requires_job_id(self) -> None:
         """Test that job_id is required."""
         with pytest.raises(ValidationError, match="job_id"):
-            IngestionJob(
+            IngestionJob(  # type: ignore[call-arg]
                 source_type=SourceType.WEB,
                 source_target="https://example.com",
                 state=JobState.PENDING,

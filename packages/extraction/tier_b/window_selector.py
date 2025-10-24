@@ -1,7 +1,8 @@
 """Tier B window selector for Tier C LLM processing."""
 
 import re
-from typing import Any
+
+from packages.extraction.types import ExtractionWindow
 
 
 class WindowSelector:
@@ -41,24 +42,24 @@ class WindowSelector:
             list[str]: Sentences.
         """
         # Simple sentence splitting on period, question mark, exclamation
-        sentences = re.split(r'(?<=[.!?])\s+', text)
+        sentences = re.split(r"(?<=[.!?])\s+", text)
         return [s.strip() for s in sentences if s.strip()]
 
-    def select_windows(self, text: str) -> list[dict[str, Any]]:
+    def select_windows(self, text: str) -> list[ExtractionWindow]:
         """Select micro-windows from text for Tier C processing.
 
         Args:
             text: Input text to process.
 
         Returns:
-            list[dict[str, Any]]: Windows with content, token_count, start, end.
+            list[ExtractionWindow]: Windows with content, token_count, start, end.
         """
         if not text:
             return []
 
         sentences = self._split_into_sentences(text)
-        windows = []
-        current_window = []
+        windows: list[ExtractionWindow] = []
+        current_window: list[str] = []
         current_tokens = 0
         current_start = 0
 
@@ -68,19 +69,21 @@ class WindowSelector:
             # If single sentence exceeds limit, split by words
             if sentence_tokens > self.max_tokens:
                 words = sentence.split()
-                word_window = []
+                word_window: list[str] = []
                 word_tokens = 0
 
                 for word in words:
                     word_token_count = int(1.3)  # Approximate 1 word = 1.3 tokens
                     if word_tokens + word_token_count > self.max_tokens and word_window:
                         window_text = " ".join(word_window)
-                        windows.append({
-                            "content": window_text,
-                            "token_count": word_tokens,
-                            "start": current_start,
-                            "end": current_start + len(window_text),
-                        })
+                        windows.append(
+                            {
+                                "content": window_text,
+                                "token_count": word_tokens,
+                                "start": current_start,
+                                "end": current_start + len(window_text),
+                            }
+                        )
                         current_start += len(window_text) + 1
                         word_window = []
                         word_tokens = 0
@@ -91,24 +94,28 @@ class WindowSelector:
                 # Add final word window
                 if word_window:
                     window_text = " ".join(word_window)
-                    windows.append({
-                        "content": window_text,
-                        "token_count": word_tokens,
-                        "start": current_start,
-                        "end": current_start + len(window_text),
-                    })
+                    windows.append(
+                        {
+                            "content": window_text,
+                            "token_count": word_tokens,
+                            "start": current_start,
+                            "end": current_start + len(window_text),
+                        }
+                    )
                     current_start += len(window_text) + 1
                 continue
 
             # If adding this sentence exceeds limit, save current window
             if current_tokens + sentence_tokens > self.max_tokens and current_window:
                 window_text = " ".join(current_window)
-                windows.append({
-                    "content": window_text,
-                    "token_count": current_tokens,
-                    "start": current_start,
-                    "end": current_start + len(window_text),
-                })
+                windows.append(
+                    {
+                        "content": window_text,
+                        "token_count": current_tokens,
+                        "start": current_start,
+                        "end": current_start + len(window_text),
+                    }
+                )
                 current_window = []
                 current_tokens = 0
                 current_start += len(window_text) + 1
@@ -120,11 +127,13 @@ class WindowSelector:
         # Add final window
         if current_window:
             window_text = " ".join(current_window)
-            windows.append({
-                "content": window_text,
-                "token_count": current_tokens,
-                "start": current_start,
-                "end": current_start + len(window_text),
-            })
+            windows.append(
+                {
+                    "content": window_text,
+                    "token_count": current_tokens,
+                    "start": current_start,
+                    "end": current_start + len(window_text),
+                }
+            )
 
         return windows

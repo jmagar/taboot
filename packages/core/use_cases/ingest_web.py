@@ -9,7 +9,7 @@ With job state tracking and error handling per data-model.md.
 import hashlib
 import logging
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from llama_index.core import Document as LlamaDocument
 
@@ -80,7 +80,9 @@ class IngestWebUseCase:
 
         logger.info(f"Initialized IngestWebUseCase (collection={collection_name})")
 
-    def execute(self, url: str, limit: int | None = None) -> IngestionJob:
+    def execute(
+        self, url: str, limit: int | None = None, job_id: "UUID | None" = None
+    ) -> IngestionJob:
         """Execute the full ingestion pipeline for a URL.
 
         Pipeline flow:
@@ -99,15 +101,14 @@ class IngestWebUseCase:
         Args:
             url: URL to crawl and ingest.
             limit: Optional maximum number of pages to crawl.
+            job_id: Optional pre-generated job UUID for async execution.
 
         Returns:
             IngestionJob: Job with final state and metadata.
         """
         # Step 1: Create job in PENDING state
-        job = self._create_job(url)
-        logger.info(
-            f"Created ingestion job {job.job_id} for {url} (limit={limit})"
-        )
+        job = self._create_job(url, job_id=job_id)
+        logger.info(f"Created ingestion job {job.job_id} for {url} (limit={limit})")
 
         try:
             # Step 2: Transition to RUNNING
@@ -131,9 +132,7 @@ class IngestWebUseCase:
                 all_chunks.extend(chunks)
 
                 # Update pages_processed
-                job = job.model_copy(
-                    update={"pages_processed": job.pages_processed + 1}
-                )
+                job = job.model_copy(update={"pages_processed": job.pages_processed + 1})
 
             # Step 4c-4d: Embed and upsert all chunks in batch
             if all_chunks:
@@ -158,23 +157,46 @@ class IngestWebUseCase:
 
             return job
 
+        except ConnectionError as e:
+            # Network/service connectivity issues
+            logger.error(
+                "Connection error during ingestion job %s: %s", job.job_id, e, exc_info=True
+            )
+            job = self._transition_to_failed(job, f"Connection failed: {str(e)}")
+            return job
+        except TimeoutError as e:
+            # Timeout during crawling or embedding
+            logger.error("Timeout during ingestion job %s: %s", job.job_id, e, exc_info=True)
+            job = self._transition_to_failed(job, f"Operation timed out: {str(e)}")
+            return job
+        except (KeyError, ValueError) as e:
+            # Data validation or integrity issues
+            logger.error(
+                "Data validation error during ingestion job %s: %s",
+                job.job_id,
+                e,
+                exc_info=True,
+            )
+            job = self._transition_to_failed(job, f"Data error: {str(e)}")
+            return job
         except Exception as e:
-            # Handle errors and transition to FAILED
-            logger.error(f"Ingestion job {job.job_id} failed: {e}", exc_info=True)
-            job = self._transition_to_failed(job, str(e))
+            # Unexpected errors - preserve full context
+            logger.exception("Unexpected error during ingestion job %s: %s", job.job_id, e)
+            job = self._transition_to_failed(job, f"Unexpected error: {str(e)}")
             return job
 
-    def _create_job(self, url: str) -> IngestionJob:
+    def _create_job(self, url: str, job_id: "UUID | None" = None) -> IngestionJob:
         """Create a new IngestionJob in PENDING state.
 
         Args:
             url: Source URL for the job.
+            job_id: Optional pre-generated job UUID.
 
         Returns:
             IngestionJob: Job in PENDING state.
         """
         return IngestionJob(
-            job_id=uuid4(),
+            job_id=job_id or uuid4(),
             source_type=SourceType.WEB,
             source_target=url,
             state=JobState.PENDING,

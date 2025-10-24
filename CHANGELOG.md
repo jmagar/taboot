@@ -9,6 +9,7 @@ All notable changes to Taboot will be documented in this file.
 ## [0.4.0] - 2025-10-23
 
 ### Added
+
 - **List Documents Feature (T163-T168)**: Complete implementation with filtering and pagination
   - Use case layer: `packages/core/use_cases/list_documents.py` with DocumentsClient protocol
   - CLI command: `taboot list documents` with rich table output
@@ -52,9 +53,10 @@ All notable changes to Taboot will be documented in this file.
 - LlamaIndex usage clarified across all adapter packages (ingest, extraction, vector, graph, retrieval)
 
 ### Changed
+
 - Renamed project from LlamaCrawl to Taboot across all documentation and code
 - Standardized all health check endpoints to `/health` (previously mixed `/health` and `/healthz`)
-- Updated all environment variable references (LLAMACRAWL_* → TABOOT_*)
+- Updated all environment variable references (`LLAMACRAWL_*→TABOOT_*`)
 - Removed legacy `uv run taboot-api` entry point (API runs via Docker only)
 - Docker service name changed from `taboot-api` to `taboot-app` in documentation
 - Updated CLI command name from `llama` to `taboot`
@@ -62,6 +64,7 @@ All notable changes to Taboot will be documented in this file.
 - Added prominent single-user system philosophy notes to README.md and CLAUDE.md
 
 ### Fixed
+
 - Fixed FIRECRAWL_PORT and FIRECRAWL_INTERNAL_PORT variable naming in .env files
 - Fixed NUQ_DATABASE_URL to use ${POSTGRES_DB} variable instead of hardcoded 'postgres'
 - Added TABOOT_HTTP_PORT environment variable

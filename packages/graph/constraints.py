@@ -5,6 +5,7 @@ file during system initialization. Ensures proper unique indexes and composite i
 are created for efficient graph traversal and data integrity.
 """
 
+import asyncio
 from pathlib import Path
 
 from neo4j import Driver
@@ -124,17 +125,14 @@ def create_constraints(driver: Driver) -> None:
     """
     correlation_id = get_correlation_id()
 
-    logger.info(
-        "Starting Neo4j constraint creation",
-        extra={"correlation_id": correlation_id}
-    )
+    logger.info("Starting Neo4j constraint creation", extra={"correlation_id": correlation_id})
 
     try:
         statements = load_constraint_statements()
 
         logger.info(
             f"Loaded {len(statements)} constraint statements",
-            extra={"correlation_id": correlation_id, "statement_count": len(statements)}
+            extra={"correlation_id": correlation_id, "statement_count": len(statements)},
         )
 
         with driver.session() as session:
@@ -146,8 +144,8 @@ def create_constraints(driver: Driver) -> None:
                         extra={
                             "correlation_id": correlation_id,
                             "statement_number": i,
-                            "total_statements": len(statements)
-                        }
+                            "total_statements": len(statements),
+                        },
                     )
                 except Neo4jError as e:
                     logger.exception(
@@ -157,7 +155,7 @@ def create_constraints(driver: Driver) -> None:
                         extra={
                             "correlation_id": correlation_id,
                             "statement_number": i,
-                        }
+                        },
                     )
                     raise ConstraintCreationError(
                         f"Failed to create Neo4j constraints: {str(e)}"
@@ -165,28 +163,20 @@ def create_constraints(driver: Driver) -> None:
 
         logger.info(
             "Successfully created all Neo4j constraints",
-            extra={"correlation_id": correlation_id, "statement_count": len(statements)}
+            extra={"correlation_id": correlation_id, "statement_count": len(statements)},
         )
 
     except FileNotFoundError as e:
-        logger.exception(
-            "Constraints file not found",
-            extra={"correlation_id": correlation_id}
-        )
-        raise ConstraintCreationError(
-            f"Failed to create Neo4j constraints: {str(e)}"
-        ) from e
+        logger.exception("Constraints file not found", extra={"correlation_id": correlation_id})
+        raise ConstraintCreationError(f"Failed to create Neo4j constraints: {str(e)}") from e
     except ConstraintCreationError:
         # Re-raise ConstraintCreationError without wrapping
         raise
     except Exception as e:
         logger.exception(
-            "Unexpected error during constraint creation",
-            extra={"correlation_id": correlation_id}
+            "Unexpected error during constraint creation", extra={"correlation_id": correlation_id}
         )
-        raise ConstraintCreationError(
-            f"Failed to create Neo4j constraints: {str(e)}"
-        ) from e
+        raise ConstraintCreationError(f"Failed to create Neo4j constraints: {str(e)}") from e
 
 
 async def create_neo4j_constraints() -> None:
@@ -205,10 +195,10 @@ async def create_neo4j_constraints() -> None:
 
     client = Neo4jClient()
     try:
-        client.connect()
-        create_constraints(client.get_driver())
+        await asyncio.to_thread(client.connect)
+        await asyncio.to_thread(create_constraints, client.get_driver())
     finally:
-        client.close()
+        await asyncio.to_thread(client.close)
 
 
 __all__ = [

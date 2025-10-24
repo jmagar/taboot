@@ -156,7 +156,13 @@ def build_trace_chain(
         ...     window_id="win-456"
         ... )
         >>> print(trace)
-        {'doc_id': 'abc-123', 'section': 'Installation > Prerequisites', 'window_id': 'win-456', 'triple_id': None, 'neo4j_txid': None}
+        {
+            'doc_id': 'abc-123',
+            'section': 'Installation > Prerequisites',
+            'window_id': 'win-456',
+            'triple_id': None,
+            'neo4j_txid': None
+        }
     """
     return {
         "doc_id": doc_id,

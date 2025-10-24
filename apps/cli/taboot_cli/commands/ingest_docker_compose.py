@@ -5,11 +5,10 @@ Implements Docker Compose YAML ingestion workflow:
 2. Parse docker-compose.yaml file using DockerComposeReader
 3. Extract Service nodes with image and version
 4. Extract DEPENDS_ON and BINDS relationships
-5. Write nodes and relationships to Neo4j using BatchedGraphWriter
+5. Write nodes and relationships to Neo4j using direct Cypher queries
 6. Display progress and results
 
-This command is thin - parsing logic is in packages/ingest/readers/docker_compose.py,
-and graph writing is in packages/graph/writers/batched.py.
+This command is thin - parsing logic is in packages/ingest/readers/docker_compose.py.
 """
 
 import logging
@@ -140,64 +139,54 @@ def _write_to_neo4j(
         services: List of service dictionaries with name, image, version.
         relationships: List of relationship dictionaries with type, source, target/port.
     """
-    # Create Neo4j client
-    client = Neo4jClient()
-    client.connect()
-
-    try:
-        with client.session() as session:
-            # Write Service nodes
-            for service in services:
-                query = """
+    # Create Neo4j client using context manager
+    with Neo4jClient() as client, client.session() as session:
+        # Write Service nodes
+        for service in services:
+            query = """
                 MERGE (s:Service {name: $name})
                 SET s.image = $image,
                     s.version = $version
                 RETURN s
                 """
-                session.run(
-                    query,
-                    {
-                        "name": service["name"],
-                        "image": service.get("image", ""),
-                        "version": service.get("version", ""),
-                    },
-                )
+            session.run(
+                query,
+                {
+                    "name": service["name"],
+                    "image": service.get("image", ""),
+                    "version": service.get("version", ""),
+                },
+            )
 
-            # Write relationships
-            for rel in relationships:
-                if rel["type"] == "DEPENDS_ON":
-                    query = """
+        # Write relationships
+        for rel in relationships:
+            if rel["type"] == "DEPENDS_ON":
+                query = """
                     MATCH (source:Service {name: $source}),
                           (target:Service {name: $target})
                     MERGE (source)-[:DEPENDS_ON]->(target)
                     """
-                    session.run(
-                        query,
-                        {
-                            "source": str(rel["source"]),
-                            "target": str(rel["target"]),
-                        },
-                    )
+                session.run(
+                    query,
+                    {
+                        "source": str(rel["source"]),
+                        "target": str(rel["target"]),
+                    },
+                )
 
-                elif rel["type"] == "BINDS":
-                    query = """
+            elif rel["type"] == "BINDS":
+                query = """
                     MATCH (s:Service {name: $service})
-                    MERGE (s)-[b:BINDS]->(s)
-                    SET b.port = $port,
-                        b.protocol = $protocol
+                    MERGE (s)-[b:BINDS {port: $port, protocol: $protocol}]->(s)
                     """
-                    session.run(
-                        query,
-                        {
-                            "service": rel["source"],
-                            "port": rel["port"],
-                            "protocol": rel["protocol"],
-                        },
-                    )
-
-    finally:
-        # Clean up client connection
-        client.close()
+                session.run(
+                    query,
+                    {
+                        "service": rel["source"],
+                        "port": rel["port"],
+                        "protocol": rel["protocol"],
+                    },
+                )
 
 
 # Export public API

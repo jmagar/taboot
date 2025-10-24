@@ -175,15 +175,28 @@ class ExtractPendingUseCase:
                     failed += 1
                     logger.warning(f"Document {doc.doc_id} extraction failed: state={job.state}")
 
-            except Exception as e:
-                # Per-document error handling: log, increment failed, continue
+            except (ConnectionError, TimeoutError) as e:
+                # Service connectivity issues - mark as failed and continue
                 processed += 1
                 failed += 1
                 logger.error(
-                    f"Error processing document {doc.doc_id}: {e}",
+                    "Service connection error processing document %s: %s",
+                    doc.doc_id,
+                    e,
                     exc_info=True,
                 )
-                # Continue to next document
+            except (KeyError, ValueError) as e:
+                # Data validation issues - mark as failed and continue
+                processed += 1
+                failed += 1
+                logger.error(
+                    "Data validation error processing document %s: %s", doc.doc_id, e, exc_info=True
+                )
+            except Exception as e:
+                # Unexpected errors - log with full context, mark as failed, continue
+                processed += 1
+                failed += 1
+                logger.exception("Unexpected error processing document %s: %s", doc.doc_id, e)
 
         # Step 3: Log final summary
         logger.info(

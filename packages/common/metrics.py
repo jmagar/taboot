@@ -11,9 +11,12 @@ All metrics are persisted in Redis with atomic operations.
 """
 
 import time
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
-from redis import asyncio as aioredis
+
+if TYPE_CHECKING:
+    from redis.asyncio import Redis
 
 from packages.common.logging import get_logger
 
@@ -85,7 +88,7 @@ class MetricsCollector:
     # ZSET memory bounds: keep only latest N entries to prevent unbounded growth
     MAX_ZSET_SIZE = 10_000
 
-    def __init__(self, redis_client: aioredis.Redis) -> None:
+    def __init__(self, redis_client: "Redis[bytes]") -> None:
         """Initialize metrics collector.
 
         Args:
@@ -324,11 +327,14 @@ class MetricsCollector:
 
         for member, _timestamp_score in members_with_scores:
             # Member format: "timestamp:duration_ms:count"
-            # Handle bytes if Redis client didn't decode responses
+            # Handle bytes from Redis client
+            member_str: str
             if isinstance(member, (bytes, bytearray)):
-                member = member.decode("utf-8", errors="ignore")
+                member_str = member.decode("utf-8", errors="ignore")
+            else:
+                member_str = str(member)
 
-            parts = member.split(":")
+            parts = member_str.split(":")
             if len(parts) == 3:
                 timestamp = float(parts[0])
                 count = int(parts[2])

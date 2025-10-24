@@ -24,7 +24,7 @@ export default function Page() {
             </Link>
           </Button>
           <Button asChild variant="secondary" size="sm">
-            <Link href="https://github.com/jmagar/taboot" target="_blank">
+            <Link href="https://github.com/jmagar/taboot" target="_blank" rel="noopener noreferrer">
               View on GitHub
             </Link>
           </Button>

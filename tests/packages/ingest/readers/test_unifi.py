@@ -4,9 +4,15 @@ Tests Unifi Controller API client following TDD methodology (RED-GREEN-REFACTOR)
 Extracts network topology: devices, clients, Host nodes, IP nodes, LOCATED_AT relationships.
 """
 
+from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock, patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from packages.ingest.readers.unifi import UnifiReader
+else:
+    UnifiReader = Any
 
 
 class TestUnifiReader:
@@ -81,7 +87,7 @@ class TestUnifiReader:
         ]
 
     @pytest.fixture
-    def unifi_reader(self) -> "UnifiReader":
+    def unifi_reader(self) -> UnifiReader:
         """Create UnifiReader instance for testing.
 
         Returns:
@@ -149,7 +155,7 @@ class TestUnifiReader:
 
     @patch("packages.ingest.readers.unifi.requests.Session")
     def test_reader_authenticates_with_controller(
-        self, mock_session_class: Mock, unifi_reader: "UnifiReader"
+        self, mock_session_class: Mock, unifi_reader: UnifiReader
     ) -> None:
         """Test that UnifiReader authenticates with Unifi Controller."""
         mock_session = Mock()
@@ -172,7 +178,7 @@ class TestUnifiReader:
 
     @patch("packages.ingest.readers.unifi.requests.Session")
     def test_reader_handles_authentication_failure(
-        self, mock_session_class: Mock, unifi_reader: "UnifiReader"
+        self, mock_session_class: Mock, unifi_reader: UnifiReader
     ) -> None:
         """Test that UnifiReader raises error on authentication failure."""
         from packages.ingest.readers.unifi import UnifiAuthError
@@ -193,7 +199,7 @@ class TestUnifiReader:
     def test_reader_extracts_devices(
         self,
         mock_session_class: Mock,
-        unifi_reader: "UnifiReader",
+        unifi_reader: UnifiReader,
         mock_devices_response: list[dict],
     ) -> None:
         """Test that UnifiReader extracts device topology."""
@@ -239,7 +245,7 @@ class TestUnifiReader:
     def test_reader_extracts_clients(
         self,
         mock_session_class: Mock,
-        unifi_reader: "UnifiReader",
+        unifi_reader: UnifiReader,
         mock_clients_response: list[dict],
     ) -> None:
         """Test that UnifiReader extracts client information."""
@@ -285,7 +291,7 @@ class TestUnifiReader:
     def test_reader_extracts_ip_addresses(
         self,
         mock_session_class: Mock,
-        unifi_reader: "UnifiReader",
+        unifi_reader: UnifiReader,
         mock_devices_response: list[dict],
     ) -> None:
         """Test that UnifiReader extracts IP address nodes."""
@@ -332,7 +338,7 @@ class TestUnifiReader:
     def test_reader_creates_located_at_relationships(
         self,
         mock_session_class: Mock,
-        unifi_reader: "UnifiReader",
+        unifi_reader: UnifiReader,
         mock_devices_response: list[dict],
     ) -> None:
         """Test that UnifiReader creates LOCATED_AT relationships."""
@@ -379,7 +385,7 @@ class TestUnifiReader:
 
     @patch("packages.ingest.readers.unifi.requests.Session")
     def test_reader_validates_mac_addresses(
-        self, mock_session_class: Mock, unifi_reader: "UnifiReader"
+        self, mock_session_class: Mock, unifi_reader: UnifiReader
     ) -> None:
         """Test that UnifiReader validates MAC address format."""
         from packages.ingest.readers.unifi import InvalidMACError
@@ -421,7 +427,7 @@ class TestUnifiReader:
 
     @patch("packages.ingest.readers.unifi.requests.Session")
     def test_reader_validates_ip_addresses(
-        self, mock_session_class: Mock, unifi_reader: "UnifiReader"
+        self, mock_session_class: Mock, unifi_reader: UnifiReader
     ) -> None:
         """Test that UnifiReader validates IP address format."""
         from packages.ingest.readers.unifi import InvalidIPError
@@ -463,7 +469,7 @@ class TestUnifiReader:
 
     @patch("packages.ingest.readers.unifi.requests.Session")
     def test_reader_handles_network_errors(
-        self, mock_session_class: Mock, unifi_reader: "UnifiReader"
+        self, mock_session_class: Mock, unifi_reader: UnifiReader
     ) -> None:
         """Test that UnifiReader handles network connection errors."""
         from packages.ingest.readers.unifi import UnifiConnectionError
@@ -481,7 +487,7 @@ class TestUnifiReader:
 
     @patch("packages.ingest.readers.unifi.requests.Session")
     def test_reader_handles_ssl_errors(
-        self, mock_session_class: Mock, unifi_reader: "UnifiReader"
+        self, mock_session_class: Mock, unifi_reader: UnifiReader
     ) -> None:
         """Test that UnifiReader handles SSL certificate errors."""
         from packages.ingest.readers.unifi import UnifiSSLError
@@ -501,7 +507,7 @@ class TestUnifiReader:
     def test_reader_returns_structured_data(
         self,
         mock_session_class: Mock,
-        unifi_reader: "UnifiReader",
+        unifi_reader: UnifiReader,
         mock_devices_response: list[dict],
         mock_clients_response: list[dict],
     ) -> None:
@@ -566,7 +572,7 @@ class TestUnifiReader:
 
     @patch("packages.ingest.readers.unifi.requests.Session")
     def test_reader_handles_ipv6_addresses(
-        self, mock_session_class: Mock, unifi_reader: "UnifiReader"
+        self, mock_session_class: Mock, unifi_reader: UnifiReader
     ) -> None:
         """Test that UnifiReader handles IPv6 addresses."""
         mock_session = Mock()

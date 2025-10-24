@@ -18,8 +18,8 @@ export default function ProfilePage() {
     { label: 'User ID', value: user.id },
     { label: 'Email Verified', value: user.emailVerified ? 'Yes' : 'No' },
     { label: 'Profile Image', value: user.image ? 'Available' : 'No image set' },
-    { label: 'Created At', value: formatDate(user.createdAt, 'PPpp') },
-    { label: 'Updated At', value: formatDate(user.updatedAt, 'PPpp') },
+    { label: 'Created At', value: formatMaybeDate(user.createdAt) },
+    { label: 'Updated At', value: formatMaybeDate(user.updatedAt) },
   ];
 
   return (
@@ -28,7 +28,10 @@ export default function ProfilePage() {
         <CardHeader className="flex flex-col items-center justify-center gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-4">
             <Avatar className="ring-border h-20 w-20 rounded-md ring-2">
-              <AvatarImage src={user.image ?? ''} alt={user.name ?? ''} />
+              <AvatarImage
+                src={user.image ?? ''}
+                alt={user.name ? `${user.name}'s profile photo` : 'User profile photo'}
+              />
               <AvatarFallback className="text-3xl capitalize">
                 {user.name?.[0] ?? '?'}
               </AvatarFallback>
@@ -53,4 +56,17 @@ export default function ProfilePage() {
       </Card>
     </section>
   );
+}
+
+function formatMaybeDate(value: Date | string | null | undefined): string {
+  if (!value) {
+    return '—';
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+
+  return formatDate(date, 'PPpp');
 }

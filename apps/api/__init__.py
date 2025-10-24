@@ -1,0 +1,1 @@
+"""Taboot FastAPI application shell."""

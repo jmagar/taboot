@@ -9,11 +9,11 @@ class TestWindowSelector:
     """Test micro-window selection (≤512 tokens) for Tier C."""
 
     @pytest.fixture
-    def selector(self):
+    def selector(self) -> None:
         """Create window selector instance."""
         return WindowSelector(max_tokens=512)
 
-    def test_select_windows_from_short_text(self, selector):
+    def test_select_windows_from_short_text(self, selector) -> None:
         """Test selecting windows from short text."""
         text = "The api-service connects to postgres database."
 
@@ -22,7 +22,7 @@ class TestWindowSelector:
         assert len(windows) >= 1
         assert all(w["token_count"] <= 512 for w in windows)
 
-    def test_select_windows_from_long_text(self, selector):
+    def test_select_windows_from_long_text(self, selector) -> None:
         """Test selecting windows from long text that needs splitting."""
         # Create text with multiple sentences
         text = " ".join([f"Sentence {i} about services and dependencies." for i in range(100)])
@@ -32,7 +32,7 @@ class TestWindowSelector:
         assert len(windows) >= 1
         assert all(w["token_count"] <= 512 for w in windows)
 
-    def test_window_has_required_fields(self, selector):
+    def test_window_has_required_fields(self, selector) -> None:
         """Test that windows have required fields."""
         text = "The nginx proxy routes to api-service."
 
@@ -45,12 +45,12 @@ class TestWindowSelector:
         assert "start" in window
         assert "end" in window
 
-    def test_empty_text_returns_empty(self, selector):
+    def test_empty_text_returns_empty(self, selector) -> None:
         """Test empty text returns empty list."""
         windows = selector.select_windows("")
         assert windows == []
 
-    def test_respects_max_tokens(self, selector):
+    def test_respects_max_tokens(self, selector) -> None:
         """Test that windows respect max token limit."""
         # Create very long text
         text = " ".join(["word" for _ in range(2000)])

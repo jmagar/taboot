@@ -6,13 +6,13 @@ from uuid import uuid4
 
 import pytest
 
-from packages.common.db_schema import get_postgres_client
 from packages.clients.postgres_document_store import PostgresDocumentStore
+from packages.common.db_schema import get_postgres_client
 from packages.schemas.models import Document, ExtractionState, SourceType
 
 
 @pytest.fixture
-def db_connection():
+def db_connection() -> None:
     """Fixture providing clean database connection."""
     conn = get_postgres_client()
     yield conn
@@ -26,12 +26,12 @@ def db_connection():
 
 
 @pytest.fixture
-def document_store(db_connection):
+def document_store(db_connection) -> None:
     """Fixture providing PostgresDocumentStore instance."""
     return PostgresDocumentStore(db_connection)
 
 
-def test_create_document_and_content(document_store):
+def test_create_document_and_content(document_store) -> None:
     """Test creating document record and storing content."""
     doc_id = uuid4()
     content = "Test document content for extraction"
@@ -46,7 +46,7 @@ def test_create_document_and_content(document_store):
         extraction_state=ExtractionState.PENDING,
         extraction_version=None,
         updated_at=datetime.now(UTC),
-        metadata={"test": "data"}
+        metadata={"test": "data"},
     )
 
     # Should not raise
@@ -57,7 +57,7 @@ def test_create_document_and_content(document_store):
     assert retrieved_content == content
 
 
-def test_query_pending_returns_pending_documents(document_store):
+def test_query_pending_returns_pending_documents(document_store) -> None:
     """Test querying documents with extraction_state=PENDING."""
     # Create 3 documents: 2 PENDING, 1 COMPLETED
     pending_docs = []
@@ -76,7 +76,7 @@ def test_query_pending_returns_pending_documents(document_store):
             extraction_state=ExtractionState.PENDING,
             extraction_version=None,
             updated_at=datetime.now(UTC),
-            metadata=None
+            metadata=None,
         )
         document_store.create(doc, content)
         pending_docs.append(doc)
@@ -94,7 +94,7 @@ def test_query_pending_returns_pending_documents(document_store):
         extraction_state=ExtractionState.COMPLETED,
         extraction_version="1.0.0",
         updated_at=datetime.now(UTC),
-        metadata=None
+        metadata=None,
     )
     document_store.create(completed_doc, completed_content)
 
@@ -105,7 +105,7 @@ def test_query_pending_returns_pending_documents(document_store):
     assert all(doc.extraction_state == ExtractionState.PENDING for doc in results)
 
 
-def test_update_document_changes_extraction_state(document_store):
+def test_update_document_changes_extraction_state(document_store) -> None:
     """Test updating document extraction state."""
     doc_id = uuid4()
     content = "Test content"
@@ -121,16 +121,13 @@ def test_update_document_changes_extraction_state(document_store):
         extraction_state=ExtractionState.PENDING,
         extraction_version=None,
         updated_at=datetime.now(UTC),
-        metadata=None
+        metadata=None,
     )
     document_store.create(document, content)
 
     # Update to COMPLETED
     updated_doc = document.model_copy(
-        update={
-            "extraction_state": ExtractionState.COMPLETED,
-            "extraction_version": "1.0.0"
-        }
+        update={"extraction_state": ExtractionState.COMPLETED, "extraction_version": "1.0.0"}
     )
     document_store.update_document(updated_doc)
 
@@ -139,7 +136,7 @@ def test_update_document_changes_extraction_state(document_store):
     assert len(results) == 0
 
 
-def test_get_content_raises_on_missing_document(document_store):
+def test_get_content_raises_on_missing_document(document_store) -> None:
     """Test that get_content raises KeyError for missing documents."""
     missing_id = uuid4()
 

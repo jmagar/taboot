@@ -8,7 +8,7 @@ import logging
 import sys
 from typing import Any
 
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger.json import JsonFormatter
 
 from packages.common.config import get_config
 
@@ -36,7 +36,7 @@ class CorrelationIdFilter(logging.Filter):
         return True
 
 
-class CustomJsonFormatter(jsonlogger.JsonFormatter):
+class CustomJsonFormatter(JsonFormatter):
     """Custom JSON formatter with additional fields.
 
     Adds timestamp, level, module, and correlation_id to all log records.

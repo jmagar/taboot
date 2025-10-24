@@ -11,7 +11,7 @@ This command is thin - all business logic is in packages/core/use_cases/extract_
 """
 
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 import redis.asyncio
@@ -26,6 +26,7 @@ from packages.extraction.tier_a.parsers import parse_code_blocks, parse_tables
 from packages.extraction.tier_a.patterns import EntityPatternMatcher
 from packages.extraction.tier_b.window_selector import WindowSelector
 from packages.extraction.tier_c.llm_client import TierCLLMClient
+from packages.extraction.types import CodeBlock, Table
 from packages.schemas.models import Document, ExtractionState
 
 console = Console()
@@ -54,7 +55,8 @@ class InMemoryDocumentStore:
             list[Document]: List of documents with extraction_state == PENDING.
         """
         pending = [
-            doc for doc in self._documents.values()
+            doc
+            for doc in self._documents.values()
             if doc.extraction_state == ExtractionState.PENDING
         ]
 
@@ -91,19 +93,18 @@ class InMemoryDocumentStore:
 class TierAParser:
     """Wrapper for Tier A parser functions."""
 
-    def parse_code_blocks(self, content: str) -> list[dict[str, Any]]:
+    def parse_code_blocks(self, content: str) -> list[CodeBlock]:
         """Parse code blocks from content."""
         return parse_code_blocks(content)
 
-    def parse_tables(self, content: str) -> list[dict[str, Any]]:
+    def parse_tables(self, content: str) -> list[Table]:
         """Parse tables from content."""
         return parse_tables(content)
 
 
 async def extract_pending_command(
     limit: Annotated[
-        int | None,
-        typer.Option("--limit", "-l", help="Maximum number of documents to process")
+        int | None, typer.Option("--limit", "-l", help="Maximum number of documents to process")
     ] = None,
 ) -> None:
     """Extract pending documents through multi-tier extraction pipeline.
@@ -145,7 +146,7 @@ async def extract_pending_command(
         logger.info("Creating extraction pipeline dependencies")
 
         # Redis client for state management
-        redis_client: Redis[bytes] = await redis.asyncio.from_url(config.redis_url)
+        redis_client: Redis[bytes] = redis.asyncio.from_url(config.redis_url)
 
         # Tier A components
         tier_a_parser = TierAParser()
@@ -171,8 +172,8 @@ async def extract_pending_command(
         )
 
         # Create document store (PostgreSQL)
-        from packages.common.db_schema import get_postgres_client
         from packages.clients.postgres_document_store import PostgresDocumentStore
+        from packages.common.db_schema import get_postgres_client
 
         pg_conn = get_postgres_client()
         try:
@@ -191,19 +192,13 @@ async def extract_pending_command(
             # Display results
             console.print("\n[bold cyan]Extraction Pipeline[/bold cyan]")
             console.print("─────────────────────")
-            console.print(
-                f"[green]Processed: {summary['processed']} documents[/green]"
-            )
-            console.print(
-                f"[green]Succeeded: {summary['succeeded']} documents[/green]"
-            )
+            console.print(f"[green]Processed: {summary['processed']} documents[/green]")
+            console.print(f"[green]Succeeded: {summary['succeeded']} documents[/green]")
 
             if summary["failed"] > 0:
                 console.print(f"[red]Failed: {summary['failed']} documents[/red]")
             else:
-                console.print(
-                    f"[green]Failed: {summary['failed']} documents[/green]"
-                )
+                console.print(f"[green]Failed: {summary['failed']} documents[/green]")
 
             logger.info(
                 "Extraction complete: processed=%d, succeeded=%d, failed=%d",
@@ -223,7 +218,7 @@ async def extract_pending_command(
     except Exception as e:
         # Catch any other errors and report them
         console.print(f"[red]✗ Extraction failed: {e!s}[/red]")
-        logger.exception("Extraction failed: %s", e)
+        logger.exception("Extraction failed")
         raise typer.Exit(1) from None
 
 

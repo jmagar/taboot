@@ -1,18 +1,29 @@
 """FastAPI application for Taboot API with CORS, lifecycle management, and middleware."""
 
 import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 import redis.asyncio as redis
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from apps.api.middleware import RequestLoggingMiddleware
+from apps.api.middleware.logging import RequestLoggingMiddleware
 from apps.api.routes import documents, extract, ingest, init, query, status
 from packages.common.config import get_config
 
 logger = logging.getLogger(__name__)
+
+# Single source of truth for version
+try:
+    from importlib.metadata import version as get_version
+
+    VERSION = get_version("taboot")
+except Exception:
+    # Fallback for development or when package not installed
+    VERSION = os.getenv("TABOOT_VERSION", "0.4.0")
 
 
 @asynccontextmanager
@@ -30,13 +41,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     config = get_config()
 
     # Startup
-    logger.info("Starting Taboot API", extra={"version": "0.4.0"})
+    logger.info("Starting Taboot API", extra={"version": VERSION})
 
     try:
         redis_client = redis.from_url(
             config.redis_url,
-            encoding="utf-8",
-            decode_responses=True,
         )
         app.state.redis = redis_client
         logger.info("Redis client initialized", extra={"url": config.redis_url})
@@ -60,7 +69,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title="Taboot API",
-    version="0.4.0",
+    version=VERSION,
     description="Doc-to-Graph RAG Platform",
     lifespan=lifespan,
 )
@@ -70,7 +79,7 @@ config = get_config()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.cors_allow_origins,
-    allow_credentials=False if "*" in config.cors_allow_origins else True,
+    allow_credentials="*" not in config.cors_allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -88,7 +97,7 @@ app.include_router(documents.router, tags=["documents"])
 
 
 @app.get("/health")
-async def health() -> dict:
+async def health(response: Response) -> dict[str, Any]:
     """Health check endpoint with service validation.
 
     Checks connectivity to all critical services:
@@ -101,37 +110,31 @@ async def health() -> dict:
     - Playwright (browser automation)
 
     Returns:
-        dict: Health status with overall status and per-service status.
+        dict[str, Any]: Health status with overall status and per-service status.
             - 200 if all services healthy
             - 503 if any service unhealthy
     """
     from fastapi import status as http_status
-    from fastapi.responses import JSONResponse
 
     from packages.common.health import check_system_health
 
     health_status = await check_system_health()
 
     is_healthy = health_status.get("healthy", False)
-    status_code = (
-        http_status.HTTP_200_OK
-        if is_healthy
-        else http_status.HTTP_503_SERVICE_UNAVAILABLE
+    response.status_code = (
+        http_status.HTTP_200_OK if is_healthy else http_status.HTTP_503_SERVICE_UNAVAILABLE
     )
 
-    return JSONResponse(
-        content={
-            "data": health_status,
-            "error": None if is_healthy else "UNHEALTHY",
-        },
-        status_code=status_code,
-    )
+    return {
+        "data": health_status,
+        "error": None if is_healthy else "UNHEALTHY",
+    }
 
 
 @app.get("/")
 async def root() -> dict[str, dict[str, str] | None]:
     """Root endpoint."""
     return {
-        "data": {"message": "Taboot API v0.4.0", "docs": "/docs"},
+        "data": {"message": f"Taboot API v{VERSION}", "docs": "/docs"},
         "error": None,
     }

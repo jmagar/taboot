@@ -35,27 +35,23 @@ def ingest_reddit_command(
     try:
         config = get_config()
         limit_str = f"limit: {limit}" if limit is not None else "no limit"
-        console.print(
-            f"[yellow]Starting Reddit ingestion: r/{subreddit} ({limit_str})[/yellow]"
-        )
+        console.print(f"[yellow]Starting Reddit ingestion: r/{subreddit} ({limit_str})[/yellow]")
 
         # Validate credentials
+        missing_creds = []
         if not config.reddit_client_id:
-            raise ValueError(
-                "Reddit client ID not configured (REDDIT_CLIENT_ID env var required)"
-            )
+            missing_creds.append("REDDIT_CLIENT_ID")
         if not config.reddit_client_secret:
-            raise ValueError(
-                "Reddit client secret not configured (REDDIT_CLIENT_SECRET env var required)"
-            )
+            missing_creds.append("REDDIT_CLIENT_SECRET")
         if not config.reddit_user_agent:
-            raise ValueError(
-                "Reddit user agent not configured (REDDIT_USER_AGENT env var required)"
-            )
+            missing_creds.append("REDDIT_USER_AGENT")
+
+        if missing_creds:
+            raise ValueError(f"Missing required Reddit credentials: {', '.join(missing_creds)}")
 
         reddit_reader = RedditReader(
             client_id=config.reddit_client_id,
-            client_secret=config.reddit_client_secret,
+            client_secret=config.reddit_client_secret.get_secret_value(),
             user_agent=config.reddit_user_agent,
         )
         normalizer = Normalizer()
@@ -75,15 +71,14 @@ def ingest_reddit_command(
             console.print("[yellow]Normalizing...[/yellow]")
             # Preserve metadata by wrapping normalized text back into Document
             normalized_docs = [
-                Document(text=normalizer.normalize(doc.text), metadata=doc.metadata)
-                for doc in docs
+                Document(text=normalizer.normalize(doc.text), metadata=doc.metadata) for doc in docs
             ]
 
             console.print("[yellow]Chunking...[/yellow]")
             all_chunks: list[Chunk] = []
-            doc_id = uuid4()
             ingested_at = int(datetime.now(UTC).timestamp())
             for doc in normalized_docs:
+                doc_id = uuid4()  # ✅ Unique per post
                 # Call chunk_document with Document object, not string
                 chunk_docs = chunker.chunk_document(doc)
                 for i, chunk_doc in enumerate(chunk_docs):
@@ -94,6 +89,7 @@ def ingest_reddit_command(
                         content=chunk_doc.text,
                         section=None,
                         position=i,
+                        # Approximate token count (actual tokenization may differ)
                         token_count=len(chunk_doc.text.split()),
                         source_url=doc.metadata.get("source_url", ""),
                         source_type=SourceType.REDDIT,

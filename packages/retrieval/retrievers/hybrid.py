@@ -20,7 +20,7 @@ class HybridRetriever:
         neo4j_password: str,
         reranker_model: str = "Qwen/Qwen3-Reranker-0.6B",
         reranker_device: str = "auto",
-        tei_embedding_url: str | None = None
+        tei_embedding_url: str | None = None,
     ):
         """
         Initialize hybrid retriever.
@@ -39,22 +39,12 @@ class HybridRetriever:
         self.neo4j_uri = neo4j_uri
 
         # Initialize components
-        self.vector_search = VectorSearch(
-            qdrant_url=qdrant_url,
-            collection_name=qdrant_collection
-        )
+        self.vector_search = VectorSearch(qdrant_url=qdrant_url, collection_name=qdrant_collection)
 
-        self.reranker = Reranker(
-            model_name=reranker_model,
-            device=reranker_device,
-            batch_size=16
-        )
+        self.reranker = Reranker(model_name=reranker_model, device=reranker_device, batch_size=16)
 
         self.graph_traversal = GraphTraversal(
-            neo4j_uri=neo4j_uri,
-            username=neo4j_username,
-            password=neo4j_password,
-            max_hops=2
+            neo4j_uri=neo4j_uri, username=neo4j_username, password=neo4j_password, max_hops=2
         )
 
         self.tei_url = tei_embedding_url or "http://taboot-embed:80"
@@ -65,7 +55,7 @@ class HybridRetriever:
         top_k: int = 20,
         rerank_top_n: int = 5,
         max_graph_hops: int = 2,
-        source_types: list[str] | None = None
+        source_types: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Perform hybrid retrieval: vector search → rerank → graph expansion.
@@ -85,9 +75,7 @@ class HybridRetriever:
 
         # Step 2: Vector search
         vector_results = self.vector_search.search(
-            query_embedding=query_embedding,
-            top_k=top_k,
-            source_types=source_types
+            query_embedding=query_embedding, top_k=top_k, source_types=source_types
         )
 
         if not vector_results:
@@ -96,9 +84,7 @@ class HybridRetriever:
         # Step 3: Rerank
         passages = [r["content"] for r in vector_results]
         reranked_indices = self.reranker.rerank_with_indices(
-            query=query,
-            passages=passages,
-            top_n=rerank_top_n
+            query=query, passages=passages, top_n=rerank_top_n
         )
 
         top_results = [vector_results[idx] for idx, _ in reranked_indices]
@@ -110,15 +96,14 @@ class HybridRetriever:
         graph_results = []
         if entity_names:
             graph_results = self.graph_traversal.traverse_from_entities(
-                entity_names=entity_names,
-                max_hops=max_graph_hops
+                entity_names=entity_names, max_hops=max_graph_hops
             )
 
         # Step 6: Combine results
         combined = {
             "vector_results": top_results,
             "graph_results": graph_results,
-            "entity_names": entity_names
+            "entity_names": entity_names,
         }
 
         return [combined]

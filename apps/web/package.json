@@ -17,6 +17,7 @@
     "@hookform/resolvers": "catalog:web",
     "@tanstack/react-query": "catalog:web",
     "@types/qrcode": "catalog:web",
+    "@taboot/api-client": "workspace:*",
     "@taboot/auth": "workspace:*",
     "@taboot/ui": "workspace:*",
     "@taboot/utils": "workspace:*",

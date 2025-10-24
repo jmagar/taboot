@@ -4,9 +4,13 @@ Implements GET /documents with filtering and pagination.
 """
 
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from apps.api.deps import get_document_store
+from apps.api.schemas import ResponseEnvelope
+from packages.clients.postgres_document_store import PostgresDocumentStore
 from packages.core.use_cases.list_documents import DocumentListResponse
 from packages.schemas.models import ExtractionState, SourceType
 
@@ -15,19 +19,34 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
-@router.get("", response_model=DocumentListResponse)
+@router.get("", response_model=ResponseEnvelope[DocumentListResponse])
 def list_documents(
-    limit: int = Query(default=10, ge=1, le=100, description="Maximum documents to return"),
-    offset: int = Query(default=0, ge=0, description="Number of documents to skip (pagination)"),
-    source_type: str | None = Query(
-        default=None, description="Filter by source type (web, github, etc.)"
-    ),
-    extraction_state: str | None = Query(
-        default=None, description="Filter by extraction state (pending, completed, etc.)"
-    ),
-) -> DocumentListResponse:
-    """
-    List ingested documents with optional filters and pagination.
+    limit: Annotated[
+        int,
+        Query(default=10, ge=1, le=100, description="Maximum documents to return"),
+    ],
+    offset: Annotated[
+        int,
+        Query(default=0, ge=0, description="Number of documents to skip (pagination)"),
+    ],
+    source_type: Annotated[
+        str | None,
+        Query(
+            default=None,
+            description="Filter by source type (web, github, etc.)",
+        ),
+    ] = None,
+    extraction_state: Annotated[
+        str | None,
+        Query(
+            default=None,
+            description="Filter by extraction state (pending, completed, etc.)",
+        ),
+    ] = None,
+    *,
+    document_store: Annotated[PostgresDocumentStore, Depends(get_document_store)],
+) -> ResponseEnvelope[DocumentListResponse]:
+    """List ingested documents with optional filters and pagination.
 
     Query parameters:
         - limit: Maximum documents to return (1-100, default: 10)
@@ -43,6 +62,7 @@ def list_documents(
     Raises:
         HTTPException 400: Invalid filter values
         HTTPException 500: Database or internal errors
+
     """
     try:
         # Parse and validate filters
@@ -52,6 +72,10 @@ def list_documents(
                 source_type_enum = SourceType(source_type)
             except ValueError:
                 valid_values = [s.value for s in SourceType]
+                logger.warning(
+                    "Invalid source_type provided",
+                    extra={"source_type": source_type, "valid_values": valid_values},
+                )
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid source_type '{source_type}'. "
@@ -64,59 +88,56 @@ def list_documents(
                 extraction_state_enum = ExtractionState(extraction_state)
             except ValueError:
                 valid_values = [e.value for e in ExtractionState]
+                logger.warning(
+                    "Invalid extraction_state provided",
+                    extra={
+                        "extraction_state": extraction_state,
+                        "valid_values": valid_values,
+                    },
+                )
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid extraction_state '{extraction_state}'. "
                     f"Valid values: {', '.join(valid_values)}",
                 ) from None
 
-        # Import database client and document store
-        from packages.common.db_schema import get_postgres_client
-        from packages.clients.postgres_document_store import PostgresDocumentStore
+        # Query documents with filters
+        documents = document_store.query_documents(
+            limit=limit,
+            offset=offset,
+            source_type=source_type_enum,
+            extraction_state=extraction_state_enum,
+        )
 
-        # Get PostgreSQL connection
-        conn = get_postgres_client()
+        # Get total count for pagination
+        total = document_store.count_documents(
+            source_type=source_type_enum,
+            extraction_state=extraction_state_enum,
+        )
 
-        try:
-            # Create document store with PostgreSQL connection
-            document_store = PostgresDocumentStore(conn)
-
-            # Query documents with filters
-            documents = document_store.query_documents(
-                limit=limit,
-                offset=offset,
-                source_type=source_type_enum,
-                extraction_state=extraction_state_enum,
-            )
-
-            # Get total count for pagination
-            total = document_store.count_documents(
-                source_type=source_type_enum,
-                extraction_state=extraction_state_enum,
-            )
-
-            result = DocumentListResponse(
-                documents=documents,
-                total=total,
-                limit=limit,
-                offset=offset,
-            )
-        finally:
-            conn.close()
+        result = DocumentListResponse(
+            documents=documents,
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
 
         logger.info(
             "Listed %d documents (total=%d, limit=%d, offset=%d)",
-            len(result.documents), result.total, limit, offset
+            len(result.documents),
+            result.total,
+            limit,
+            offset,
         )
+
+        return ResponseEnvelope(data=result, error=None)
 
     except HTTPException:
         # Re-raise HTTP exceptions
         raise
     except ValueError as e:
-        logger.exception("Validation error in list documents: %s", e)
+        logger.exception("Validation error in list documents")
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.exception("List documents failed: %s", e)
+        logger.exception("List documents failed")
         raise HTTPException(status_code=500, detail=f"Failed to list documents: {e!s}") from e
-
-    return result

@@ -32,9 +32,7 @@ class TestIngestWebEndToEnd:
     """End-to-end integration tests for web ingestion pipeline."""
 
     @pytest.mark.asyncio
-    async def test_web_ingestion_full_pipeline(
-        self, docker_services_ready: None
-    ) -> None:
+    async def test_web_ingestion_full_pipeline(self, docker_services_ready: None) -> None:
         """Test complete web ingestion pipeline with real services.
 
         Acceptance Scenario (US1): Given Docker services are healthy, When the user
@@ -164,9 +162,7 @@ class TestIngestWebEndToEnd:
             qdrant_writer.close()
 
     @pytest.mark.asyncio
-    async def test_web_ingestion_error_handling(
-        self, docker_services_ready: None
-    ) -> None:
+    async def test_web_ingestion_error_handling(self, docker_services_ready: None) -> None:
         """Test error handling in web ingestion pipeline.
 
         Acceptance Scenario: Given an invalid URL, When the pipeline executes,
@@ -231,9 +227,7 @@ class TestIngestWebEndToEnd:
             qdrant_writer.close()
 
     @pytest.mark.asyncio
-    async def test_web_ingestion_empty_result(
-        self, docker_services_ready: None
-    ) -> None:
+    async def test_web_ingestion_empty_result(self, docker_services_ready: None) -> None:
         """Test handling of empty document result.
 
         Acceptance Scenario: Given a URL that returns no documents, When the
@@ -300,9 +294,7 @@ class TestWebIngestionPerformance:
     """Performance-focused tests for web ingestion pipeline."""
 
     @pytest.mark.asyncio
-    async def test_multi_page_ingestion_performance(
-        self, docker_services_ready: None
-    ) -> None:
+    async def test_multi_page_ingestion_performance(self, docker_services_ready: None) -> None:
         """Test ingestion performance with multiple pages.
 
         Acceptance Scenario: Given a URL with multiple pages (up to 20), When the
@@ -366,9 +358,7 @@ class TestWebIngestionPerformance:
             )
 
             # Verify: Throughput is reasonable
-            assert elapsed < 60.0, (
-                f"Multi-page ingestion took {elapsed:.2f}s, expected <60s"
-            )
+            assert elapsed < 60.0, f"Multi-page ingestion took {elapsed:.2f}s, expected <60s"
 
         finally:
             embedder.close()

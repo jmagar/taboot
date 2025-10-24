@@ -9,21 +9,19 @@ from packages.retrieval.indices.vector import create_vector_index
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_create_vector_index_with_qdrant():
+def test_create_vector_index_with_qdrant() -> None:
     """Test VectorStoreIndex creation with Qdrant backend - real integration."""
     # Configure LlamaIndex to use ACTUAL TEI service (Qwen3-Embedding-0.6B, 1024-dim)
     Settings.embed_model = TextEmbeddingsInference(
         model_name="Qwen/Qwen3-Embedding-0.6B",
         base_url="http://localhost:8080",
         timeout=60,
-        embed_batch_size=32
+        embed_batch_size=32,
     )
 
     # Use host port 7000 (maps to container port 6333 from docker-compose.yaml)
     index = create_vector_index(
-        qdrant_url="http://localhost:7000",
-        collection_name="test_documents",
-        embedding_dim=1024
+        qdrant_url="http://localhost:7000", collection_name="test_documents", embedding_dim=1024
     )
 
     assert index is not None
@@ -32,21 +30,19 @@ def test_create_vector_index_with_qdrant():
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_vector_index_query():
+def test_vector_index_query() -> None:
     """Test querying VectorStoreIndex - real integration."""
     # Configure LlamaIndex to use ACTUAL TEI service (Qwen3-Embedding-0.6B, 1024-dim)
     Settings.embed_model = TextEmbeddingsInference(
         model_name="Qwen/Qwen3-Embedding-0.6B",
         base_url="http://localhost:8080",
         timeout=60,
-        embed_batch_size=32
+        embed_batch_size=32,
     )
 
     # Use host port 7000 (maps to container port 6333 from docker-compose.yaml)
     index = create_vector_index(
-        qdrant_url="http://localhost:7000",
-        collection_name="test_documents",
-        embedding_dim=1024
+        qdrant_url="http://localhost:7000", collection_name="test_documents", embedding_dim=1024
     )
 
     # Test retrieval against real Qdrant

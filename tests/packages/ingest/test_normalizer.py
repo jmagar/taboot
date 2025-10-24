@@ -5,7 +5,6 @@ Following TDD methodology (RED-GREEN-REFACTOR).
 """
 
 
-
 class TestNormalizer:
     """Tests for the Normalizer class."""
 
@@ -78,7 +77,7 @@ class TestNormalizer:
         html = """
         <h1>Code Example</h1>
         <pre><code>
-        def hello():
+        def hello() -> None:
             print("Hello, World!")
         </code></pre>
         """

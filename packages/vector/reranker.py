@@ -1,6 +1,5 @@
 """Reranking using Qwen3-Reranker-0.6B via SentenceTransformers."""
 
-
 import torch
 from sentence_transformers import CrossEncoder
 
@@ -12,7 +11,7 @@ class Reranker:
         self,
         model_name: str = "Qwen/Qwen3-Reranker-0.6B",
         device: str = "auto",
-        batch_size: int = 16
+        batch_size: int = 16,
     ):
         """
         Initialize reranker with cross-encoder model.
@@ -32,11 +31,7 @@ class Reranker:
             self.device = device
 
         # Load cross-encoder model
-        self.model = CrossEncoder(
-            model_name=model_name,
-            device=self.device,
-            max_length=512
-        )
+        self.model = CrossEncoder(model_name=model_name, device=self.device, max_length=512)
 
         # Configure padding token for batch processing
         if self.model.tokenizer.pad_token is None:
@@ -44,15 +39,10 @@ class Reranker:
             self.model.tokenizer.pad_token_id = self.model.tokenizer.eos_token_id
 
         # Update model config to use padding token
-        if hasattr(self.model.model, 'config'):
+        if hasattr(self.model.model, "config"):
             self.model.model.config.pad_token_id = self.model.tokenizer.pad_token_id
 
-    def rerank(
-        self,
-        query: str,
-        passages: list[str],
-        top_n: int = 5
-    ) -> list[float]:
+    def rerank(self, query: str, passages: list[str], top_n: int = 5) -> list[float]:
         """
         Rerank passages by relevance to query.
 
@@ -71,26 +61,15 @@ class Reranker:
         pairs = [[query, passage] for passage in passages]
 
         # Score pairs in batches
-        scores = self.model.predict(
-            pairs,
-            batch_size=self.batch_size,
-            show_progress_bar=False
-        )
+        scores = self.model.predict(pairs, batch_size=self.batch_size, show_progress_bar=False)
 
         # Get top-n scores
-        top_indices = sorted(
-            range(len(scores)),
-            key=lambda i: scores[i],
-            reverse=True
-        )[:top_n]
+        top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_n]
 
         return [float(scores[i]) for i in top_indices]
 
     def rerank_with_indices(
-        self,
-        query: str,
-        passages: list[str],
-        top_n: int = 5
+        self, query: str, passages: list[str], top_n: int = 5
     ) -> list[tuple[int, float]]:
         """
         Rerank passages and return indices with scores.
@@ -110,16 +89,10 @@ class Reranker:
         pairs = [[query, passage] for passage in passages]
 
         # Score pairs
-        scores = self.model.predict(
-            pairs,
-            batch_size=self.batch_size,
-            show_progress_bar=False
-        )
+        scores = self.model.predict(pairs, batch_size=self.batch_size, show_progress_bar=False)
 
         # Get top-n (index, score) pairs
-        scored_indices = [
-            (i, float(scores[i])) for i in range(len(scores))
-        ]
+        scored_indices = [(i, float(scores[i])) for i in range(len(scores))]
         scored_indices.sort(key=lambda x: x[1], reverse=True)
 
         return scored_indices[:top_n]

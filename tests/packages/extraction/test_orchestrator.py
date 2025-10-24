@@ -1,58 +1,110 @@
 """Tests for extraction orchestrator coordinating Tier A → B → C execution."""
 
+from __future__ import annotations
+
+from collections.abc import Iterator
+from typing import Any, cast
 from unittest.mock import AsyncMock, Mock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
-from packages.extraction.orchestrator import ExtractionOrchestrator
+from packages.extraction.orchestrator import ExtractionOrchestrator, TierAParser
+from packages.extraction.tier_a.patterns import EntityPatternMatcher
+from packages.extraction.tier_b.window_selector import WindowSelector
+from packages.extraction.tier_c.llm_client import TierCLLMClient
 from packages.extraction.tier_c.schema import ExtractionResult, Triple
+from packages.extraction.types import CodeBlock, ExtractionWindow, Table
 from packages.schemas.models import ExtractionJob, ExtractionState
 
 
+class MockTierAParser(TierAParser):
+    """Tier A parser backed by mocks for deterministic control."""
+
+    def __init__(self) -> None:
+        self.parse_code_blocks_mock: Mock = Mock(return_value=[])
+        self.parse_tables_mock: Mock = Mock(return_value=[])
+
+    def parse_code_blocks(self, content: str) -> list[CodeBlock]:
+        return cast(list[CodeBlock], self.parse_code_blocks_mock(content))
+
+    def parse_tables(self, content: str) -> list[Table]:
+        return cast(list[Table], self.parse_tables_mock(content))
+
+
+class MockPatternMatcher(EntityPatternMatcher):
+    """EntityPatternMatcher-compatible stub."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.find_matches_mock: Mock = Mock(
+            return_value=[
+                {
+                    "entity_type": "service",
+                    "text": "postgres",
+                    "start": 0,
+                    "end": 8,
+                }
+            ]
+        )
+
+    def find_matches(self, content: str) -> list[dict[str, Any]]:
+        return cast(list[dict[str, Any]], self.find_matches_mock(content))
+
+
+class MockWindowSelector(WindowSelector):
+    """Window selector stub delegating to a mock."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.select_windows_mock: Mock = Mock(
+            return_value=[
+                {
+                    "content": "Test window content",
+                    "token_count": 4,
+                    "start": 0,
+                    "end": 19,
+                }
+            ]
+        )
+
+    def select_windows(self, text: str) -> list[ExtractionWindow]:
+        return cast(list[ExtractionWindow], self.select_windows_mock(text))
+
+
+class MockTierCLLMClient(TierCLLMClient):
+    """Tier C LLM client stub delegating to AsyncMock."""
+
+    def __init__(self) -> None:
+        super().__init__(redis_client=None)
+        self.batch_extract_mock: AsyncMock = AsyncMock()
+
+    async def batch_extract(self, windows: list[str]) -> list[ExtractionResult]:
+        return cast(list[ExtractionResult], await self.batch_extract_mock(windows))
+
+
 @pytest.fixture
-def mock_tier_a_parser():
+def mock_tier_a_parser() -> Iterator[MockTierAParser]:
     """Mock Tier A parser."""
-    parser = Mock()
-    parser.parse_code_blocks = Mock(return_value=[])
-    parser.parse_tables = Mock(return_value=[])
-    return parser
+    yield MockTierAParser()
 
 
 @pytest.fixture
-def mock_tier_a_patterns():
+def mock_tier_a_patterns() -> Iterator[MockPatternMatcher]:
     """Mock Tier A pattern matcher."""
-    patterns = Mock()
-    patterns.find_matches = Mock(return_value=[
-        {
-            "entity_type": "service",
-            "text": "postgres",
-            "start": 0,
-            "end": 8,
-        }
-    ])
-    return patterns
+    yield MockPatternMatcher()
 
 
 @pytest.fixture
-def mock_window_selector():
+def mock_window_selector() -> Iterator[MockWindowSelector]:
     """Mock Tier B window selector."""
-    selector = Mock()
-    selector.select_windows = Mock(return_value=[
-        {
-            "content": "Test window content",
-            "token_count": 4,
-            "start": 0,
-            "end": 19,
-        }
-    ])
-    return selector
+    yield MockWindowSelector()
 
 
 @pytest.fixture
-def mock_llm_client():
+def mock_llm_client() -> Iterator[MockTierCLLMClient]:
     """Mock Tier C LLM client."""
-    client = AsyncMock()
+    client = MockTierCLLMClient()
     # Return extraction result with one triple
     result = ExtractionResult(
         triples=[
@@ -64,30 +116,30 @@ def mock_llm_client():
             )
         ]
     )
-    client.batch_extract = AsyncMock(return_value=[result])
-    return client
+    client.batch_extract_mock.return_value = [result]
+    yield client
 
 
 @pytest.fixture
-def mock_redis_client():
+def mock_redis_client() -> Iterator[AsyncMock]:
     """Mock Redis client for state management."""
     redis = AsyncMock()
     redis.set = AsyncMock()
     redis.get = AsyncMock(return_value=None)
     redis.incr = AsyncMock()
-    return redis
+    yield redis
 
 
 @pytest.fixture
 def orchestrator(
-    mock_tier_a_parser,
-    mock_tier_a_patterns,
-    mock_window_selector,
-    mock_llm_client,
-    mock_redis_client,
-):
+    mock_tier_a_parser: MockTierAParser,
+    mock_tier_a_patterns: MockPatternMatcher,
+    mock_window_selector: MockWindowSelector,
+    mock_llm_client: MockTierCLLMClient,
+    mock_redis_client: AsyncMock,
+) -> Iterator[ExtractionOrchestrator]:
     """Create ExtractionOrchestrator with mocked dependencies."""
-    return ExtractionOrchestrator(
+    yield ExtractionOrchestrator(
         tier_a_parser=mock_tier_a_parser,
         tier_a_patterns=mock_tier_a_patterns,
         window_selector=mock_window_selector,
@@ -97,7 +149,10 @@ def orchestrator(
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_coordinates_tier_execution(orchestrator, mock_redis_client):
+async def test_orchestrator_coordinates_tier_execution(
+    orchestrator: ExtractionOrchestrator,
+    mock_redis_client: AsyncMock,
+) -> None:
     """Test that orchestrator coordinates Tier A → B → C execution."""
     doc_id = uuid4()
     content = "api-service depends on postgres for data storage"
@@ -119,7 +174,10 @@ async def test_orchestrator_coordinates_tier_execution(orchestrator, mock_redis_
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_state_transitions(orchestrator, mock_redis_client):
+async def test_orchestrator_state_transitions(
+    orchestrator: ExtractionOrchestrator,
+    mock_redis_client: AsyncMock,
+) -> None:
     """Test state transitions tracked in Redis.
 
     States: pending → tier_a_done → tier_b_done → tier_c_done → completed
@@ -135,7 +193,8 @@ async def test_orchestrator_state_transitions(orchestrator, mock_redis_client):
     # Verify Redis state updates were made
     # Each tier transition should call _update_state which calls redis.set
     state_updates = [
-        call for call in mock_redis_client.set.call_args_list
+        call
+        for call in mock_redis_client.set.call_args_list
         if "state" in str(call) or "extraction_job" in str(call)
     ]
     assert len(state_updates) >= 4
@@ -143,28 +202,26 @@ async def test_orchestrator_state_transitions(orchestrator, mock_redis_client):
 
 @pytest.mark.asyncio
 async def test_orchestrator_tracks_metrics(
-    orchestrator,
-    mock_tier_a_patterns,
-    mock_window_selector,
-    mock_llm_client,
-):
+    orchestrator: ExtractionOrchestrator,
+    mock_tier_a_patterns: MockPatternMatcher,
+    mock_window_selector: MockWindowSelector,
+    mock_llm_client: MockTierCLLMClient,
+) -> None:
     """Test metrics tracked (tier_a_triples, tier_b_windows, tier_c_triples)."""
     doc_id = uuid4()
     content = "Test content with postgres service"
 
     # Configure mocks to return specific counts
-    mock_tier_a_patterns.find_matches.return_value = [
+    mock_tier_a_patterns.find_matches_mock.return_value = [
         {"entity_type": "service", "text": "postgres", "start": 0, "end": 8}
     ]
-    mock_window_selector.select_windows.return_value = [
+    mock_window_selector.select_windows_mock.return_value = [
         {"content": "window1", "token_count": 3, "start": 0, "end": 7},
         {"content": "window2", "token_count": 3, "start": 8, "end": 15},
     ]
-    mock_llm_client.batch_extract.return_value = [
+    mock_llm_client.batch_extract_mock.return_value = [
         ExtractionResult(
-            triples=[
-                Triple(subject="s1", predicate="p1", object="o1", confidence=0.9)
-            ]
+            triples=[Triple(subject="s1", predicate="p1", object="o1", confidence=0.9)]
         ),
         ExtractionResult(
             triples=[
@@ -184,14 +241,16 @@ async def test_orchestrator_tracks_metrics(
 
 @pytest.mark.asyncio
 async def test_orchestrator_error_handling_with_retry(
-    orchestrator, mock_llm_client, mock_redis_client
-):
+    orchestrator: ExtractionOrchestrator,
+    mock_llm_client: MockTierCLLMClient,
+    mock_redis_client: AsyncMock,
+) -> None:
     """Test error handling with retry logic (max 3 retries)."""
     doc_id = uuid4()
     content = "Test content"
 
     # Make Tier C fail twice, then succeed
-    mock_llm_client.batch_extract.side_effect = [
+    mock_llm_client.batch_extract_mock.side_effect = [
         Exception("LLM error 1"),
         Exception("LLM error 2"),
         [ExtractionResult(triples=[])],  # Success on third try
@@ -205,13 +264,16 @@ async def test_orchestrator_error_handling_with_retry(
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_fails_after_max_retries(orchestrator, mock_llm_client):
+async def test_orchestrator_fails_after_max_retries(
+    orchestrator: ExtractionOrchestrator,
+    mock_llm_client: MockTierCLLMClient,
+) -> None:
     """Test transition to FAILED state after max retries."""
     doc_id = uuid4()
     content = "Test content"
 
     # Make Tier C always fail
-    mock_llm_client.batch_extract.side_effect = Exception("Persistent LLM error")
+    mock_llm_client.batch_extract_mock.side_effect = Exception("Persistent LLM error")
 
     job = await orchestrator.process_document(doc_id, content)
 

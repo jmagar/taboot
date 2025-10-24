@@ -10,10 +10,10 @@ All operations use JSON structured logging and correlation ID tracking.
 """
 
 from types import TracebackType
-from typing import Any
 
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
+from qdrant_client.http.models import CollectionInfo
 
 from packages.common.logging import get_logger
 from packages.vector.collections import create_collection as create_from_contract
@@ -130,9 +130,7 @@ class QdrantVectorClient:
                 "Failed to check collection existence",
                 extra={"collection_name": self.collection_name},
             )
-            raise QdrantConnectionError(
-                f"Failed to check collection existence: {e}"
-            ) from e
+            raise QdrantConnectionError(f"Failed to check collection existence: {e}") from e
 
     def create_collection(self) -> None:
         """Create collection with HNSW indexing configuration.
@@ -155,9 +153,7 @@ class QdrantVectorClient:
         try:
             create_from_contract(self.client, self.collection_name)
         except Exception as e:
-            raise QdrantConnectionError(
-                f"Failed to create collection: {e}"
-            ) from e
+            raise QdrantConnectionError(f"Failed to create collection: {e}") from e
 
     def delete_collection(self) -> None:
         """Delete collection from Qdrant.
@@ -189,19 +185,15 @@ class QdrantVectorClient:
                         "status_code": e.status_code,
                     },
                 )
-                raise QdrantConnectionError(
-                    f"Failed to delete collection: {e}"
-                ) from e
+                raise QdrantConnectionError(f"Failed to delete collection: {e}") from e
         except Exception as e:
             logger.exception(
                 "Failed to delete collection",
                 extra={"collection_name": self.collection_name},
             )
-            raise QdrantConnectionError(
-                f"Failed to delete collection: {e}"
-            ) from e
+            raise QdrantConnectionError(f"Failed to delete collection: {e}") from e
 
-    def get_collection_info(self) -> Any | None:
+    def get_collection_info(self) -> CollectionInfo | None:
         """Get collection information and statistics.
 
         Returns:
@@ -243,17 +235,13 @@ class QdrantVectorClient:
                         "status_code": e.status_code,
                     },
                 )
-                raise QdrantConnectionError(
-                    f"Failed to get collection info: {e}"
-                ) from e
+                raise QdrantConnectionError(f"Failed to get collection info: {e}") from e
         except Exception as e:
             logger.exception(
                 "Failed to get collection info",
                 extra={"collection_name": self.collection_name},
             )
-            raise QdrantConnectionError(
-                f"Failed to get collection info: {e}"
-            ) from e
+            raise QdrantConnectionError(f"Failed to get collection info: {e}") from e
 
     def close(self) -> None:
         """Close Qdrant client connection.

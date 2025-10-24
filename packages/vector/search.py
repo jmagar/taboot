@@ -4,7 +4,14 @@ from datetime import datetime
 from typing import Any
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import FieldCondition, Filter, MatchAny, Range, SearchParams
+from qdrant_client.models import (
+    Condition,
+    FieldCondition,
+    Filter,
+    MatchAny,
+    Range,
+    SearchParams,
+)
 
 
 class VectorSearch:
@@ -23,9 +30,7 @@ class VectorSearch:
         self.client = QdrantClient(url=qdrant_url)
 
     def build_metadata_filter(
-        self,
-        source_types: list[str] | None = None,
-        after: datetime | None = None
+        self, source_types: list[str] | None = None, after: datetime | None = None
     ) -> Filter | None:
         """
         Build Qdrant filter for metadata constraints.
@@ -37,24 +42,14 @@ class VectorSearch:
         Returns:
             Qdrant Filter object or None if no filters
         """
-        conditions = []
+        conditions: list[Condition] = []
 
         if source_types:
-            conditions.append(
-                FieldCondition(
-                    key="source_type",
-                    match=MatchAny(any=source_types)
-                )
-            )
+            conditions.append(FieldCondition(key="source_type", match=MatchAny(any=source_types)))
 
         if after:
             timestamp = int(after.timestamp())
-            conditions.append(
-                FieldCondition(
-                    key="ingested_at",
-                    range=Range(gte=timestamp)
-                )
-            )
+            conditions.append(FieldCondition(key="ingested_at", range=Range(gte=timestamp)))
 
         if not conditions:
             return None
@@ -66,7 +61,7 @@ class VectorSearch:
         query_embedding: list[float],
         top_k: int = 20,
         source_types: list[str] | None = None,
-        after: datetime | None = None
+        after: datetime | None = None,
     ) -> list[dict[str, Any]]:
         """
         Perform vector search with optional metadata filters.
@@ -80,29 +75,29 @@ class VectorSearch:
         Returns:
             List of search results with payloads and scores
         """
-        metadata_filter = self.build_metadata_filter(
-            source_types=source_types,
-            after=after
-        )
+        metadata_filter = self.build_metadata_filter(source_types=source_types, after=after)
 
         search_results = self.client.search(
             collection_name=self.collection_name,
             query_vector=query_embedding,
             query_filter=metadata_filter,
             limit=top_k,
-            search_params=SearchParams(hnsw_ef=128)
+            search_params=SearchParams(hnsw_ef=128),
         )
 
         results = []
         for hit in search_results:
-            results.append({
-                "chunk_id": str(hit.id),
-                "score": hit.score,
-                "content": hit.payload.get("content", ""),
-                "doc_id": hit.payload.get("doc_id"),
-                "source_url": hit.payload.get("source_url"),
-                "section": hit.payload.get("section"),
-                "metadata": hit.payload
-            })
+            payload = hit.payload or {}
+            results.append(
+                {
+                    "chunk_id": str(hit.id),
+                    "score": hit.score,
+                    "content": payload.get("content", ""),
+                    "doc_id": payload.get("doc_id"),
+                    "source_url": payload.get("source_url"),
+                    "section": payload.get("section"),
+                    "metadata": payload,
+                }
+            )
 
         return results

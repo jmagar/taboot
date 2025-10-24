@@ -13,6 +13,12 @@ import { useSidebar } from '@taboot/ui/components/sidebar';
 import { LaptopIcon, MoonIcon, SunIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
+const THEMES = [
+  { name: 'light', label: 'Light', icon: SunIcon },
+  { name: 'dark', label: 'Dark', icon: MoonIcon },
+  { name: 'system', label: 'System', icon: LaptopIcon },
+] as const;
+
 export default function ThemeSwitcher() {
   const mounted = useMounted();
   const { theme, setTheme } = useTheme();
@@ -30,12 +36,6 @@ export default function ThemeSwitcher() {
       <LaptopIcon className="h-4 w-4" />
     );
 
-  const themes = [
-    { name: 'light', label: 'Light', icon: SunIcon },
-    { name: 'dark', label: 'Dark', icon: MoonIcon },
-    { name: 'system', label: 'System', icon: LaptopIcon },
-  ];
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild className={isSidebarExpanded ? '' : 'self-center'}>
@@ -50,11 +50,11 @@ export default function ThemeSwitcher() {
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
-          {themes.map((theme) => (
-            <DropdownMenuRadioItem key={theme.name} value={theme.name}>
+          {THEMES.map((opt) => (
+            <DropdownMenuRadioItem key={opt.name} value={opt.name}>
               <div className="flex items-center">
-                <theme.icon className="mr-2 h-4 w-4" />
-                <span>{theme.label}</span>
+                <opt.icon className="mr-2 h-4 w-4" />
+                <span>{opt.label}</span>
               </div>
             </DropdownMenuRadioItem>
           ))}

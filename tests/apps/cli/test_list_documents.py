@@ -13,7 +13,7 @@ runner = CliRunner()
 
 
 @pytest.mark.unit
-def test_list_documents_command_exists():
+def test_list_documents_command_exists() -> None:
     """Test that list documents command can be invoked.
 
     RED phase: Will fail until command exists.
@@ -24,7 +24,7 @@ def test_list_documents_command_exists():
 
 
 @pytest.mark.unit
-def test_list_documents_accepts_limit():
+def test_list_documents_accepts_limit() -> None:
     """Test list documents accepts --limit option.
 
     RED phase: Will fail until command exists.
@@ -39,7 +39,7 @@ def test_list_documents_accepts_limit():
 
 
 @pytest.mark.unit
-def test_list_documents_accepts_source_type_filter():
+def test_list_documents_accepts_source_type_filter() -> None:
     """Test list documents accepts --source-type filter.
 
     RED phase: Will fail until command exists.
@@ -54,7 +54,7 @@ def test_list_documents_accepts_source_type_filter():
 
 
 @pytest.mark.unit
-def test_list_documents_accepts_extraction_state_filter():
+def test_list_documents_accepts_extraction_state_filter() -> None:
     """Test list documents accepts --extraction-state filter.
 
     RED phase: Will fail until command exists.
@@ -69,7 +69,7 @@ def test_list_documents_accepts_extraction_state_filter():
 
 
 @pytest.mark.unit
-def test_list_documents_accepts_offset():
+def test_list_documents_accepts_offset() -> None:
     """Test list documents accepts --offset for pagination.
 
     RED phase: Will fail until command exists.
@@ -84,7 +84,7 @@ def test_list_documents_accepts_offset():
 
 
 @pytest.mark.unit
-def test_list_documents_combined_filters():
+def test_list_documents_combined_filters() -> None:
     """Test list documents accepts combined filters.
 
     RED phase: Will fail until command exists.
@@ -109,7 +109,7 @@ def test_list_documents_combined_filters():
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_list_documents_with_real_db():
+def test_list_documents_with_real_db() -> None:
     """Test list documents command against real database.
 
     Requires PostgreSQL service running.

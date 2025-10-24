@@ -1,6 +1,7 @@
 import { auth } from '@taboot/auth';
 import { prisma } from '@taboot/db';
 import { passwordSchema } from '@taboot/utils';
+import { logger } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ hasPassword });
   } catch (error) {
-    console.error('Error checking password status:', error);
+    logger.error('Error checking password status', { error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -37,15 +38,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { newPassword } = await req.json();
+    let newPasswordRaw: unknown;
+    try {
+      const body = await req.json();
+      if (!body || typeof body !== 'object') {
+        logger.warn('Password request body is not an object');
+        return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+      }
+      newPasswordRaw = (body as { newPassword?: unknown }).newPassword;
+    } catch (parseError) {
+      logger.warn('Invalid password request payload', { error: parseError });
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
 
-    const { success, error } = passwordSchema.safeParse(newPassword);
-    if (error || !success) {
+    if (typeof newPasswordRaw !== 'string') {
+      return NextResponse.json(
+        { error: 'Password must be provided as a string' },
+        { status: 400 },
+      );
+    }
+
+    const validation = passwordSchema.safeParse(newPasswordRaw);
+    if (!validation.success) {
       return NextResponse.json(
         { error: 'Password must be 8-100 characters long' },
         { status: 400 },
       );
     }
+    const newPassword = validation.data;
 
     // Check if user already has a credential account with password
     const existingAccount = await prisma.account.findFirst({
@@ -75,7 +95,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: 'Password set successfully' });
   } catch (error) {
-    console.error('Error setting password:', error);
+    logger.error('Error setting password', { error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

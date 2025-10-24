@@ -2,13 +2,13 @@
 
 import pytest
 
-from packages.common.db_schema import get_postgres_client
 from packages.clients.postgres_document_store import PostgresDocumentStore
+from packages.common.db_schema import get_postgres_client
 from packages.schemas.models import ExtractionState
 
 
 @pytest.mark.integration
-def test_github_ingestion_creates_document_record():
+def test_github_ingestion_creates_document_record() -> None:
     """Test that GitHub ingestion creates Document record in PostgreSQL."""
     # Clear existing records
     conn = get_postgres_client()

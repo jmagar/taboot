@@ -1,35 +1,39 @@
 """Authentication dependencies for FastAPI."""
 
 import logging
+from typing import Annotated
 
 import redis.asyncio as redis
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 
 from packages.common.api_key_store import ApiKeyStore
 
 logger = logging.getLogger(__name__)
 
 
-async def get_redis_client() -> redis.Redis:
-    """Get Redis client from app state.
+async def get_redis_client(request: Request) -> "redis.Redis[bytes]":
+    """Get Redis client from app state via Request.
+
+    Args:
+        request: FastAPI Request object (injected).
 
     Returns:
-        redis.Redis: Async Redis client.
+        redis.Redis[bytes]: Async Redis client (returns bytes, not decoded strings).
     """
-    from apps.api.app import app
+    from typing import cast
 
-    return app.state.redis
+    return cast("redis.Redis[bytes]", request.app.state.redis)
 
 
 async def verify_api_key(
-    x_api_key: str | None = Header(None, description="API key for authentication"),
-    redis_client: redis.Redis = Depends(get_redis_client),
+    redis_client: Annotated["redis.Redis[bytes]", Depends(get_redis_client)],  # noqa: B008
+    x_api_key: Annotated[str | None, Header(description="API key for authentication")] = None,
 ) -> bool:
     """Verify API key from X-API-Key header.
 
     Args:
+        redis_client: Redis client for key validation (injected via Depends).
         x_api_key: API key from header (optional).
-        redis_client: Redis client for key validation.
 
     Returns:
         bool: True if key is valid.
@@ -61,4 +65,4 @@ async def verify_api_key(
     return True
 
 
-__all__ = ["verify_api_key", "get_redis_client"]
+__all__ = ["get_redis_client", "verify_api_key"]

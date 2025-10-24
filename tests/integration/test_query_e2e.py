@@ -12,7 +12,7 @@ from packages.vector.qdrant_client import QdrantClient as QdrantClientWrapper
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_query_e2e_workflow():
+def test_query_e2e_workflow() -> None:
     """
     Test complete query workflow end-to-end:
     1. Verify services healthy
@@ -32,11 +32,7 @@ def test_query_e2e_workflow():
     qdrant_client = QdrantClientWrapper(url=qdrant_url)
     assert qdrant_client.is_healthy(), "Qdrant not healthy"
 
-    neo4j_client = Neo4jClient(
-        uri=neo4j_uri,
-        username=neo4j_user,
-        password=neo4j_password
-    )
+    neo4j_client = Neo4jClient(uri=neo4j_uri, username=neo4j_user, password=neo4j_password)
     assert neo4j_client.is_healthy(), "Neo4j not healthy"
 
     # Step 2: Execute query
@@ -49,7 +45,7 @@ def test_query_e2e_workflow():
         neo4j_password=neo4j_password,
         ollama_base_url=ollama_url,
         top_k=20,
-        rerank_top_n=5
+        rerank_top_n=5,
     )
 
     # Step 3: Validate response format
@@ -86,7 +82,7 @@ def test_query_e2e_workflow():
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_query_with_source_filters():
+def test_query_with_source_filters() -> None:
     """Test query with source type filters."""
     qdrant_url = os.getenv("QDRANT_URL", "http://localhost:7000")
     neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -102,7 +98,7 @@ def test_query_with_source_filters():
         neo4j_password=neo4j_password,
         ollama_base_url=ollama_url,
         source_types=["web", "docker_compose"],
-        top_k=10
+        top_k=10,
     )
 
     assert result is not None
@@ -111,7 +107,7 @@ def test_query_with_source_filters():
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_query_with_date_filter():
+def test_query_with_date_filter() -> None:
     """Test query with date filter."""
     qdrant_url = os.getenv("QDRANT_URL", "http://localhost:7000")
     neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -130,7 +126,7 @@ def test_query_with_date_filter():
         neo4j_password=neo4j_password,
         ollama_base_url=ollama_url,
         after=after_date,
-        top_k=10
+        top_k=10,
     )
 
     assert result is not None
@@ -139,7 +135,7 @@ def test_query_with_date_filter():
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_query_empty_results_gracefully():
+def test_query_empty_results_gracefully() -> None:
     """Test query handles empty results gracefully."""
     qdrant_url = os.getenv("QDRANT_URL", "http://localhost:7000")
     neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -155,7 +151,7 @@ def test_query_empty_results_gracefully():
         neo4j_username=neo4j_user,
         neo4j_password=neo4j_password,
         ollama_base_url=ollama_url,
-        top_k=5
+        top_k=5,
     )
 
     # Should return result even if no matches

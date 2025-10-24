@@ -8,6 +8,7 @@ Provides:
 All operations use JSON structured logging and correlation ID tracking.
 """
 
+import asyncio
 import json
 import uuid
 from pathlib import Path
@@ -85,7 +86,7 @@ def load_collection_config() -> dict[str, Any]:
     try:
         with contract_path.open(encoding="utf-8") as f:
             config: dict[str, Any] = json.load(f)
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         logger.exception(
             "Failed to parse collection config JSON",
             extra={
@@ -329,9 +330,9 @@ async def create_qdrant_collections() -> None:
     client = QdrantClient(url=config.qdrant_url)
 
     try:
-        create_collection(client, config.collection_name)
+        await asyncio.to_thread(create_collection, client, config.collection_name)
     finally:
-        client.close()
+        await asyncio.to_thread(client.close)
 
 
 # Export public API

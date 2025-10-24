@@ -1,5 +1,6 @@
 """Neo4j graph traversal for knowledge graph expansion."""
 
+from types import TracebackType
 from typing import Any
 
 from neo4j import GraphDatabase
@@ -14,7 +15,7 @@ class GraphTraversal:
         username: str,
         password: str,
         max_hops: int = 2,
-        relationship_priority: list[str] | None = None
+        relationship_priority: list[str] | None = None,
     ):
         """
         Initialize graph traversal client.
@@ -33,13 +34,10 @@ class GraphTraversal:
             "ROUTES_TO",
             "BINDS",
             "EXPOSES_ENDPOINT",
-            "MENTIONS"
+            "MENTIONS",
         ]
 
-        self.driver = GraphDatabase.driver(
-            neo4j_uri,
-            auth=(username, password)
-        )
+        self.driver = GraphDatabase.driver(neo4j_uri, auth=(username, password))
 
     def get_relationship_priority(self) -> list[str]:
         """Get relationship type priority order."""
@@ -49,7 +47,7 @@ class GraphTraversal:
         self,
         start_node_names: list[str],
         relationship_types: list[str] | None = None,
-        max_hops: int | None = None
+        max_hops: int | None = None,
     ) -> str:
         """
         Build Cypher query for multi-hop graph traversal.
@@ -88,7 +86,7 @@ class GraphTraversal:
         self,
         entity_names: list[str],
         max_hops: int | None = None,
-        relationship_types: list[str] | None = None
+        relationship_types: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Traverse graph from given entity names.
@@ -105,9 +103,7 @@ class GraphTraversal:
             return []
 
         query = self.build_traversal_query(
-            start_node_names=entity_names,
-            relationship_types=relationship_types,
-            max_hops=max_hops
+            start_node_names=entity_names, relationship_types=relationship_types, max_hops=max_hops
         )
 
         results = []
@@ -115,14 +111,16 @@ class GraphTraversal:
             records = session.run(query, start_names=entity_names)
 
             for record in records:
-                results.append({
-                    "start_name": record["start_name"],
-                    "rel_types": record["rel_types"],
-                    "end_name": record["end_name"],
-                    "end_labels": record["end_labels"],
-                    "end_properties": dict(record["end_properties"]),
-                    "hops": record["hops"]
-                })
+                results.append(
+                    {
+                        "start_name": record["start_name"],
+                        "rel_types": record["rel_types"],
+                        "end_name": record["end_name"],
+                        "end_labels": record["end_labels"],
+                        "end_properties": dict(record["end_properties"]),
+                        "hops": record["hops"],
+                    }
+                )
 
         return results
 
@@ -130,10 +128,15 @@ class GraphTraversal:
         """Close Neo4j driver connection."""
         self.driver.close()
 
-    def __enter__(self):
+    def __enter__(self) -> "GraphTraversal":
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Context manager exit."""
         self.close()

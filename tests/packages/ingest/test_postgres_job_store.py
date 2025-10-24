@@ -10,12 +10,12 @@ from packages.schemas.models import IngestionJob, JobState, SourceType
 
 
 @pytest.fixture
-def job_store(postgres_conn):
+def job_store(postgres_conn) -> None:
     """Create PostgresJobStore instance with test connection."""
     return PostgresJobStore(postgres_conn)
 
 
-def test_create_job(job_store):
+def test_create_job(job_store) -> None:
     """Test creating an ingestion job."""
     job = IngestionJob(
         job_id=uuid4(),
@@ -39,7 +39,7 @@ def test_create_job(job_store):
     assert retrieved.state == JobState.PENDING
 
 
-def test_update_job(job_store):
+def test_update_job(job_store) -> None:
     """Test updating job state and metrics."""
     job = IngestionJob(
         job_id=uuid4(),
@@ -71,7 +71,7 @@ def test_update_job(job_store):
     assert retrieved.chunks_created == 42
 
 
-def test_get_by_id_not_found(job_store):
+def test_get_by_id_not_found(job_store) -> None:
     """Test getting nonexistent job returns None."""
     result = job_store.get_by_id(uuid4())
     assert result is None

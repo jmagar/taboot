@@ -60,8 +60,13 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
     onSuccess: async (data) => {
       if (data) {
         // Generate QR code image from TOTP URI
-        const qrCodeDataUrl = await QRCode.toDataURL(data.totpURI);
-        setQrCode(qrCodeDataUrl);
+        try {
+          const qrCodeDataUrl = await QRCode.toDataURL(data.totpURI);
+          setQrCode(qrCodeDataUrl);
+        } catch {
+          toast.error('Failed to generate QR code');
+          setQrCode('');
+        }
         setBackupCodes(data.backupCodes || []);
         setStep('verify');
         setPassword('');
@@ -151,19 +156,25 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
     setShowSetupDialog(true);
   };
 
-  const copyBackupCodes = () => {
-    navigator.clipboard.writeText(backupCodes.join('\n'));
-    toast.success('Backup codes copied to clipboard');
+  const copyBackupCodes = async () => {
+    try {
+      await navigator.clipboard.writeText(backupCodes.join('\n'));
+      toast.success('Backup codes copied to clipboard');
+    } catch {
+      toast.error('Failed to copy backup codes');
+    }
   };
 
   const downloadBackupCodes = () => {
     const element = document.createElement('a');
     const file = new Blob([backupCodes.join('\n')], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
+    const url = URL.createObjectURL(file);
+    element.href = url;
     element.download = 'backup-codes.txt';
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
+    URL.revokeObjectURL(url);
     toast.success('Backup codes downloaded');
   };
 
@@ -255,6 +266,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="current-password"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -307,7 +319,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
                   <InputOTP
                     maxLength={6}
                     value={totpCode}
-                    onChange={(value: string) => setTotpCode(value)}
+                    onChange={(value: string) => setTotpCode(value.replace(/\D/g, ''))}
                     onComplete={handleVerify2FA}
                     autoFocus
                   >
@@ -386,6 +398,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
               <Input
                 id="disable-password"
                 type="password"
+                autoComplete="current-password"
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

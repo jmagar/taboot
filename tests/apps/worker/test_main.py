@@ -10,21 +10,21 @@ import pytest
 
 
 @pytest.fixture
-def mock_redis_client():
+def mock_redis_client() -> None:
     """Mock Redis client for queue operations."""
     client = AsyncMock()
     return client
 
 
 @pytest.fixture
-def mock_extract_use_case():
+def mock_extract_use_case() -> None:
     """Mock extraction use case."""
     use_case = AsyncMock()
     return use_case
 
 
 @pytest.mark.asyncio
-async def test_worker_polls_extraction_queue(mock_redis_client):
+async def test_worker_polls_extraction_queue(mock_redis_client) -> None:
     """Test worker polls Redis extraction queue.
 
     RED phase: Will fail until worker exists.
@@ -42,7 +42,7 @@ async def test_worker_polls_extraction_queue(mock_redis_client):
 
 
 @pytest.mark.asyncio
-async def test_worker_processes_extraction_job(mock_redis_client, mock_extract_use_case):
+async def test_worker_processes_extraction_job(mock_redis_client, mock_extract_use_case) -> None:
     """Test worker processes extraction job from queue.
 
     RED phase: Will fail until worker exists.
@@ -66,7 +66,7 @@ async def test_worker_processes_extraction_job(mock_redis_client, mock_extract_u
 
 
 @pytest.mark.asyncio
-async def test_worker_handles_processing_error(mock_redis_client, mock_extract_use_case):
+async def test_worker_handles_processing_error(mock_redis_client, mock_extract_use_case) -> None:
     """Test worker handles extraction errors gracefully.
 
     RED phase: Will fail until worker exists.
@@ -92,7 +92,7 @@ async def test_worker_handles_processing_error(mock_redis_client, mock_extract_u
 
 
 @pytest.mark.asyncio
-async def test_worker_runs_continuous_loop(mock_redis_client):
+async def test_worker_runs_continuous_loop(mock_redis_client) -> None:
     """Test worker runs continuous polling loop.
 
     RED phase: Will fail until worker exists.
@@ -102,7 +102,7 @@ async def test_worker_runs_continuous_loop(mock_redis_client):
     # Return None after 2 polls to stop loop
     poll_count = 0
 
-    async def mock_blpop(*args, **kwargs):
+    async def mock_blpop(*args, **kwargs) -> None:
         nonlocal poll_count
         poll_count += 1
         if poll_count >= 2:
@@ -115,14 +115,14 @@ async def test_worker_runs_continuous_loop(mock_redis_client):
     worker = ExtractionWorker(redis_client=mock_redis_client)
 
     # Run for 2 iterations
-    with patch.object(worker, 'should_stop', side_effect=[False, False, True]):
+    with patch.object(worker, "should_stop", side_effect=[False, False, True]):
         await worker.run()
 
     assert poll_count >= 2
 
 
 @pytest.mark.asyncio
-async def test_worker_respects_shutdown_signal(mock_redis_client):
+async def test_worker_respects_shutdown_signal(mock_redis_client) -> None:
     """Test worker stops on shutdown signal.
 
     RED phase: Will fail until worker exists.

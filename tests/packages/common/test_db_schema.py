@@ -25,7 +25,7 @@ def test_load_schema_file_success(postgres_schema_path: Path) -> None:
     assert "CREATE TABLE IF NOT EXISTS extraction_windows" in sql_content
     assert "CREATE TABLE IF NOT EXISTS ingestion_jobs" in sql_content
     assert "CREATE TABLE IF NOT EXISTS extraction_jobs" in sql_content
-    assert "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"" in sql_content
+    assert 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp"' in sql_content
 
 
 @pytest.mark.unit
@@ -155,8 +155,8 @@ def test_create_schema_handles_sql_error(test_config: TabootConfig, mocker: Any)
     mocker.patch("packages.common.db_schema._get_connection", return_value=mock_conn)
     mocker.patch("packages.common.db_schema.load_schema_file", return_value="INVALID SQL")
 
-    # Should raise Exception on SQL error
-    with pytest.raises(Exception):
+    # Should raise RuntimeError on SQL error
+    with pytest.raises(RuntimeError):
         create_schema(test_config)
 
     # Connection should be rolled back on error
@@ -169,7 +169,10 @@ def test_create_schema_connection_error(test_config: TabootConfig, mocker: Any) 
     from packages.common.db_schema import create_schema
 
     # Mock connection failure
-    mocker.patch("packages.common.db_schema._get_connection", side_effect=ConnectionError("Connection refused"))
+    mocker.patch(
+        "packages.common.db_schema._get_connection",
+        side_effect=ConnectionError("Connection refused"),
+    )
 
     # Should raise ConnectionError
     with pytest.raises(ConnectionError):
@@ -227,13 +230,14 @@ def test_verify_schema_query_structure(test_config: TabootConfig, mocker: Any) -
 
 
 @pytest.mark.integration
-def test_document_content_table_exists():
+def test_document_content_table_exists() -> None:
     """Test that document_content table is created in schema."""
     # Ensure schema is created
     # This is async but we need to run it synchronously for this test
     import asyncio
 
     from packages.common.db_schema import create_postgresql_schema, get_postgres_client
+
     asyncio.run(create_postgresql_schema())
 
     conn = get_postgres_client()
@@ -256,8 +260,8 @@ def test_document_content_table_exists():
         """)
         columns = {row[0] for row in cur.fetchall()}
 
-        assert 'doc_id' in columns
-        assert 'content' in columns
-        assert 'created_at' in columns
+        assert "doc_id" in columns
+        assert "content" in columns
+        assert "created_at" in columns
 
     conn.close()

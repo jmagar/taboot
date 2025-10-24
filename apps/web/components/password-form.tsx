@@ -55,7 +55,8 @@ export function PasswordForm({ onSuccess }: PasswordFormProps) {
   const setPasswordMutation = useMutation({
     mutationFn: async (values: SetPasswordFormValues) => {
       const body = { newPassword: values.password };
-      const response = await fetch('/api/auth/password', {
+      const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/api/auth/password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -63,7 +64,22 @@ export function PasswordForm({ onSuccess }: PasswordFormProps) {
         body: JSON.stringify(body),
       });
 
-      return response.json();
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+
+      if (!response.ok) {
+        const errorMessage =
+          (payload as { error?: string; message?: string } | null)?.error ??
+          (payload as { error?: string; message?: string } | null)?.message ??
+          `Failed to set password (${response.status})`;
+        throw new Error(errorMessage);
+      }
+
+      return payload;
     },
     onSuccess: () => {
       toast.success(`Password set successfully!`);
@@ -254,8 +270,12 @@ export function PasswordForm({ onSuccess }: PasswordFormProps) {
             />
           </CardContent>
           <CardFooter className="mt-4">
-            <Button type="submit" disabled={setPasswordMutation.isPending} className="w-full">
-              {setPasswordMutation.isPending ? (
+            <Button
+              type="submit"
+              disabled={setPasswordMutation.isPending || changePasswordMutation.isPending}
+              className="w-full"
+            >
+              {setPasswordMutation.isPending || changePasswordMutation.isPending ? (
                 <>
                   <Spinner />
                   {isChangeMode ? 'Changing password...' : 'Setting password...'}

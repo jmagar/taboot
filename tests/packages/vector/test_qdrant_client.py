@@ -39,7 +39,11 @@ class TestQdrantVectorClient:
             assert client.collection_name == "test_collection"
             assert client.embedding_dim == 1024
 
-    def test_health_check_success(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_health_check_success(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test successful health check."""
         # Mock health check response
         mock_qdrant_client.get_collections.return_value = MagicMock()
@@ -49,7 +53,11 @@ class TestQdrantVectorClient:
         assert is_healthy is True
         mock_qdrant_client.get_collections.assert_called_once()
 
-    def test_health_check_failure(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_health_check_failure(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test health check failure."""
         # Mock connection error
         mock_qdrant_client.get_collections.side_effect = Exception("Connection refused")
@@ -58,7 +66,11 @@ class TestQdrantVectorClient:
 
         assert is_healthy is False
 
-    def test_collection_exists_true(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_collection_exists_true(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test collection existence check when collection exists."""
         # Mock collection exists
         mock_qdrant_client.collection_exists.return_value = True
@@ -68,7 +80,11 @@ class TestQdrantVectorClient:
         assert exists is True
         mock_qdrant_client.collection_exists.assert_called_once_with("test_collection")
 
-    def test_collection_exists_false(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_collection_exists_false(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test collection existence check when collection doesn't exist."""
         # Mock collection doesn't exist
         mock_qdrant_client.collection_exists.return_value = False
@@ -78,7 +94,11 @@ class TestQdrantVectorClient:
         assert exists is False
         mock_qdrant_client.collection_exists.assert_called_once_with("test_collection")
 
-    def test_collection_exists_error(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_collection_exists_error(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test collection existence check raises error on connection failure."""
         # Mock connection error
         mock_qdrant_client.collection_exists.side_effect = Exception("Connection error")
@@ -86,7 +106,11 @@ class TestQdrantVectorClient:
         with pytest.raises(QdrantConnectionError, match="Failed to check collection existence"):
             client.collection_exists()
 
-    def test_create_collection_success(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_create_collection_success(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test successful collection creation."""
         # Mock successful creation
         mock_qdrant_client.create_collection.return_value = True
@@ -101,7 +125,11 @@ class TestQdrantVectorClient:
         assert call_args[1]["vectors_config"].size == 1024
         assert call_args[1]["vectors_config"].distance == models.Distance.COSINE
 
-    def test_create_collection_already_exists(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_create_collection_already_exists(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test collection creation when collection already exists."""
         # Mock collection already exists error
         mock_qdrant_client.create_collection.side_effect = UnexpectedResponse(
@@ -116,7 +144,11 @@ class TestQdrantVectorClient:
 
         mock_qdrant_client.create_collection.assert_called_once()
 
-    def test_create_collection_error(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_create_collection_error(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test collection creation raises error on failure."""
         # Mock generic error
         mock_qdrant_client.create_collection.side_effect = Exception("Failed to create")
@@ -124,7 +156,11 @@ class TestQdrantVectorClient:
         with pytest.raises(QdrantConnectionError, match="Failed to create collection"):
             client.create_collection()
 
-    def test_delete_collection_success(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_delete_collection_success(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test successful collection deletion."""
         # Mock successful deletion
         mock_qdrant_client.delete_collection.return_value = True
@@ -133,7 +169,11 @@ class TestQdrantVectorClient:
 
         mock_qdrant_client.delete_collection.assert_called_once_with("test_collection")
 
-    def test_delete_collection_not_found(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_delete_collection_not_found(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test collection deletion when collection doesn't exist."""
         # Mock not found error
         mock_qdrant_client.delete_collection.side_effect = UnexpectedResponse(
@@ -148,7 +188,11 @@ class TestQdrantVectorClient:
 
         mock_qdrant_client.delete_collection.assert_called_once()
 
-    def test_delete_collection_error(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_delete_collection_error(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test collection deletion raises error on failure."""
         # Mock generic error
         mock_qdrant_client.delete_collection.side_effect = Exception("Failed to delete")
@@ -156,7 +200,11 @@ class TestQdrantVectorClient:
         with pytest.raises(QdrantConnectionError, match="Failed to delete collection"):
             client.delete_collection()
 
-    def test_get_collection_info_success(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_get_collection_info_success(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test successful collection info retrieval."""
         # Mock collection info
         mock_info = MagicMock()
@@ -171,7 +219,11 @@ class TestQdrantVectorClient:
         assert info.vectors_count == 1000
         mock_qdrant_client.get_collection.assert_called_once_with("test_collection")
 
-    def test_get_collection_info_not_found(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_get_collection_info_not_found(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test collection info retrieval when collection doesn't exist."""
         # Mock not found error
         mock_qdrant_client.get_collection.side_effect = UnexpectedResponse(
@@ -185,7 +237,11 @@ class TestQdrantVectorClient:
 
         assert info is None
 
-    def test_get_collection_info_error(self, client: QdrantVectorClient, mock_qdrant_client: Mock) -> None:
+    def test_get_collection_info_error(
+        self,
+        client: QdrantVectorClient,
+        mock_qdrant_client: Mock,
+    ) -> None:
         """Test collection info retrieval raises error on failure."""
         # Mock generic error
         mock_qdrant_client.get_collection.side_effect = Exception("Failed to get info")

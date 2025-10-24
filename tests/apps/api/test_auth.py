@@ -1,8 +1,12 @@
 """Tests for API authentication."""
 
+from __future__ import annotations
+
 import hashlib
 import os
+from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 import redis.asyncio as redis
@@ -15,7 +19,7 @@ from packages.schemas.api_key import ApiKey
 
 
 @pytest.fixture(scope="module", autouse=True)
-def set_test_env():
+def set_test_env() -> Iterator[None]:
     """Set environment variables before TestClient is created."""
     # Ensure config can load without validation errors
     os.environ["RERANKER_BATCH_SIZE"] = "16"
@@ -29,23 +33,24 @@ def set_test_env():
 
 
 @pytest.fixture
-def client():
+def client() -> TestClient:
     """Create test client."""
     from apps.api.app import app
+
     return TestClient(app)
 
 
 @pytest.fixture
-async def redis_client():
+async def redis_client() -> AsyncIterator[redis.Redis[Any]]:
     """Create Redis client for testing."""
     client = await redis.from_url("redis://localhost:6379", decode_responses=True)
     yield client
     await client.flushdb()  # Clean up
-    await client.aclose()
+    await client.close()
 
 
 @pytest.mark.asyncio
-async def test_verify_api_key_success(redis_client):
+async def test_verify_api_key_success(redis_client: redis.Redis[Any]) -> None:
     """Test successful API key verification."""
     # Store valid key
     raw_key = "sk_test_valid"
@@ -70,7 +75,7 @@ async def test_verify_api_key_success(redis_client):
 
 
 @pytest.mark.asyncio
-async def test_verify_api_key_invalid(redis_client):
+async def test_verify_api_key_invalid(redis_client: redis.Redis[Any]) -> None:
     """Test invalid API key raises 401."""
     with pytest.raises(HTTPException) as exc_info:
         await verify_api_key("sk_test_invalid", redis_client)

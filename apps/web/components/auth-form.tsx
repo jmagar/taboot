@@ -6,6 +6,7 @@ import Logo from '@/components/logo';
 import { config } from '@/config/site';
 import { useAuthUser } from '@/hooks/use-auth-user';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { validateCallbackUrl } from '@/lib/validate-callback-url';
 import { signIn } from '@taboot/auth';
 import { Button } from '@taboot/ui/components/button';
 import {
@@ -26,16 +27,16 @@ type AuthFormProps = React.ComponentProps<'div'> & {
 
 export function AuthForm({ mode, className, ...props }: AuthFormProps) {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const callbackUrl = validateCallbackUrl(searchParams.get('callbackUrl'));
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuthUser();
   const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace('/'); // redirect without adding history entry
+      router.replace(callbackUrl); // redirect without adding history entry
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, router, callbackUrl]);
 
   // Don't render anything while checking or redirecting
   if (isLoading || isAuthenticated) return null;

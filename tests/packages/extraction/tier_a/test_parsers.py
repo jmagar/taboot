@@ -16,7 +16,7 @@ class TestCodeBlockParser:
 Some text before.
 
 ```python
-def hello():
+def hello() -> None:
     print("Hello, world!")
 ```
 
@@ -26,7 +26,7 @@ Some text after.
 
         assert len(blocks) == 1
         assert blocks[0]["language"] == "python"
-        assert 'def hello()' in blocks[0]["code"]
+        assert "def hello()" in blocks[0]["code"]
         assert 'print("Hello, world!")' in blocks[0]["code"]
 
     def test_parse_multiple_code_blocks(self) -> None:

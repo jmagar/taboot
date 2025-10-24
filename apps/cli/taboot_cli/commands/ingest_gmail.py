@@ -20,6 +20,11 @@ from packages.vector.writer import QdrantWriter
 console = Console()
 logger = logging.getLogger(__name__)
 
+# Error message constant for Gmail credentials validation
+GMAIL_CREDENTIALS_ERROR = (
+    "Gmail credentials not configured (GMAIL_CREDENTIALS_PATH env var required)"
+)
+
 
 def ingest_gmail_command(
     query: Annotated[str, typer.Argument(..., help="Gmail search query (e.g., 'is:unread')")],
@@ -35,16 +40,12 @@ def ingest_gmail_command(
     try:
         config = get_config()
         limit_str = f"limit: {limit}" if limit is not None else "no limit"
-        console.print(
-            f"[yellow]Starting Gmail ingestion: '{query}' ({limit_str})[/yellow]"
-        )
+        console.print(f"[yellow]Starting Gmail ingestion: '{query}' ({limit_str})[/yellow]")
 
         # Validate credentials
         gmail_creds = getattr(config, "gmail_credentials_path", None)
         if not gmail_creds:
-            raise ValueError(
-                "Gmail credentials not configured (GMAIL_CREDENTIALS_PATH env var required)"
-            )
+            raise ValueError(GMAIL_CREDENTIALS_ERROR)
 
         gmail_reader = GmailReader(credentials_path=gmail_creds)
         normalizer = Normalizer()
@@ -63,15 +64,15 @@ def ingest_gmail_command(
             console.print("[yellow]Normalizing...[/yellow]")
             # Preserve metadata by wrapping normalized text back into Document
             normalized_docs = [
-                Document(text=normalizer.normalize(doc.text), metadata=doc.metadata)
-                for doc in docs
+                Document(text=normalizer.normalize(doc.text), metadata=doc.metadata) for doc in docs
             ]
 
             console.print("[yellow]Chunking...[/yellow]")
             all_chunks: list[Chunk] = []
-            doc_id = uuid4()
             ingested_at = int(datetime.now(UTC).timestamp())
             for doc in normalized_docs:
+                # Generate unique doc_id per email
+                doc_id = uuid4()
                 # Call chunk_document with Document object, not string
                 chunk_docs = chunker.chunk_document(doc)
                 for i, chunk_doc in enumerate(chunk_docs):
@@ -82,6 +83,7 @@ def ingest_gmail_command(
                         content=chunk_doc.text,
                         section=None,
                         position=i,
+                        # Approximate token count (actual tokenization may differ)
                         token_count=len(chunk_doc.text.split()),
                         source_url=doc.metadata.get("source_url", ""),
                         source_type=SourceType.GMAIL,

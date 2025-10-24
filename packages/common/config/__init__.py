@@ -54,7 +54,6 @@ class TabootConfig(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
-        env_file_override=True,  # .env file takes precedence over environment
     )
 
     # ========== Service URLs ==========
@@ -134,7 +133,10 @@ class TabootConfig(BaseSettings):
     # ========== API Service ==========
     taboot_http_port: int = 8000
     host: str = "0.0.0.0"
-    cors_allow_origins: list[str] = ["*"]  # Override via CORS_ALLOW_ORIGINS env var
+    cors_allow_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:3003",
+    ]  # Override via CORS_ALLOW_ORIGINS env var (comma-separated)
 
     def model_post_init(self, __context: object) -> None:
         """Post-initialization hook to rewrite URLs for host execution.

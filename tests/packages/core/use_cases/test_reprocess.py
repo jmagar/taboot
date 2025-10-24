@@ -82,6 +82,7 @@ class TestReprocessUseCase:
         assert document_store.update_document.called
         updated_doc = document_store.update_document.call_args[0][0]
         assert updated_doc.extraction_state == ExtractionState.PENDING
+        assert result["documents_queued"] == 1
 
     def test_reprocess_handles_empty_result(self) -> None:
         """Test that reprocess handles no documents gracefully."""

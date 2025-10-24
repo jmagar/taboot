@@ -33,7 +33,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className={`flex ${isSidebarExpanded ? 'flex-row' : 'flex-col'}`}>
+      <SidebarHeader className={cn('flex', isSidebarExpanded ? 'flex-row' : 'flex-col')}>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1">
@@ -51,7 +51,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupContent>
             <SidebarMenu>
               {config.nav.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton tooltip={item.title} asChild>
                     <Link href={item.href}>
                       <item.icon />
@@ -73,23 +73,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ) : (
           <div className={cn('flex flex-col gap-2', { 'self-center': !isSidebarExpanded })}>
             <ThemeSwitcher />
-            <Button size={isSidebarExpanded ? 'sm' : 'icon'} aria-label="Sign up">
+            <Button asChild size={isSidebarExpanded ? 'sm' : 'icon'} aria-label="Sign up">
               <Link
                 href="/sign-up"
-                className={`flex flex-row items-center justify-center ${isSidebarExpanded ? 'space-x-2' : ''}`}
+                className={cn('flex flex-row items-center justify-center', isSidebarExpanded && 'space-x-2')}
               >
                 <UserPlus className="h-4 w-4" />
                 <span>{isSidebarExpanded ? 'Sign up' : ''}</span>
               </Link>
             </Button>
             <Button
+              asChild
               variant="secondary"
               size={isSidebarExpanded ? 'sm' : 'icon'}
               aria-label="Sign in"
             >
               <Link
                 href="/sign-in"
-                className={`flex flex-row items-center justify-center ${isSidebarExpanded ? 'space-x-2' : ''}`}
+                className={cn('flex flex-row items-center justify-center', isSidebarExpanded && 'space-x-2')}
               >
                 <LogIn className="h-4 w-4" />
                 <span>{isSidebarExpanded ? 'Sign in' : ''}</span>

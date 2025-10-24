@@ -10,7 +10,7 @@ import pytest
 
 
 @pytest.fixture
-def mock_redis_client():
+def mock_redis_client() -> None:
     """Mock Redis client for DLQ operations."""
     client = AsyncMock()
     client.lpush = AsyncMock(return_value=1)
@@ -21,7 +21,7 @@ def mock_redis_client():
 
 
 @pytest.mark.asyncio
-async def test_dlq_sends_failed_job_to_queue(mock_redis_client):
+async def test_dlq_sends_failed_job_to_queue(mock_redis_client) -> None:
     """Test DLQ sends failed job to dead letter queue.
 
     RED phase: Will fail until DLQ exists.
@@ -40,7 +40,7 @@ async def test_dlq_sends_failed_job_to_queue(mock_redis_client):
 
 
 @pytest.mark.asyncio
-async def test_dlq_tracks_retry_count(mock_redis_client):
+async def test_dlq_tracks_retry_count(mock_redis_client) -> None:
     """Test DLQ tracks retry count for jobs.
 
     RED phase: Will fail until DLQ exists.
@@ -62,7 +62,7 @@ async def test_dlq_tracks_retry_count(mock_redis_client):
 
 
 @pytest.mark.asyncio
-async def test_dlq_respects_max_retries(mock_redis_client):
+async def test_dlq_respects_max_retries(mock_redis_client) -> None:
     """Test DLQ respects max retry limit.
 
     RED phase: Will fail until DLQ exists.
@@ -80,7 +80,7 @@ async def test_dlq_respects_max_retries(mock_redis_client):
 
 
 @pytest.mark.asyncio
-async def test_dlq_allows_retry_below_max(mock_redis_client):
+async def test_dlq_allows_retry_below_max(mock_redis_client) -> None:
     """Test DLQ allows retry when below max.
 
     RED phase: Will fail until DLQ exists.
@@ -98,7 +98,7 @@ async def test_dlq_allows_retry_below_max(mock_redis_client):
 
 
 @pytest.mark.asyncio
-async def test_dlq_calculates_backoff_delay(mock_redis_client):
+async def test_dlq_calculates_backoff_delay(mock_redis_client) -> None:
     """Test DLQ calculates exponential backoff delay.
 
     RED phase: Will fail until DLQ exists.
@@ -121,7 +121,7 @@ async def test_dlq_calculates_backoff_delay(mock_redis_client):
 
 
 @pytest.mark.asyncio
-async def test_dlq_stores_error_metadata(mock_redis_client):
+async def test_dlq_stores_error_metadata(mock_redis_client) -> None:
     """Test DLQ stores error metadata with job.
 
     RED phase: Will fail until DLQ exists.

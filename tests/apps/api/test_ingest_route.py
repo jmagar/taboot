@@ -98,11 +98,10 @@ class TestPostIngestEndpoint:
 
         Expected to FAIL initially (endpoint not implemented yet).
         """
-        with patch(
-            "apps.api.routes.ingest.get_ingest_use_case"
-        ) as mock_get_use_case, patch(
-            "apps.api.routes.ingest.get_job_store"
-        ) as mock_get_store:
+        with (
+            patch("apps.api.routes.ingest.get_ingest_use_case") as mock_get_use_case,
+            patch("apps.api.routes.ingest.get_job_store") as mock_get_store,
+        ):
             mock_use_case = Mock()
             mock_use_case.execute.return_value = sample_job
             mock_get_use_case.return_value = mock_use_case
@@ -169,11 +168,10 @@ class TestPostIngestEndpoint:
 
         Expected to FAIL initially (endpoint not implemented yet).
         """
-        with patch(
-            "apps.api.routes.ingest.get_ingest_use_case"
-        ) as mock_get_use_case, patch(
-            "apps.api.routes.ingest.get_job_store"
-        ) as mock_get_store:
+        with (
+            patch("apps.api.routes.ingest.get_ingest_use_case") as mock_get_use_case,
+            patch("apps.api.routes.ingest.get_job_store") as mock_get_store,
+        ):
             mock_use_case = Mock()
             mock_use_case.execute.return_value = sample_job
             mock_get_use_case.return_value = mock_use_case
@@ -206,11 +204,10 @@ class TestPostIngestEndpoint:
 
         Expected to FAIL initially (endpoint not implemented yet).
         """
-        with patch(
-            "apps.api.routes.ingest.get_ingest_use_case"
-        ) as mock_get_use_case, patch(
-            "apps.api.routes.ingest.get_job_store"
-        ) as mock_get_store:
+        with (
+            patch("apps.api.routes.ingest.get_ingest_use_case") as mock_get_use_case,
+            patch("apps.api.routes.ingest.get_job_store") as mock_get_store,
+        ):
             mock_use_case = Mock()
             mock_use_case.execute.return_value = sample_job
             mock_get_use_case.return_value = mock_use_case
@@ -242,11 +239,10 @@ class TestPostIngestEndpoint:
 
         Expected to FAIL initially (endpoint not implemented yet).
         """
-        with patch(
-            "apps.api.routes.ingest.get_ingest_use_case"
-        ) as mock_get_use_case, patch(
-            "apps.api.routes.ingest.get_job_store"
-        ) as mock_get_store:
+        with (
+            patch("apps.api.routes.ingest.get_ingest_use_case") as mock_get_use_case,
+            patch("apps.api.routes.ingest.get_job_store") as mock_get_store,
+        ):
             mock_use_case = Mock()
             mock_use_case.execute.return_value = sample_job
             mock_get_use_case.return_value = mock_use_case
@@ -275,9 +271,7 @@ class TestPostIngestEndpoint:
             UUID(data["job_id"])  # Should parse as valid UUID
             assert data["source_type"] == "web"
             assert data["source_target"] == "https://example.com"
-            datetime.fromisoformat(
-                data["created_at"].replace("Z", "+00:00")
-            )  # Valid ISO datetime
+            datetime.fromisoformat(data["created_at"].replace("Z", "+00:00"))  # Valid ISO datetime
 
             # Verify job was persisted
             mock_store.create.assert_called_once()
@@ -326,9 +320,7 @@ class TestGetIngestStatusEndpoint:
             assert "started_at" in data
             assert "completed_at" in data
 
-    def test_get_status_job_not_found_returns_404(
-        self, client: TestClient
-    ) -> None:
+    def test_get_status_job_not_found_returns_404(self, client: TestClient) -> None:
         """Test that GET /ingest/{job_id} returns 404 for missing job.
 
         Expected to FAIL initially (endpoint not implemented yet).
@@ -345,9 +337,7 @@ class TestGetIngestStatusEndpoint:
             data = response.json()
             assert "detail" in data or "error" in data
 
-    def test_get_status_validates_job_id_format(
-        self, client: TestClient
-    ) -> None:
+    def test_get_status_validates_job_id_format(self, client: TestClient) -> None:
         """Test that GET /ingest/{job_id} validates UUID format.
 
         Expected to FAIL initially (endpoint not implemented yet).

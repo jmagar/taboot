@@ -29,9 +29,7 @@ class TestInitEndToEnd:
     """End-to-end integration tests for initialization workflow."""
 
     @pytest.mark.asyncio
-    async def test_init_creates_neo4j_constraints(
-        self, docker_services_ready: None
-    ) -> None:
+    async def test_init_creates_neo4j_constraints(self, docker_services_ready: None) -> None:
         """Test that Neo4j constraints are actually created during init.
 
         Acceptance Scenario 1: Given a fresh deployment, When the user runs init
@@ -59,9 +57,7 @@ class TestInitEndToEnd:
                 for record in constraints:
                     name = record.get("name", "")
                     # Different Neo4j versions may use different field names
-                    labels_or_types = record.get(
-                        "labelsOrTypes", record.get("entityType", [])
-                    )
+                    labels_or_types = record.get("labelsOrTypes", record.get("entityType", []))
                     properties = record.get("properties", [])
 
                     if labels_or_types and properties:
@@ -74,12 +70,10 @@ class TestInitEndToEnd:
                         constraint_map[f"{label}.{prop}"] = name
 
                 # Assert required constraints exist
-                assert (
-                    "Service.name" in constraint_map
-                ), "Service.name unique constraint not found"
-                assert (
-                    "Host.hostname" in constraint_map
-                ), "Host.hostname unique constraint not found"
+                assert "Service.name" in constraint_map, "Service.name unique constraint not found"
+                assert "Host.hostname" in constraint_map, (
+                    "Host.hostname unique constraint not found"
+                )
 
                 # Check for Endpoint composite index (may be index or constraint)
                 result_indexes = session.run("SHOW INDEXES")
@@ -87,9 +81,7 @@ class TestInitEndToEnd:
 
                 endpoint_index_found = False
                 for record in indexes:
-                    labels_or_types = record.get(
-                        "labelsOrTypes", record.get("entityType", [])
-                    )
+                    labels_or_types = record.get("labelsOrTypes", record.get("entityType", []))
                     properties = record.get("properties", [])
 
                     if labels_or_types and properties:
@@ -106,17 +98,15 @@ class TestInitEndToEnd:
                             endpoint_index_found = True
                             break
 
-                assert (
-                    endpoint_index_found
-                ), "Endpoint(service, method, path) composite index not found"
+                assert endpoint_index_found, (
+                    "Endpoint(service, method, path) composite index not found"
+                )
 
         finally:
             driver.close()
 
     @pytest.mark.asyncio
-    async def test_init_creates_qdrant_collection(
-        self, docker_services_ready: None
-    ) -> None:
+    async def test_init_creates_qdrant_collection(self, docker_services_ready: None) -> None:
         """Test that Qdrant collection is actually created during init.
 
         Acceptance Scenario 2: Given Neo4j initialized, When Qdrant initialization
@@ -136,9 +126,9 @@ class TestInitEndToEnd:
 
             # Assert main collection exists
             expected_collection = "taboot_documents"
-            assert (
-                expected_collection in collection_names
-            ), f"Qdrant collection '{expected_collection}' not found"
+            assert expected_collection in collection_names, (
+                f"Qdrant collection '{expected_collection}' not found"
+            )
 
             # Get collection info
             collection_info = client.get_collection(expected_collection)
@@ -152,9 +142,7 @@ class TestInitEndToEnd:
             assert vectors.size == 1024, "Vector dimension should be 1024"
 
             # Assert HNSW indexing is enabled
-            assert (
-                vectors.distance.name == "Cosine"
-            ), "Distance metric should be Cosine"
+            assert vectors.distance.name == "Cosine", "Distance metric should be Cosine"
 
             # Check for HNSW config
             hnsw_config = collection_info.config.hnsw_config
@@ -164,9 +152,7 @@ class TestInitEndToEnd:
             client.close()
 
     @pytest.mark.asyncio
-    async def test_init_all_services_healthy(
-        self, docker_services_ready: None
-    ) -> None:
+    async def test_init_all_services_healthy(self, docker_services_ready: None) -> None:
         """Test that all services report healthy after init.
 
         Acceptance Scenario 3: Given all schemas initialized, When the system
@@ -178,9 +164,7 @@ class TestInitEndToEnd:
         health_status = await check_system_health()
 
         # Assert overall system health
-        assert (
-            health_status["healthy"] is True
-        ), f"System not healthy: {health_status['services']}"
+        assert health_status["healthy"] is True, f"System not healthy: {health_status['services']}"
 
         # Assert individual service health
         required_services = [
@@ -194,9 +178,9 @@ class TestInitEndToEnd:
         ]
 
         for service in required_services:
-            assert (
-                health_status["services"].get(service) is True
-            ), f"Service {service} is not healthy"
+            assert health_status["services"].get(service) is True, (
+                f"Service {service} is not healthy"
+            )
 
     @pytest.mark.asyncio
     async def test_init_is_idempotent(self, docker_services_ready: None) -> None:
@@ -244,8 +228,7 @@ class TestInitEndToEnd:
                 constraints_after = list(result_after)
 
                 assert len(constraints_after) == initial_count, (
-                    "Init should be idempotent - constraint count should not change "
-                    "on second run"
+                    "Init should be idempotent - constraint count should not change on second run"
                 )
 
         finally:
@@ -259,9 +242,9 @@ class TestInitEndToEnd:
             collection_names = [col.name for col in collections.collections]
 
             expected_collection = "taboot_documents"
-            assert (
-                expected_collection in collection_names
-            ), "Collection should still exist after re-init"
+            assert expected_collection in collection_names, (
+                "Collection should still exist after re-init"
+            )
 
         finally:
             client.close()
@@ -273,9 +256,7 @@ class TestInitWorkflowComponents:
     """Test individual components of the init workflow."""
 
     @pytest.mark.asyncio
-    async def test_neo4j_connection_established(
-        self, docker_services_ready: None
-    ) -> None:
+    async def test_neo4j_connection_established(self, docker_services_ready: None) -> None:
         """Test that Neo4j connection can be established."""
         config = get_config()
 
@@ -299,9 +280,7 @@ class TestInitWorkflowComponents:
             driver.close()
 
     @pytest.mark.asyncio
-    async def test_qdrant_connection_established(
-        self, docker_services_ready: None
-    ) -> None:
+    async def test_qdrant_connection_established(self, docker_services_ready: None) -> None:
         """Test that Qdrant connection can be established."""
         config = get_config()
 

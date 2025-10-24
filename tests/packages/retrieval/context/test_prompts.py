@@ -6,7 +6,7 @@ from packages.retrieval.context.prompts import get_qa_prompt_template, get_synth
 
 
 @pytest.mark.unit
-def test_qa_prompt_template_has_citation_instructions():
+def test_qa_prompt_template_has_citation_instructions() -> None:
     """Test that QA prompt template includes citation formatting instructions."""
     prompt_template = get_qa_prompt_template()
 
@@ -16,7 +16,7 @@ def test_qa_prompt_template_has_citation_instructions():
 
 
 @pytest.mark.unit
-def test_synthesis_prompt_requires_inline_citations():
+def test_synthesis_prompt_requires_inline_citations() -> None:
     """Test that synthesis prompt enforces inline citation format."""
     prompt = get_synthesis_prompt()
 
@@ -25,7 +25,7 @@ def test_synthesis_prompt_requires_inline_citations():
 
 
 @pytest.mark.unit
-def test_synthesis_prompt_specifies_format():
+def test_synthesis_prompt_specifies_format() -> None:
     """Test that synthesis prompt specifies citation format clearly."""
     prompt = get_synthesis_prompt()
 

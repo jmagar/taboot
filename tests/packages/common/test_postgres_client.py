@@ -3,7 +3,7 @@
 from packages.common.db_schema import get_postgres_client
 
 
-def test_get_postgres_client_returns_connection():
+def test_get_postgres_client_returns_connection() -> None:
     """Test that get_postgres_client returns a valid connection."""
     conn = get_postgres_client()
 
@@ -18,7 +18,7 @@ def test_get_postgres_client_returns_connection():
     conn.close()
 
 
-def test_get_postgres_client_connection_has_dict_cursor():
+def test_get_postgres_client_connection_has_dict_cursor() -> None:
     """Test that connection uses RealDictCursor for dict results."""
     conn = get_postgres_client()
 
@@ -26,6 +26,6 @@ def test_get_postgres_client_connection_has_dict_cursor():
     with conn.cursor() as cur:
         cur.execute("SELECT 1 as test_value")
         result = cur.fetchone()
-        assert result['test_value'] == 1
+        assert result["test_value"] == 1
 
     conn.close()

@@ -37,6 +37,16 @@ DATABASE_URL=postgresql://user:password@localhost:5432/mydb
 > [!NOTE]
 > You also need to update the same DATABASE_URL in the packages/db/.env file (by copying the contents of .env.example in the packages/db/ directory), as Prisma reads it from there.
 
+#### Web App
+
+Set the base URL for API requests:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+The web app uses this to communicate with the FastAPI backend.
+
 #### Auth.js Secret
 
 Set your Better Auth development secret:

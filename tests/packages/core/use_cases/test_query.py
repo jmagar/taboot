@@ -6,7 +6,7 @@ from packages.core.use_cases.query import execute_query
 
 
 @pytest.mark.unit
-def test_execute_query_validates_inputs():
+def test_execute_query_validates_inputs() -> None:
     """Test query validation."""
     # Empty query should raise error
     with pytest.raises(ValueError, match="[Qq]uery cannot be empty"):
@@ -15,13 +15,13 @@ def test_execute_query_validates_inputs():
             qdrant_url="http://localhost:6333",
             neo4j_uri="bolt://localhost:7687",
             neo4j_username="neo4j",
-            neo4j_password="test"
+            neo4j_password="test",
         )
 
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_execute_query_with_real_services(qdrant_client, neo4j_client):
+def test_execute_query_with_real_services(qdrant_client, neo4j_client) -> None:
     """Test query execution against real services."""
     result = execute_query(
         query="Which services expose port 8080?",
@@ -31,7 +31,7 @@ def test_execute_query_with_real_services(qdrant_client, neo4j_client):
         neo4j_username="neo4j",
         neo4j_password="changeme",
         ollama_base_url="http://localhost:11434",
-        top_k=10
+        top_k=10,
     )
 
     assert result is not None
@@ -41,7 +41,7 @@ def test_execute_query_with_real_services(qdrant_client, neo4j_client):
 
 
 @pytest.mark.unit
-def test_execute_query_with_filters():
+def test_execute_query_with_filters() -> None:
     """Test query with source type and date filters."""
     from datetime import UTC, datetime
 
@@ -54,7 +54,7 @@ def test_execute_query_with_filters():
         neo4j_password="test",
         source_types=["web", "docker_compose"],
         after=datetime(2025, 10, 1, tzinfo=UTC),
-        dry_run=True  # Don't actually query
+        dry_run=True,  # Don't actually query
     )
 
     # Dry run should return None or placeholder

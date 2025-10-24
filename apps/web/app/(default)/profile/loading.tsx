@@ -3,7 +3,7 @@ import { Skeleton } from '@taboot/ui/components/skeleton';
 
 export default function ProfileLoading() {
   return (
-    <section className="w-2xl mx-auto px-4 py-10">
+    <section className="max-w-2xl mx-auto px-4 py-10">
       <Card>
         <CardHeader className="flex flex-col items-center justify-center gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-4">

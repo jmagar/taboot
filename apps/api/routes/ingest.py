@@ -6,20 +6,28 @@ monitoring ingestion jobs.
 Required by FR-033: API MUST provide ingestion endpoints with job tracking.
 """
 
-import logging
-from typing import Any
-from uuid import UUID
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+from typing import TYPE_CHECKING, Any
+from uuid import UUID, uuid4
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+if TYPE_CHECKING:
+    from packages.ingest.postgres_job_store import PostgresJobStore
+
+from datetime import UTC, datetime
+
 from apps.api.deps.auth import verify_api_key
+from packages.common.validators import URLValidationError, validate_url
 from packages.core.use_cases.ingest_web import IngestWebUseCase
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
 from packages.ingest.normalizer import Normalizer
 from packages.ingest.readers.web import WebReader
-from packages.schemas.models import SourceType
+from packages.schemas.models import IngestionJob, JobState, SourceType
 from packages.vector.writer import QdrantWriter
 
 logger = logging.getLogger(__name__)
@@ -36,15 +44,9 @@ class IngestionRequest(BaseModel):
         limit: Optional maximum pages/items to ingest.
     """
 
-    source_type: SourceType = Field(
-        ..., description="Source type for ingestion"
-    )
-    source_target: str = Field(
-        ..., min_length=1, description="URL or source identifier"
-    )
-    limit: int | None = Field(
-        default=None, ge=1, description="Maximum pages to ingest"
-    )
+    source_type: SourceType = Field(..., description="Source type for ingestion")
+    source_target: str = Field(..., min_length=1, description="URL or source identifier")
+    limit: int | None = Field(default=None, ge=1, description="Maximum pages to ingest")
 
 
 class IngestionJobResponse(BaseModel):
@@ -99,16 +101,16 @@ def get_ingest_use_case() -> IngestWebUseCase:
     Returns:
         IngestWebUseCase: Configured use case instance.
     """
+    from packages.clients.postgres_document_store import PostgresDocumentStore
     from packages.common.config import get_config
     from packages.common.db_schema import get_postgres_client
-    from packages.clients.postgres_document_store import PostgresDocumentStore
 
     config = get_config()
 
     # Initialize adapters
     web_reader = WebReader(
         firecrawl_url=config.firecrawl_api_url,
-        firecrawl_api_key=config.firecrawl_api_key,
+        firecrawl_api_key=config.firecrawl_api_key.get_secret_value(),
     )
     normalizer = Normalizer()
     chunker = Chunker()
@@ -133,7 +135,7 @@ def get_ingest_use_case() -> IngestWebUseCase:
     )
 
 
-def get_job_store() -> "PostgresJobStore":
+def get_job_store() -> PostgresJobStore:
     """Dependency factory for PostgresJobStore.
 
     Returns:
@@ -146,26 +148,59 @@ def get_job_store() -> "PostgresJobStore":
     return PostgresJobStore(pg_conn)
 
 
+async def _execute_ingestion_job(
+    job_id: UUID,
+    url: str,
+    limit: int | None,
+    use_case: IngestWebUseCase,
+    job_store: PostgresJobStore,
+) -> None:
+    """Background task to execute ingestion and update job store.
+
+    Args:
+        job_id: Pre-generated job UUID.
+        url: URL to ingest.
+        limit: Optional page limit.
+        use_case: IngestWebUseCase instance.
+        job_store: PostgresJobStore instance.
+    """
+    try:
+        logger.info(f"Starting background ingestion for job {job_id}")
+        # Execute use case with pre-generated job_id
+        completed_job = use_case.execute(url=url, limit=limit, job_id=job_id)
+        # Update job store with final state
+        job_store.update(completed_job)
+        logger.info(f"Completed background ingestion for job {job_id}")
+    except Exception as e:
+        logger.exception(f"Background ingestion failed for job {job_id}: {e}")
+        # Job state should already be FAILED from use case error handling,
+        # but log the error for visibility
+
+
 @router.post(
     "/",
     response_model=IngestionJobResponse,
     status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(verify_api_key)],
 )
-async def start_ingestion(request_body: IngestionRequest) -> IngestionJobResponse:
+async def start_ingestion(
+    request_body: IngestionRequest,
+    background_tasks: BackgroundTasks,
+) -> IngestionJobResponse:
     """Start an ingestion job.
 
-    Creates and executes an ingestion job for the specified source.
-    Currently only supports web source type.
+    Creates a PENDING job and queues it for background processing.
+    Returns immediately with HTTP 202 Accepted.
 
     Args:
         request_body: Ingestion request with source details.
+        background_tasks: FastAPI background tasks.
 
     Returns:
-        IngestionJobResponse: Created job details.
+        IngestionJobResponse: Job details in PENDING state.
 
     Raises:
-        HTTPException: 400 if source_type is not supported.
+        HTTPException: 400 if source_type is not supported or URL is invalid.
     """
     # Validate source type
     if request_body.source_type != SourceType.WEB:
@@ -177,17 +212,45 @@ async def start_ingestion(request_body: IngestionRequest) -> IngestionJobRespons
             ),
         )
 
-    # Get dependencies
-    use_case = get_ingest_use_case()
+    # Validate URL for security (SSRF protection)
+    try:
+        validate_url(request_body.source_target)
+    except URLValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid URL: {str(e)}",
+        ) from e
+
+    # Generate job ID and create PENDING job
+    job_id = uuid4()
+    job = IngestionJob(
+        job_id=job_id,
+        source_type=request_body.source_type,
+        source_target=request_body.source_target,
+        state=JobState.PENDING,
+        created_at=datetime.now(UTC),
+        pages_processed=0,
+        chunks_created=0,
+    )
+
+    # Persist PENDING job immediately
     job_store = get_job_store()
-
-    # Execute use case
-    job = use_case.execute(url=request_body.source_target, limit=request_body.limit)
-
-    # Persist job
     job_store.create(job)
 
-    # Return response
+    # Queue background task to execute ingestion
+    use_case = get_ingest_use_case()
+    background_tasks.add_task(
+        _execute_ingestion_job,
+        job_id=job_id,
+        url=request_body.source_target,
+        limit=request_body.limit,
+        use_case=use_case,
+        job_store=job_store,
+    )
+
+    logger.info(f"Queued ingestion job {job_id} for {request_body.source_target}")
+
+    # Return 202 ACCEPTED with PENDING job
     return IngestionJobResponse(
         job_id=str(job.job_id),
         state=job.state.value,

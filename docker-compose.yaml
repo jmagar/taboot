@@ -128,14 +128,14 @@ services:
       - taboot-graph_logs:/logs
       - taboot-graph_plugins:/plugins
     environment:
-      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-changeme}
+      NEO4J_AUTH: ${NEO4J_USER}/${NEO4J_PASSWORD}
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_server_memory_heap_initial__size: 2G
       NEO4J_server_memory_heap_max__size: 2G
       NEO4J_server_memory_pagecache_size: 2G
       NEO4J_initial_dbms_default__database: neo4j
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u \"${NEO4J_USER:-neo4j}\" -p \"${NEO4J_PASSWORD:-changeme}\" 'RETURN 1'"]
+      test: ["CMD-SHELL", "cypher-shell -u \"${NEO4J_USER}\" -p \"${NEO4J_PASSWORD}\" 'RETURN 1'"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -307,50 +307,34 @@ services:
       retries: 3
       start_period: 30s
 
-  # taboot-worker: Extraction worker (spaCy Tier B + LLM Tier C)
-  #
-  # Status: Disabled until extraction pipeline implementation is complete.
-  #
-  # To enable:
-  #   1. Uncomment the entire taboot-worker section below
-  #   2. Ensure packages/extraction/ contains Tier B (spaCy) and Tier C (LLM)
-  #   3. Build the worker image: docker compose build taboot-worker
-  #   4. Start: docker compose up taboot-worker
-  #   5. Dependencies (listed below) must all be healthy before worker starts
-  #
-  # Depends on: taboot-cache, taboot-vectors, taboot-graph, taboot-embed,
-  #            taboot-rerank, taboot-db
-  #
-  # See: docs/WORKER_SETUP.md for configuration details
-  #
-  # taboot-worker:
-  #   <<: *common-base
-  #   build:
-  #     context: .
-  #     dockerfile: docker/worker/Dockerfile
-  #   container_name: taboot-worker
-  #   env_file:
-  #     - .env
-  #   depends_on:
-  #     taboot-cache:
-  #       condition: service_healthy
-  #     taboot-vectors:
-  #       condition: service_healthy
-  #     taboot-graph:
-  #       condition: service_healthy
-  #     taboot-embed:
-  #       condition: service_healthy
-  #     taboot-rerank:
-  #       condition: service_healthy
-  #     taboot-db:
-  #       condition: service_healthy
-  #   command: ["python", "-m", "packages.extraction.worker"]
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pgrep -f 'extraction.worker' || exit 1"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 30s
+  taboot-worker:
+    <<: *common-base
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    container_name: taboot-worker
+    env_file:
+      - .env
+    depends_on:
+      taboot-cache:
+        condition: service_healthy
+      taboot-vectors:
+        condition: service_healthy
+      taboot-graph:
+        condition: service_healthy
+      taboot-embed:
+        condition: service_healthy
+      taboot-rerank:
+        condition: service_healthy
+      taboot-db:
+        condition: service_healthy
+    command: ["python", "-m", "apps.worker.main"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'apps.worker.main' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   taboot-embed:

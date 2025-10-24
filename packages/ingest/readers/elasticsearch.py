@@ -5,10 +5,12 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 """
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 from llama_index.core import Document
-from llama_index.readers.elasticsearch import ElasticsearchReader as LlamaElasticsearchReader
+from llama_index.readers.elasticsearch import (
+    ElasticsearchReader as LlamaElasticsearchReader,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +53,11 @@ class ElasticsearchReader:
         self.max_retries = max_retries
 
         logger.info(
-            f"Initialized ElasticsearchReader (endpoint={endpoint}, index={index}, max_retries={max_retries})"
+            f"Initialized ElasticsearchReader (endpoint={endpoint}, index={index}, "
+            f"max_retries={max_retries})"
         )
 
-    def load_data(
-        self, query: dict[str, Any], limit: int | None = None
-    ) -> list[Document]:
+    def load_data(self, query: dict[str, Any], limit: int | None = None) -> list[Document]:
         """Load documents from Elasticsearch.
 
         Args:
@@ -69,9 +70,7 @@ class ElasticsearchReader:
         Raises:
             ElasticsearchReaderError: If loading fails after all retries.
         """
-        logger.info(
-            f"Loading documents from Elasticsearch index '{self.index}' (limit: {limit})"
-        )
+        logger.info(f"Loading documents from Elasticsearch index '{self.index}' (limit: {limit})")
 
         # Create reader
         reader = LlamaElasticsearchReader(endpoint=self.endpoint, index=self.index)
@@ -81,10 +80,13 @@ class ElasticsearchReader:
         for attempt in range(self.max_retries):
             try:
                 # Load documents
-                docs = reader.load_data(
-                    field="text",  # Default field to extract
-                    query=query,
-                    embedding_field=None,
+                docs = cast(
+                    list[Document],
+                    reader.load_data(
+                        field="text",  # Default field to extract
+                        query=query,
+                        embedding_field=None,
+                    ),
                 )
 
                 # Apply limit if specified

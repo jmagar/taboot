@@ -12,13 +12,12 @@ RUN apk add --no-cache libc6-compat
 ENV PNPM_HOME="/root/.local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
-RUN npm install -g pnpm \
+RUN npm install -g pnpm@9.15.0 \
   && pnpm config set global-bin-dir "$PNPM_HOME" \
-  && pnpm add -g turbo
+  && pnpm add -g turbo@2.3.3
 
 # Set working directory
 WORKDIR /app
-RUN pnpm add -g turbo prisma
 COPY . .
 RUN turbo prune web --docker
 
@@ -30,9 +29,9 @@ RUN apk add --no-cache libc6-compat
 ENV PNPM_HOME="/root/.local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
-RUN npm install -g pnpm \
+RUN npm install -g pnpm@9.15.0 \
   && pnpm config set global-bin-dir "$PNPM_HOME" \
-  && pnpm add -g turbo
+  && pnpm add -g turbo@2.3.3
 
 WORKDIR /app
 
@@ -68,5 +67,8 @@ USER nextjs
 COPY --from=installer --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=installer --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=installer --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
 
 CMD ["node", "apps/web/server.js"]

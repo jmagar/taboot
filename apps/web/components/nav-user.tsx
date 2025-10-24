@@ -1,4 +1,5 @@
 import { useRequiredAuthUser } from '@/hooks/use-auth-user';
+import type { ComponentType, SVGProps } from 'react';
 import { signOut } from '@taboot/auth/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@taboot/ui/components/avatar';
 import {
@@ -18,11 +19,11 @@ import {
 } from '@taboot/ui/components/sidebar';
 import { ChevronsUpDown, LogOut, Settings, Shield, User2 } from 'lucide-react';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 type DropdownItem = {
   label: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
   href?: string;
   onClick?: () => void;
 };
@@ -30,6 +31,7 @@ type DropdownItem = {
 export function NavUser() {
   const { isMobile } = useSidebar();
   const { user, isLoading, refetch } = useRequiredAuthUser();
+  const router = useRouter();
 
   if (isLoading) return null;
 
@@ -61,7 +63,7 @@ export function NavUser() {
             fetchOptions: {
               onSuccess: () => {
                 refetch();
-                redirect('/');
+                router.push('/');
               },
             },
           });
@@ -122,28 +124,31 @@ export function NavUser() {
 }
 
 function renderDropdownItems(dropdownItems: DropdownItem[][]) {
-  return dropdownItems.map((group, groupIdx) => (
-    <div key={groupIdx}>
-      <DropdownMenuGroup>
-        {group.map((item, itemIdx) =>
-          item.href ? (
-            <DropdownMenuItem asChild key={itemIdx}>
-              <Link href={item.href}>
-                <div className="flex items-center gap-2">
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </div>
-              </Link>
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem key={itemIdx} onClick={item.onClick}>
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </DropdownMenuItem>
-          ),
-        )}
-      </DropdownMenuGroup>
-      {groupIdx < dropdownItems.length - 1 && <DropdownMenuSeparator />}
-    </div>
-  ));
+  return dropdownItems.map((group, groupIdx) => {
+    const groupKey = `${groupIdx}-${group.map((item) => item.label).join('-')}`;
+    return (
+      <div key={groupKey}>
+        <DropdownMenuGroup>
+          {group.map((item) =>
+            item.href ? (
+              <DropdownMenuItem asChild key={item.label}>
+                <Link href={item.href}>
+                  <div className="flex items-center gap-2">
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </div>
+                </Link>
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem key={item.label} onClick={item.onClick}>
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </DropdownMenuItem>
+            ),
+          )}
+        </DropdownMenuGroup>
+        {groupIdx < dropdownItems.length - 1 && <DropdownMenuSeparator />}
+      </div>
+    );
+  });
 }

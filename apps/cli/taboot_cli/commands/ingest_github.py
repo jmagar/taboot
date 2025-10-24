@@ -6,17 +6,18 @@ This command is thin - business logic is in the ingestion pipeline.
 
 import hashlib
 import logging
+from contextlib import ExitStack
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, NoReturn
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import typer
 from llama_index.core import Document
 from rich.console import Console
 
+from packages.clients.postgres_document_store import PostgresDocumentStore
 from packages.common.config import get_config
 from packages.common.db_schema import get_postgres_client
-from packages.clients.postgres_document_store import PostgresDocumentStore
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
 from packages.ingest.normalizer import Normalizer
@@ -33,6 +34,12 @@ from packages.vector.writer import QdrantWriter
 
 console = Console()
 logger = logging.getLogger(__name__)
+
+
+def _die(message: str) -> NoReturn:
+    """Print error and exit with code 1."""
+    console.print(message)
+    raise typer.Exit(code=1)
 
 
 def ingest_github_command(
@@ -66,45 +73,50 @@ def ingest_github_command(
     try:
         # Validate repo format
         if "/" not in repo or repo.count("/") != 1:
-            console.print(
+            _die(
                 f"[red]✗ Invalid repository format: {repo}[/red]\n"
                 f"[yellow]Expected format: 'owner/repo' (e.g., 'anthropics/claude')[/yellow]"
             )
-            raise typer.Exit(code=1)
 
         # Load config
         config = get_config()
 
         # Display starting message (use is not None to show explicit 0 limit)
         limit_str = f"limit: {limit}" if limit is not None else "no limit"
+        job_id = uuid4()
         console.print(f"[yellow]Starting GitHub ingestion: {repo} ({limit_str})[/yellow]")
+        console.print(f"[yellow]Job ID: {job_id}[/yellow]")
 
         # Create dependencies with proper resource management
         logger.info("Creating ingestion pipeline dependencies")
 
         # Validate GitHub token is configured
         if not config.github_token:
-            raise ValueError("GitHub token not configured (GITHUB_TOKEN env var required)")
+            _die("[red]✗ GitHub token not configured (GITHUB_TOKEN env var required)[/red]")
 
         github_reader = GithubReader(
-            github_token=config.github_token,
+            github_token=config.github_token.get_secret_value(),
         )
         normalizer = Normalizer()
         chunker = Chunker()
 
-        # Initialize resources with try/finally to ensure cleanup
-        embedder = Embedder(tei_url=config.tei_embedding_url)
-        qdrant_writer = QdrantWriter(
-            url=config.qdrant_url,
-            collection_name=config.collection_name,
-        )
-        pg_conn = get_postgres_client()
-        document_store = PostgresDocumentStore(pg_conn)
+        # Initialize resources with ExitStack to ensure cleanup
+        with ExitStack() as stack:
+            embedder = Embedder(tei_url=config.tei_embedding_url)
+            stack.callback(embedder.close)
+            qdrant_writer = QdrantWriter(
+                url=config.qdrant_url,
+                collection_name=config.collection_name,
+            )
+            stack.callback(qdrant_writer.close)
+            pg_conn = get_postgres_client()
+            stack.callback(pg_conn.close)
+            document_store = PostgresDocumentStore(pg_conn)
+            stack.callback(document_store.close)
 
-        try:
             # Load documents from GitHub
             console.print(f"[yellow]Loading documents from {repo}...[/yellow]")
-            docs = github_reader.load_data(repo=repo, limit=limit)
+            docs: list[Document] = github_reader.load_data(repo=repo, limit=limit)
             console.print(f"[green]✓ Loaded {len(docs)} documents[/green]")
 
             # Normalize and chunk
@@ -120,19 +132,31 @@ def ingest_github_command(
                 # Chunk
                 chunk_docs = chunker.chunk_document(normalized_doc)
 
-                # Create deterministic doc_id from content hash to prevent drift
-                content_hash = hashlib.sha256(
-                    normalized_text.encode("utf-8")
-                ).hexdigest()
-                doc_id = uuid5(NAMESPACE_URL, content_hash)
+                # Create deterministic IDs scoped to repo/path to ensure idempotency
+                content_hash = hashlib.sha256(normalized_text.encode("utf-8")).hexdigest()
+                file_path = str(doc.metadata.get("path", ""))
+                branch = str(doc.metadata.get("branch", "main"))
+
+                # Namespace by repo to prevent collisions
+                repo_ns = uuid5(NAMESPACE_URL, f"https://github.com/{repo}")
+                name = (
+                    f"{branch}:{file_path}:{content_hash}"
+                    if file_path
+                    else f"{branch}:{content_hash}"
+                )
+                doc_id = uuid5(repo_ns, name)
 
                 # Construct proper GitHub URL if source_url not available
                 source_url = doc.metadata.get("source_url", "")
                 if not source_url:
-                    file_path = doc.metadata.get("path", "")
-                    branch = doc.metadata.get("branch", "main")
+                    sha = (
+                        doc.metadata.get("sha")
+                        or doc.metadata.get("commit")
+                        or doc.metadata.get("commit_sha")
+                    )
+                    ref = sha or branch
                     if file_path:
-                        source_url = f"https://github.com/{repo}/blob/{branch}/{file_path}"
+                        source_url = f"https://github.com/{repo}/blob/{ref}/{file_path}"
                     else:
                         source_url = f"https://github.com/{repo}"
 
@@ -143,7 +167,7 @@ def ingest_github_command(
                     token_count = max(1, min(len(chunk_doc.text.split()), 512))
 
                     chunk = Chunk(
-                        chunk_id=uuid4(),
+                        chunk_id=uuid5(doc_id, str(chunk_index)),
                         doc_id=doc_id,
                         content=chunk_doc.text,
                         section=None,
@@ -177,6 +201,11 @@ def ingest_github_command(
 
             console.print(f"[green]✓ Created {len(all_chunks)} chunks[/green]")
 
+            # Guard against empty chunks
+            if not all_chunks:
+                console.print("[yellow]No chunks to embed. Nothing to do.[/yellow]")
+                return
+
             # Embed
             console.print("[yellow]Generating embeddings...[/yellow]")
             embeddings = embedder.embed_texts([chunk.content for chunk in all_chunks])
@@ -189,15 +218,6 @@ def ingest_github_command(
 
             console.print("[green]✓ GitHub ingestion complete![/green]")
 
-        finally:
-            # Ensure all resources are closed
-            document_store.close()
-            pg_conn.close()
-
-    except ValueError as e:
-        console.print(f"[red]✗ Validation error: {e}[/red]")
-        raise typer.Exit(code=1) from None
     except Exception:
         logger.exception("GitHub ingestion failed")
-        console.print("[red]✗ GitHub ingestion failed[/red]")
-        raise typer.Exit(code=1) from None
+        _die("[red]✗ GitHub ingestion failed[/red]")

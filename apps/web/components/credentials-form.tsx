@@ -1,5 +1,6 @@
 'use client';
 
+import { validateCallbackUrl } from '@/lib/validate-callback-url';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { sendVerificationEmail, signIn, signUp } from '@taboot/auth';
@@ -27,7 +28,7 @@ import { toast } from 'sonner';
 export function CredentialsForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const callbackUrl = validateCallbackUrl(searchParams.get('callbackUrl'));
 
   const form = useForm<SignInFormValues | SignUpFormValues>({
     resolver: zodResolver(mode === 'sign-up' ? signUpSchema : signInSchema),
@@ -189,6 +190,8 @@ export function CredentialsForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
                     size="icon"
                     className="text-muted-foreground hover:text-muted-foreground absolute right-0 top-1/2 -translate-y-1/2 transform bg-transparent hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    title={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </Button>

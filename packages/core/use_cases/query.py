@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from packages.retrieval.query_engines.qa import QAQueryEngine
+from packages.retrieval.query_engines.qa import QAConfig, QAQueryEngine
 
 
 def execute_query(
@@ -18,7 +18,7 @@ def execute_query(
     rerank_top_n: int = 5,
     source_types: list[str] | None = None,
     after: datetime | None = None,
-    dry_run: bool = False
+    dry_run: bool = False,
 ) -> dict[str, Any] | None:
     """
     Execute natural language query with hybrid retrieval.
@@ -51,22 +51,20 @@ def execute_query(
         return None
 
     # Initialize query engine
-    engine = QAQueryEngine(
+    config = QAConfig(
         qdrant_url=qdrant_url,
         qdrant_collection=qdrant_collection,
         neo4j_uri=neo4j_uri,
         neo4j_username=neo4j_username,
         neo4j_password=neo4j_password,
-        ollama_base_url=ollama_base_url
+        ollama_base_url=ollama_base_url,
     )
+    engine = QAQueryEngine(config=config)
 
     try:
         # Execute query
         result = engine.query(
-            question=query,
-            top_k=top_k,
-            rerank_top_n=rerank_top_n,
-            source_types=source_types
+            question=query, top_k=top_k, rerank_top_n=rerank_top_n, source_types=source_types
         )
 
         return result

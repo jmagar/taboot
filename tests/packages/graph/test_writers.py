@@ -8,7 +8,7 @@ from packages.graph.writers import BatchedGraphWriter
 
 
 @pytest.fixture
-def mock_neo4j_client():
+def mock_neo4j_client() -> None:
     """Mock Neo4j client."""
     client = Mock()
     client.execute_query = AsyncMock(return_value=[{"created_count": 100}])
@@ -19,7 +19,7 @@ class TestBatchedGraphWriter:
     """Test batched UNWIND operations."""
 
     @pytest.mark.asyncio
-    async def test_batch_write_nodes(self, mock_neo4j_client):
+    async def test_batch_write_nodes(self, mock_neo4j_client) -> None:
         """Test batched node writing."""
         writer = BatchedGraphWriter(mock_neo4j_client, batch_size=2000)
 
@@ -36,7 +36,7 @@ class TestBatchedGraphWriter:
         assert mock_neo4j_client.execute_query.call_count == 3
 
     @pytest.mark.asyncio
-    async def test_batch_write_relationships(self, mock_neo4j_client):
+    async def test_batch_write_relationships(self, mock_neo4j_client) -> None:
         """Test batched relationship writing."""
         writer = BatchedGraphWriter(mock_neo4j_client, batch_size=2000)
 

@@ -5,10 +5,7 @@ from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
 
 
 def create_graph_index(
-    neo4j_uri: str,
-    username: str,
-    password: str,
-    database: str = "neo4j"
+    neo4j_uri: str, username: str, password: str, database: str = "neo4j"
 ) -> PropertyGraphIndex:
     """
     Create PropertyGraphIndex backed by Neo4j.
@@ -24,15 +21,10 @@ def create_graph_index(
     """
     # Create Neo4j graph store
     graph_store = Neo4jPropertyGraphStore(
-        url=neo4j_uri,
-        username=username,
-        password=password,
-        database=database
+        url=neo4j_uri, username=username, password=password, database=database
     )
 
     # Create property graph index
-    index = PropertyGraphIndex.from_existing(
-        property_graph_store=graph_store
-    )
+    index = PropertyGraphIndex.from_existing(property_graph_store=graph_store)
 
     return index

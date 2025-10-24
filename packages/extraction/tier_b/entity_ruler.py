@@ -31,13 +31,12 @@ class SpacyEntityRuler:
                 r"elasticsearch|kafka|rabbitmq|docker|kubernetes|"
                 r"api[\-\s]?service|database|cache|queue|storage|"
                 r"\w+\-service)\b",
-                re.IGNORECASE
+                re.IGNORECASE,
             ),
             "IP": re.compile(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"),
             "PORT": re.compile(r"\b(?:port\s+)?(\d{2,5})\b|\:(\d{2,5})\b", re.IGNORECASE),
             "HOST": re.compile(
-                r"\b(server\d+|host\d+|\w+\.example\.com|\w+\-host)\b",
-                re.IGNORECASE
+                r"\b(server\d+|host\d+|\w+\.example\.com|\w+\-host)\b", re.IGNORECASE
             ),
         }
 
@@ -64,19 +63,23 @@ class SpacyEntityRuler:
                     if port_text:
                         # Find the actual position of the port number
                         port_start = match.start() if match.group(1) else match.start() + 1
-                        entities.append({
-                            "label": label,
-                            "text": port_text,
-                            "start": port_start,
-                            "end": port_start + len(port_text),
-                        })
+                        entities.append(
+                            {
+                                "label": label,
+                                "text": port_text,
+                                "start": port_start,
+                                "end": port_start + len(port_text),
+                            }
+                        )
                 else:
-                    entities.append({
-                        "label": label,
-                        "text": match.group(),
-                        "start": match.start(),
-                        "end": match.end(),
-                    })
+                    entities.append(
+                        {
+                            "label": label,
+                            "text": match.group(),
+                            "start": match.start(),
+                            "end": match.end(),
+                        }
+                    )
 
         # Deduplicate and sort by position
         seen_positions = set()

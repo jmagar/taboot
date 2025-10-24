@@ -13,7 +13,7 @@ client = TestClient(app)
 
 
 @pytest.mark.unit
-def test_documents_endpoint_exists():
+def test_documents_endpoint_exists() -> None:
     """Test GET /documents endpoint exists.
 
     RED phase: Will fail until route exists.
@@ -24,7 +24,7 @@ def test_documents_endpoint_exists():
 
 
 @pytest.mark.unit
-def test_documents_endpoint_accepts_limit():
+def test_documents_endpoint_accepts_limit() -> None:
     """Test documents endpoint accepts limit query parameter.
 
     RED phase: Will fail until route exists.
@@ -35,7 +35,7 @@ def test_documents_endpoint_accepts_limit():
 
 
 @pytest.mark.unit
-def test_documents_endpoint_accepts_offset():
+def test_documents_endpoint_accepts_offset() -> None:
     """Test documents endpoint accepts offset query parameter.
 
     RED phase: Will fail until route exists.
@@ -46,7 +46,7 @@ def test_documents_endpoint_accepts_offset():
 
 
 @pytest.mark.unit
-def test_documents_endpoint_accepts_source_type_filter():
+def test_documents_endpoint_accepts_source_type_filter() -> None:
     """Test documents endpoint accepts source_type filter.
 
     RED phase: Will fail until route exists.
@@ -57,7 +57,7 @@ def test_documents_endpoint_accepts_source_type_filter():
 
 
 @pytest.mark.unit
-def test_documents_endpoint_accepts_extraction_state_filter():
+def test_documents_endpoint_accepts_extraction_state_filter() -> None:
     """Test documents endpoint accepts extraction_state filter.
 
     RED phase: Will fail until route exists.
@@ -68,7 +68,7 @@ def test_documents_endpoint_accepts_extraction_state_filter():
 
 
 @pytest.mark.unit
-def test_documents_endpoint_accepts_combined_filters():
+def test_documents_endpoint_accepts_combined_filters() -> None:
     """Test documents endpoint accepts multiple filters.
 
     RED phase: Will fail until route exists.
@@ -81,7 +81,7 @@ def test_documents_endpoint_accepts_combined_filters():
 
 
 @pytest.mark.unit
-def test_documents_endpoint_validates_invalid_source_type():
+def test_documents_endpoint_validates_invalid_source_type() -> None:
     """Test documents endpoint rejects invalid source_type.
 
     RED phase: Will fail until route exists.
@@ -92,7 +92,7 @@ def test_documents_endpoint_validates_invalid_source_type():
 
 
 @pytest.mark.unit
-def test_documents_endpoint_validates_invalid_extraction_state():
+def test_documents_endpoint_validates_invalid_extraction_state() -> None:
     """Test documents endpoint rejects invalid extraction_state.
 
     RED phase: Will fail until route exists.
@@ -103,7 +103,7 @@ def test_documents_endpoint_validates_invalid_extraction_state():
 
 
 @pytest.mark.unit
-def test_documents_endpoint_validates_negative_limit():
+def test_documents_endpoint_validates_negative_limit() -> None:
     """Test documents endpoint rejects negative limit.
 
     RED phase: Will fail until route exists.
@@ -114,7 +114,7 @@ def test_documents_endpoint_validates_negative_limit():
 
 
 @pytest.mark.unit
-def test_documents_endpoint_validates_negative_offset():
+def test_documents_endpoint_validates_negative_offset() -> None:
     """Test documents endpoint rejects negative offset.
 
     RED phase: Will fail until route exists.
@@ -125,7 +125,7 @@ def test_documents_endpoint_validates_negative_offset():
 
 
 @pytest.mark.unit
-def test_documents_endpoint_returns_expected_structure():
+def test_documents_endpoint_returns_expected_structure() -> None:
     """Test documents endpoint returns expected response structure.
 
     RED phase: Will fail until route exists.
@@ -147,7 +147,7 @@ def test_documents_endpoint_returns_expected_structure():
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_documents_endpoint_with_real_db():
+def test_documents_endpoint_with_real_db() -> None:
     """Test documents endpoint against real database.
 
     Requires PostgreSQL service running.

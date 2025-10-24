@@ -4,7 +4,7 @@ import pytest
 
 
 @pytest.mark.unit
-def test_query_endpoint_validates_request(client):
+def test_query_endpoint_validates_request(client) -> None:
     """Test query endpoint validates request body."""
     # Empty question should fail
     response = client.post("/query", json={"question": ""})
@@ -16,15 +16,15 @@ def test_query_endpoint_validates_request(client):
 
 
 @pytest.mark.unit
-def test_query_endpoint_accepts_valid_request(client):
+def test_query_endpoint_accepts_valid_request(client) -> None:
     """Test query endpoint accepts valid request."""
     response = client.post(
         "/query",
         json={
             "question": "Which services expose port 8080?",
             "top_k": 10,
-            "source_types": ["web", "docker_compose"]
-        }
+            "source_types": ["web", "docker_compose"],
+        },
     )
 
     # May fail if services not running, but should accept request
@@ -33,12 +33,9 @@ def test_query_endpoint_accepts_valid_request(client):
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_query_endpoint_with_real_services(client, qdrant_client, neo4j_client):
+def test_query_endpoint_with_real_services(client, qdrant_client, neo4j_client) -> None:
     """Test query endpoint against real services."""
-    response = client.post(
-        "/query",
-        json={"question": "test question", "top_k": 5}
-    )
+    response = client.post("/query", json={"question": "test question", "top_k": 5})
 
     # Should succeed or fail gracefully
     assert response.status_code in [200, 500]

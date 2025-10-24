@@ -9,7 +9,7 @@ from packages.extraction.tier_c.schema import ExtractionResult, Triple
 class TestTriple:
     """Test triple validation schema."""
 
-    def test_valid_triple(self):
+    def test_valid_triple(self) -> None:
         """Test valid triple."""
         triple = Triple(
             subject="api-service",
@@ -23,7 +23,7 @@ class TestTriple:
         assert triple.object == "postgres"
         assert triple.confidence == 0.95
 
-    def test_subject_required(self):
+    def test_subject_required(self) -> None:
         """Test subject is required."""
         with pytest.raises(ValidationError) as exc_info:
             Triple(predicate="DEPENDS_ON", object="postgres", confidence=0.9)
@@ -31,7 +31,7 @@ class TestTriple:
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("subject",) for e in errors)
 
-    def test_predicate_required(self):
+    def test_predicate_required(self) -> None:
         """Test predicate is required."""
         with pytest.raises(ValidationError) as exc_info:
             Triple(subject="api", object="db", confidence=0.9)
@@ -39,7 +39,7 @@ class TestTriple:
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("predicate",) for e in errors)
 
-    def test_object_required(self):
+    def test_object_required(self) -> None:
         """Test object is required."""
         with pytest.raises(ValidationError) as exc_info:
             Triple(subject="api", predicate="DEPENDS_ON", confidence=0.9)
@@ -47,7 +47,7 @@ class TestTriple:
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("object",) for e in errors)
 
-    def test_confidence_between_0_and_1(self):
+    def test_confidence_between_0_and_1(self) -> None:
         """Test confidence must be between 0 and 1."""
         with pytest.raises(ValidationError):
             Triple(subject="api", predicate="DEPENDS_ON", object="db", confidence=1.5)
@@ -59,7 +59,7 @@ class TestTriple:
 class TestExtractionResult:
     """Test extraction result schema."""
 
-    def test_valid_extraction_result(self):
+    def test_valid_extraction_result(self) -> None:
         """Test valid extraction result."""
         result = ExtractionResult(
             triples=[
@@ -71,12 +71,12 @@ class TestExtractionResult:
         assert len(result.triples) == 2
         assert result.triples[0].subject == "api"
 
-    def test_empty_triples_allowed(self):
+    def test_empty_triples_allowed(self) -> None:
         """Test empty triples list is allowed."""
         result = ExtractionResult(triples=[])
         assert result.triples == []
 
-    def test_triples_is_list(self):
+    def test_triples_is_list(self) -> None:
         """Test triples must be a list."""
         with pytest.raises(ValidationError):
             ExtractionResult(triples="not a list")

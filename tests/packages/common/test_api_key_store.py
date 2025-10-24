@@ -11,7 +11,7 @@ from packages.schemas.api_key import ApiKey
 
 
 @pytest.fixture
-async def redis_client():
+async def redis_client() -> None:
     """Create Redis client for testing."""
     client = await redis.from_url("redis://localhost:6379", decode_responses=True)
     yield client
@@ -20,13 +20,13 @@ async def redis_client():
 
 
 @pytest.fixture
-def api_key_store(redis_client):
+def api_key_store(redis_client) -> None:
     """Create ApiKeyStore instance."""
     return ApiKeyStore(redis_client)
 
 
 @pytest.mark.asyncio
-async def test_store_and_validate_api_key(api_key_store):
+async def test_store_and_validate_api_key(api_key_store) -> None:
     """Test storing and validating API key."""
     # Create API key
     raw_key = "sk_test_abc123def456"
@@ -55,7 +55,7 @@ async def test_store_and_validate_api_key(api_key_store):
 
 
 @pytest.mark.asyncio
-async def test_inactive_key_fails_validation(api_key_store):
+async def test_inactive_key_fails_validation(api_key_store) -> None:
     """Test that inactive keys fail validation."""
     raw_key = "sk_test_inactive"
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()

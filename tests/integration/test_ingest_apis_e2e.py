@@ -130,9 +130,7 @@ class TestYoutubeIngestionE2E:
         )
 
         # Load transcript (using a short video for speed)
-        docs = youtube_reader.load_data(
-            video_urls=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
-        )
+        docs = youtube_reader.load_data(video_urls=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"])
         assert len(docs) >= 1
 
         # Process through pipeline

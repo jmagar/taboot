@@ -6,7 +6,7 @@ from packages.retrieval.context.settings import RetrievalSettings
 
 
 @pytest.mark.unit
-def test_retrieval_settings_loads_tei_config():
+def test_retrieval_settings_loads_tei_config() -> None:
     """Test that retrieval settings loads TEI embedding configuration."""
     settings = RetrievalSettings()
 
@@ -16,7 +16,7 @@ def test_retrieval_settings_loads_tei_config():
 
 
 @pytest.mark.unit
-def test_retrieval_settings_loads_ollama_config():
+def test_retrieval_settings_loads_ollama_config() -> None:
     """Test that retrieval settings loads Ollama LLM configuration."""
     settings = RetrievalSettings()
 
@@ -26,7 +26,7 @@ def test_retrieval_settings_loads_ollama_config():
 
 
 @pytest.mark.unit
-def test_retrieval_settings_loads_search_params():
+def test_retrieval_settings_loads_search_params() -> None:
     """Test that retrieval settings loads vector search parameters."""
     settings = RetrievalSettings()
 
@@ -37,7 +37,7 @@ def test_retrieval_settings_loads_search_params():
 
 
 @pytest.mark.unit
-def test_retrieval_settings_loads_graph_params():
+def test_retrieval_settings_loads_graph_params() -> None:
     """Test that retrieval settings loads graph traversal parameters."""
     settings = RetrievalSettings()
 

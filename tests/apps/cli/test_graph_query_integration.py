@@ -13,7 +13,7 @@ runner = CliRunner()
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_graph_query_with_real_neo4j(docker_services_ready):
+def test_graph_query_with_real_neo4j(docker_services_ready) -> None:
     """Test graph query command against real Neo4j instance.
 
     Requires: docker compose up -d (Neo4j service running)
@@ -38,7 +38,7 @@ def test_graph_query_with_real_neo4j(docker_services_ready):
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_graph_query_node_count_with_real_neo4j(docker_services_ready):
+def test_graph_query_node_count_with_real_neo4j(docker_services_ready) -> None:
     """Test counting nodes in Neo4j graph."""
     result = runner.invoke(app, ["graph", "query", "MATCH (n) RETURN count(n) as total"])
 
@@ -50,12 +50,13 @@ def test_graph_query_node_count_with_real_neo4j(docker_services_ready):
 
     # Should show numeric result
     import re
-    assert re.search(r'\d+', result.stdout), "Should contain numeric count"
+
+    assert re.search(r"\d+", result.stdout), "Should contain numeric count"
 
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_graph_query_json_format_with_real_neo4j(docker_services_ready):
+def test_graph_query_json_format_with_real_neo4j(docker_services_ready) -> None:
     """Test graph query with JSON output format."""
     result = runner.invoke(app, ["graph", "query", "RETURN 42 as answer", "--format", "json"])
 
@@ -69,7 +70,7 @@ def test_graph_query_json_format_with_real_neo4j(docker_services_ready):
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_graph_query_invalid_cypher_with_real_neo4j(docker_services_ready):
+def test_graph_query_invalid_cypher_with_real_neo4j(docker_services_ready) -> None:
     """Test graph query with invalid Cypher syntax."""
     result = runner.invoke(app, ["graph", "query", "INVALID CYPHER SYNTAX HERE"])
 
@@ -82,7 +83,7 @@ def test_graph_query_invalid_cypher_with_real_neo4j(docker_services_ready):
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_graph_query_empty_result_with_real_neo4j(docker_services_ready):
+def test_graph_query_empty_result_with_real_neo4j(docker_services_ready) -> None:
     """Test graph query that returns no results."""
     result = runner.invoke(app, ["graph", "query", "MATCH (n:NonExistentLabel) RETURN n"])
 
@@ -93,11 +94,10 @@ def test_graph_query_empty_result_with_real_neo4j(docker_services_ready):
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_graph_query_multiple_columns_with_real_neo4j(docker_services_ready):
+def test_graph_query_multiple_columns_with_real_neo4j(docker_services_ready) -> None:
     """Test graph query returning multiple columns."""
     result = runner.invoke(
-        app,
-        ["graph", "query", "RETURN 'test' as name, 123 as count, true as active"]
+        app, ["graph", "query", "RETURN 'test' as name, 123 as count, true as active"]
     )
 
     # Should succeed
@@ -115,15 +115,12 @@ def test_graph_query_multiple_columns_with_real_neo4j(docker_services_ready):
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_graph_query_with_parameters_simulation(docker_services_ready):
+def test_graph_query_with_parameters_simulation(docker_services_ready) -> None:
     """Test graph query with inline values (parameter simulation).
 
     Note: CLI doesn't support parameterized queries yet, but tests inline values.
     """
-    result = runner.invoke(
-        app,
-        ["graph", "query", "RETURN 'Service' as type, 'example' as name"]
-    )
+    result = runner.invoke(app, ["graph", "query", "RETURN 'Service' as type, 'example' as name"])
 
     # Should succeed
     assert result.exit_code == 0

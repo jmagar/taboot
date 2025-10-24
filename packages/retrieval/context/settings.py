@@ -12,29 +12,29 @@ class RetrievalSettings(BaseSettings):
     # TEI Embeddings
     tei_embedding_url: str = Field(
         default=os.getenv("TEI_EMBEDDING_URL", "http://taboot-embed:80"),
-        description="Text Embeddings Inference API URL"
+        description="Text Embeddings Inference API URL",
     )
     embedding_dimension: int = Field(
         default=1024,
-        description="Embedding vector dimension (Qwen3-Embedding-0.6B)"
+        description="Embedding vector dimension (Qwen3-Embedding-0.6B)",
     )
     embedding_model_name: str = Field(
         default="Qwen/Qwen3-Embedding-0.6B",
-        description="Embedding model identifier"
+        description="Embedding model identifier",
     )
 
     # Ollama LLM
     ollama_base_url: str = Field(
         default=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-        description="Ollama API base URL"
+        description="Ollama API base URL",
     )
     llm_model_name: str = Field(
         default="qwen3:4b",
-        description="LLM model for answer synthesis"
+        description="LLM model for answer synthesis",
     )
     llm_temperature: float = Field(
         default=0.0,
-        description="Temperature for deterministic synthesis"
+        description="Temperature for deterministic synthesis",
     )
 
     # Vector Search
@@ -42,13 +42,13 @@ class RetrievalSettings(BaseSettings):
         default=20,
         ge=5,
         le=50,
-        description="Number of candidates from vector search"
+        description="Number of candidates from vector search",
     )
     rerank_top_n: int = Field(
         default=5,
         ge=3,
         le=20,
-        description="Number of chunks after reranking"
+        description="Number of chunks after reranking",
     )
 
     # Graph Traversal
@@ -56,15 +56,15 @@ class RetrievalSettings(BaseSettings):
         default=2,
         ge=1,
         le=3,
-        description="Maximum hops for graph traversal"
+        description="Maximum hops for graph traversal",
     )
     relationship_priority: list[str] = Field(
         default=["DEPENDS_ON", "ROUTES_TO", "BINDS", "EXPOSES_ENDPOINT", "MENTIONS"],
-        description="Priority order for relationship types in graph traversal"
+        description="Priority order for relationship types in graph traversal",
     )
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"  # Ignore extra env vars not defined in model
+        extra="ignore",  # Ignore extra env vars not defined in model
     )

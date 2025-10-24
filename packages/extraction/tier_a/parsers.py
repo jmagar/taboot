@@ -6,16 +6,17 @@ from typing import Any
 
 import yaml
 
+from packages.extraction.types import CodeBlock, Table
 
-def parse_code_blocks(content: str) -> list[dict[str, str]]:
+
+def parse_code_blocks(content: str) -> list[CodeBlock]:
     """Extract fenced code blocks from markdown content.
 
     Args:
         content: Markdown text content.
 
     Returns:
-        list[dict[str, str]]: List of code blocks with language and code.
-            Each dict has keys: "language" and "code".
+        list[CodeBlock]: List of code blocks with language and code.
     """
     if not content:
         return []
@@ -23,23 +24,22 @@ def parse_code_blocks(content: str) -> list[dict[str, str]]:
     pattern = r"```(\w*)\n(.*?)```"
     matches = re.findall(pattern, content, re.DOTALL)
 
-    return [{"language": lang, "code": code.strip()} for lang, code in matches]
+    return [CodeBlock(language=lang, code=code.strip()) for lang, code in matches]
 
 
-def parse_tables(content: str) -> list[dict[str, Any]]:
+def parse_tables(content: str) -> list[Table]:
     """Extract markdown tables from content.
 
     Args:
         content: Markdown text content.
 
     Returns:
-        list[dict[str, Any]]: List of tables with headers and rows.
-            Each dict has keys: "headers" (list[str]) and "rows" (list[list[str]]).
+        list[Table]: List of tables with headers and rows.
     """
     if not content:
         return []
 
-    tables: list[dict[str, Any]] = []
+    tables: list[Table] = []
     lines = content.split("\n")
 
     i = 0
@@ -67,7 +67,7 @@ def parse_tables(content: str) -> list[dict[str, Any]]:
                         else:
                             break
 
-                    tables.append({"headers": headers, "rows": rows})
+                    tables.append(Table(headers=headers, rows=rows))
                     i = j
                     continue
 
@@ -91,9 +91,17 @@ def parse_yaml_json(content: str, format_type: str) -> dict[str, Any] | list[Any
 
     try:
         if format_type == "yaml":
-            return yaml.safe_load(content)
+            result = yaml.safe_load(content)
+            # yaml.safe_load can return various types; validate return type
+            if isinstance(result, (dict, list)):
+                return result
+            return None
         elif format_type == "json":
-            return json.loads(content)
+            result = json.loads(content)
+            # json.loads can return various types; validate return type
+            if isinstance(result, (dict, list)):
+                return result
+            return None
         else:
             raise ValueError(f"Unknown format_type: {format_type}")
     except (yaml.YAMLError, json.JSONDecodeError, ValueError):

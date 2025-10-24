@@ -6,7 +6,7 @@ Implements document persistence and querying for extraction pipeline.
 from datetime import UTC, datetime
 from uuid import UUID
 
-from psycopg2.extensions import connection as PGConnection
+from psycopg2.extensions import connection
 from psycopg2.extras import Json, RealDictCursor
 
 from packages.common.logging import get_logger
@@ -22,13 +22,13 @@ class PostgresDocumentStore:
     Handles Document CRUD operations and content storage.
     """
 
-    def __init__(self, connection: PGConnection) -> None:
+    def __init__(self, conn: connection) -> None:
         """Initialize with PostgreSQL connection.
 
         Args:
-            connection: psycopg2 PGConnection object.
+            conn: psycopg2 connection object.
         """
-        self.conn = connection
+        self.conn = conn
         logger.info("Initialized PostgresDocumentStore")
 
     def create(self, document: Document, content: str) -> None:
@@ -116,6 +116,44 @@ class PostgresDocumentStore:
         logger.info(f"Found {len(documents)} pending documents")
         return documents
 
+    def query_by_date(self, since_date: datetime) -> list[Document]:
+        """Query documents modified since specified date.
+
+        Args:
+            since_date: Return documents updated after this datetime.
+
+        Returns:
+            list[Document]: Documents modified since the specified date.
+        """
+        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT * FROM documents
+                WHERE updated_at >= %s
+                ORDER BY updated_at DESC
+            """,
+                (since_date,),
+            )
+            rows = cur.fetchall()
+
+        documents = []
+        for row in rows:
+            doc = Document(
+                doc_id=UUID(row["doc_id"]),
+                source_url=row["source_url"],
+                source_type=SourceType(row["source_type"]),
+                content_hash=row["content_hash"],
+                ingested_at=row["ingested_at"],
+                extraction_state=ExtractionState(row["extraction_state"]),
+                extraction_version=row["extraction_version"],
+                updated_at=row["updated_at"],
+                metadata=row["metadata"],
+            )
+            documents.append(doc)
+
+        logger.info(f"Found {len(documents)} documents since {since_date}")
+        return documents
+
     def get_content(self, doc_id: UUID) -> str:
         """Get full document content by doc_id.
 
@@ -129,15 +167,14 @@ class PostgresDocumentStore:
             KeyError: If document not found.
         """
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                "SELECT content FROM document_content WHERE doc_id = %s", (str(doc_id),)
-            )
+            cur.execute("SELECT content FROM document_content WHERE doc_id = %s", (str(doc_id),))
             row = cur.fetchone()
 
         if row is None:
             raise KeyError(f"Document content not found for {doc_id}")
 
-        return row["content"]
+        content: str = row["content"]
+        return content
 
     def update_document(self, document: Document) -> None:
         """Update document metadata.

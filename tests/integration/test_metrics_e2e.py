@@ -16,8 +16,13 @@ Markers:
 - @pytest.mark.slow: End-to-end tests take longer to run
 """
 
+from typing import TYPE_CHECKING
+
 import pytest
 from redis import asyncio as redis
+
+if TYPE_CHECKING:
+    from redis.asyncio import Redis
 
 from packages.common.config import get_config
 from packages.common.health import check_system_health
@@ -30,9 +35,7 @@ class TestMetricsCollectionEndToEnd:
     """End-to-end tests for metrics collection and persistence."""
 
     @pytest.mark.asyncio
-    async def test_record_window_processing_metrics(
-        self, docker_services_ready: None
-    ) -> None:
+    async def test_record_window_processing_metrics(self, docker_services_ready: None) -> None:
         """Test recording window processing events to Redis.
 
         Acceptance Scenario 1: Given an extraction workflow processes windows
@@ -40,7 +43,7 @@ class TestMetricsCollectionEndToEnd:
         for each tier are incremented correctly.
         """
         config = get_config()
-        redis_client: redis.Redis[bytes] = await redis.from_url(config.redis_url)
+        redis_client: Redis[bytes] = await redis.from_url(config.redis_url)
 
         try:
             # Clear any existing metrics
@@ -88,7 +91,7 @@ class TestMetricsCollectionEndToEnd:
         hits and misses occur, Then Redis counters track hit/miss ratios correctly.
         """
         config = get_config()
-        redis_client: redis.Redis[bytes] = await redis.from_url(config.redis_url)
+        redis_client: Redis[bytes] = await redis.from_url(config.redis_url)
 
         try:
             # Clear any existing metrics
@@ -133,7 +136,7 @@ class TestMetricsCollectionEndToEnd:
         When write operations complete, Then Redis counters track total writes.
         """
         config = get_config()
-        redis_client: redis.Redis[bytes] = await redis.from_url(config.redis_url)
+        redis_client: Redis[bytes] = await redis.from_url(config.redis_url)
 
         try:
             # Clear any existing metrics
@@ -165,16 +168,14 @@ class TestMetricsCollectionEndToEnd:
             await redis_client.close()
 
     @pytest.mark.asyncio
-    async def test_get_status_use_case_returns_metrics(
-        self, docker_services_ready: None
-    ) -> None:
+    async def test_get_status_use_case_returns_metrics(self, docker_services_ready: None) -> None:
         """Test that GetStatusUseCase returns correct metrics from Redis.
 
         Acceptance Scenario 4: Given metrics are recorded in Redis, When GetStatusUseCase
         executes, Then it returns a SystemStatus with correct metrics snapshot.
         """
         config = get_config()
-        redis_client: redis.Redis[bytes] = await redis.from_url(config.redis_url)
+        redis_client: Redis[bytes] = await redis.from_url(config.redis_url)
 
         try:
             # Setup: Record known metrics values
@@ -221,7 +222,7 @@ class TestMetricsCollectionEndToEnd:
         When GetStatusUseCase queries queue depths, Then it returns correct counts.
         """
         config = get_config()
-        redis_client: redis.Redis[bytes] = await redis.from_url(config.redis_url)
+        redis_client: Redis[bytes] = await redis.from_url(config.redis_url)
 
         try:
             # Clear queues
@@ -247,9 +248,7 @@ class TestMetricsCollectionEndToEnd:
             # Verify queue depths
             assert status.queue_depth is not None, "Expected queue depth in status"
             assert status.queue_depth.ingestion == 5, "Expected 5 items in ingestion queue"
-            assert (
-                status.queue_depth.extraction == 12
-            ), "Expected 12 items in extraction queue"
+            assert status.queue_depth.extraction == 12, "Expected 12 items in extraction queue"
 
         finally:
             # Cleanup: Clear test queues
@@ -276,7 +275,7 @@ class TestStatusAPIEndpoint:
         config = get_config()
 
         # Setup: Record known metrics values in Redis
-        redis_client: redis.Redis[bytes] = await redis.from_url(config.redis_url)
+        redis_client: Redis[bytes] = await redis.from_url(config.redis_url)
 
         try:
             await redis_client.set("metrics:documents_ingested", 200)
@@ -314,9 +313,7 @@ class TestStatusAPIEndpoint:
                     "playwright",
                 ]
                 for service_name in expected_services:
-                    assert (
-                        service_name in data["services"]
-                    ), f"Expected {service_name} in services"
+                    assert service_name in data["services"], f"Expected {service_name} in services"
                     service = data["services"][service_name]
                     assert "healthy" in service, f"Expected 'healthy' field for {service_name}"
 
@@ -325,16 +322,16 @@ class TestStatusAPIEndpoint:
                 assert "extraction" in data["queue_depth"], "Expected 'extraction' in queue_depth"
 
                 # Verify metrics structure
-                assert (
-                    "documents_ingested" in data["metrics"]
-                ), "Expected 'documents_ingested' in metrics"
+                assert "documents_ingested" in data["metrics"], (
+                    "Expected 'documents_ingested' in metrics"
+                )
                 assert "chunks_indexed" in data["metrics"], "Expected 'chunks_indexed' in metrics"
-                assert (
-                    "extraction_jobs_completed" in data["metrics"]
-                ), "Expected 'extraction_jobs_completed' in metrics"
-                assert (
-                    "graph_nodes_created" in data["metrics"]
-                ), "Expected 'graph_nodes_created' in metrics"
+                assert "extraction_jobs_completed" in data["metrics"], (
+                    "Expected 'extraction_jobs_completed' in metrics"
+                )
+                assert "graph_nodes_created" in data["metrics"], (
+                    "Expected 'graph_nodes_created' in metrics"
+                )
 
             except httpx.ConnectError:
                 # API not running - skip test
@@ -365,9 +362,7 @@ class TestStatusAPIEndpoint:
                 response = await client.get(api_url, timeout=10.0)
 
             # Even if some services are down, the endpoint should still respond
-            assert (
-                response.status_code == 200
-            ), "Expected 200 OK even with unhealthy services"
+            assert response.status_code == 200, "Expected 200 OK even with unhealthy services"
 
             data = response.json()
 
@@ -394,16 +389,14 @@ class TestStatusCLICommand:
     """End-to-end tests for CLI status command."""
 
     @pytest.mark.asyncio
-    async def test_cli_status_command_displays_metrics(
-        self, docker_services_ready: None
-    ) -> None:
+    async def test_cli_status_command_displays_metrics(self, docker_services_ready: None) -> None:
         """Test that `taboot extract status` CLI command displays metrics.
 
         Acceptance Scenario 8: Given metrics exist in Redis, When the CLI status command
         runs, Then it displays service health, queue depths, and metrics in formatted tables.
         """
         config = get_config()
-        redis_client: redis.Redis[bytes] = await redis.from_url(config.redis_url)
+        redis_client: Redis[bytes] = await redis.from_url(config.redis_url)
 
         try:
             # Setup: Record known metrics
@@ -445,17 +438,13 @@ class TestStatusCLICommand:
             assert "Service Health" in output or "Services" in output, (
                 "Expected 'Service Health' section"
             )
-            assert "Queue Depth" in output or "Queues" in output, (
-                "Expected 'Queue Depth' section"
-            )
+            assert "Queue Depth" in output or "Queues" in output, "Expected 'Queue Depth' section"
             assert "Metrics" in output, "Expected 'Metrics' section"
 
             # Verify service names appear
             expected_services = ["neo4j", "qdrant", "redis", "tei", "ollama", "firecrawl"]
             for service in expected_services:
-                assert service.lower() in output.lower(), (
-                    f"Expected service '{service}' in output"
-                )
+                assert service.lower() in output.lower(), f"Expected service '{service}' in output"
 
             # Verify queue depths appear (5 and 12)
             assert "5" in output, "Expected ingestion queue depth 5 in output"
@@ -486,7 +475,7 @@ class TestStatusCLICommand:
         Then it displays zero queue depths without errors.
         """
         config = get_config()
-        redis_client: redis.Redis[bytes] = await redis.from_url(config.redis_url)
+        redis_client: Redis[bytes] = await redis.from_url(config.redis_url)
 
         try:
             # Clear queues
@@ -538,7 +527,7 @@ class TestMetricsEndToEndWorkflow:
         and available through both API and CLI.
         """
         config = get_config()
-        redis_client: redis.Redis[bytes] = await redis.from_url(config.redis_url)
+        redis_client: Redis[bytes] = await redis.from_url(config.redis_url)
 
         try:
             # Step 1: Clear all metrics

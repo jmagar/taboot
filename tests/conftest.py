@@ -38,6 +38,7 @@ def setup_test_env():
     # Load .env file first if present (for integration tests)
     try:
         from dotenv import load_dotenv
+
         load_dotenv()
     except ImportError:
         pass
@@ -202,6 +203,7 @@ def document_factory() -> Any:
     Example:
         >>> doc = document_factory(source_type=SourceType.GITHUB)
     """
+
     def _create_document(**kwargs: Any) -> Document:
         """Create a Document with custom parameters.
 
@@ -236,6 +238,7 @@ def service_factory() -> Any:
     Example:
         >>> svc = service_factory(name="custom-service", version="2.0.0")
     """
+
     def _create_service(**kwargs: Any) -> Service:
         """Create a Service with custom parameters.
 
@@ -319,16 +322,14 @@ def docker_services_ready() -> None:
         try:
             # Environment should already be loaded by setup_test_env fixture
             neo4j_password = os.getenv("NEO4J_PASSWORD", "changeme")
-            driver = GraphDatabase.driver(
-                "bolt://localhost:7687",
-                auth=("neo4j", neo4j_password)
-            )
+            driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", neo4j_password))
             driver.verify_connectivity()
             driver.close()
             return True
         except Exception as e:
             # Print error for debugging
             import sys
+
             print(f"\nNeo4j connection failed: {e}", file=sys.stderr)
             return False
 

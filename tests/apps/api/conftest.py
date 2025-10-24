@@ -1,8 +1,12 @@
 """Fixtures for API tests."""
 
+from __future__ import annotations
+
 import hashlib
 import os
+from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 import redis.asyncio as redis
@@ -13,7 +17,7 @@ from packages.schemas.api_key import ApiKey
 
 
 @pytest.fixture(scope="session", autouse=True)
-def set_test_env():
+def set_test_env() -> Iterator[None]:
     """Set environment variables before TestClient is created."""
     # Ensure config can load without validation errors
     os.environ["RERANKER_BATCH_SIZE"] = "16"
@@ -27,7 +31,7 @@ def set_test_env():
 
 
 @pytest.fixture(scope="module")
-def client():
+def client() -> Iterator[TestClient]:
     """Create FastAPI TestClient for API tests.
 
     Creates a test client after environment variables are set.
@@ -40,7 +44,7 @@ def client():
 
 
 @pytest.fixture
-async def redis_client():
+async def redis_client() -> AsyncIterator[redis.Redis[Any]]:
     """Create Redis client for testing."""
     client = await redis.from_url("redis://localhost:6379", decode_responses=True)
     yield client
@@ -49,7 +53,7 @@ async def redis_client():
 
 
 @pytest.fixture
-async def valid_api_key(redis_client):
+async def valid_api_key(redis_client: redis.Redis[Any]) -> str:
     """Create and store valid API key."""
     raw_key = "sk_test_integration"
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()

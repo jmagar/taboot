@@ -1,3 +1,10 @@
-"""Taboot MCP Server package."""
+"""Taboot MCP Server - Model Context Protocol integration."""
 
-__version__ = "0.4.0"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("taboot-mcp")
+except PackageNotFoundError:
+    __version__ = "0.0.0"  # Fallback for development
+
+__all__ = ["__version__"]

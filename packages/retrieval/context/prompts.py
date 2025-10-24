@@ -1,7 +1,6 @@
 """Custom prompts for retrieval with inline citation formatting."""
 
 
-
 def get_qa_prompt_template() -> str:
     """
     Get QA prompt template for answer synthesis with inline citations.

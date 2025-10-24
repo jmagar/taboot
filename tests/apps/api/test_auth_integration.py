@@ -3,7 +3,7 @@
 import pytest
 
 
-def test_ingest_requires_auth(client):
+def test_ingest_requires_auth(client) -> None:
     """Test POST /ingest requires API key."""
     response = client.post(
         "/ingest/",
@@ -18,7 +18,7 @@ def test_ingest_requires_auth(client):
 
 
 @pytest.mark.asyncio
-async def test_ingest_with_valid_key(client, valid_api_key):
+async def test_ingest_with_valid_key(client, valid_api_key) -> None:
     """Test POST /ingest succeeds with valid API key."""
     response = client.post(
         "/ingest/",
@@ -33,7 +33,7 @@ async def test_ingest_with_valid_key(client, valid_api_key):
     assert "job_id" in response.json()
 
 
-def test_query_requires_auth(client):
+def test_query_requires_auth(client) -> None:
     """Test POST /query requires API key."""
     response = client.post(
         "/query",

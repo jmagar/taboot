@@ -1,5 +1,6 @@
 'use client';
 
+import { validateCallbackUrl } from '@/lib/validate-callback-url';
 import { useMutation } from '@tanstack/react-query';
 import { twoFactor } from '@taboot/auth';
 import { Button } from '@taboot/ui/components/button';
@@ -15,16 +16,17 @@ import { Label } from '@taboot/ui/components/label';
 import { Spinner } from '@taboot/ui/components/spinner';
 import { ShieldCheck } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 export function TwoFactorVerification() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const callbackUrl = validateCallbackUrl(searchParams.get('callbackUrl'));
 
   const [code, setCode] = useState('');
   const [useBackupCode, setUseBackupCode] = useState(false);
+  const firstSlotRef = useRef<HTMLInputElement>(null);
 
   const verifyMutation = useMutation({
     mutationFn: async ({ code, isBackup }: { code: string; isBackup: boolean }) => {
@@ -46,22 +48,28 @@ export function TwoFactorVerification() {
       toast.success(
         data.type === 'backup' ? 'Backup code verified successfully!' : 'Verification successful!',
       );
-      router.push(callbackUrl);
+      router.replace(callbackUrl);
     },
     onError: (error: Error) => {
       console.error('Error verifying 2FA:', error);
       toast.error(error.message || 'Failed to verify code');
       setCode('');
+      setTimeout(() => firstSlotRef.current?.focus(), 0);
     },
   });
 
   const handleVerify = () => {
-    if (!code || (useBackupCode ? code.length !== 11 : code.length !== 6)) {
-      toast.error(useBackupCode ? 'Please enter your backup code' : 'Please enter a 6-digit code');
+    const sanitized = useBackupCode ? code.replace(/-/g, '') : code;
+    const expectedLength = useBackupCode ? 10 : 6;
+
+    if (!code || sanitized.length !== expectedLength) {
+      toast.error(
+        useBackupCode ? 'Please enter your 10-character backup code' : 'Please enter a 6-digit code',
+      );
       return;
     }
 
-    verifyMutation.mutate({ code, isBackup: useBackupCode });
+    verifyMutation.mutate({ code: sanitized, isBackup: useBackupCode });
   };
 
   return (
@@ -97,7 +105,7 @@ export function TwoFactorVerification() {
                   >
                     <InputOTPGroup>
                       {Array.from({ length: 5 }, (_, i) => (
-                        <InputOTPSlot key={i} index={i} />
+                        <InputOTPSlot key={i} index={i} ref={i === 0 ? firstSlotRef : undefined} />
                       ))}
                     </InputOTPGroup>
                     <InputOTPGroup>
@@ -119,7 +127,7 @@ export function TwoFactorVerification() {
                   >
                     <InputOTPGroup>
                       {Array.from({ length: 6 }, (_, i) => (
-                        <InputOTPSlot key={i} index={i} />
+                        <InputOTPSlot key={i} index={i} ref={i === 0 ? firstSlotRef : undefined} />
                       ))}
                     </InputOTPGroup>
                   </InputOTP>
@@ -128,7 +136,7 @@ export function TwoFactorVerification() {
 
               <p className="text-muted-foreground text-center text-xs">
                 {useBackupCode
-                  ? 'Enter your 10-character backup code (e.g., aFA81-o2bDq)'
+                  ? 'Enter your 10-character backup code (e.g., aFA81o2bDq or aFA81-o2bDq)'
                   : 'Enter the 6-digit code from your authenticator app'}
               </p>
             </div>
@@ -138,7 +146,7 @@ export function TwoFactorVerification() {
               disabled={
                 verifyMutation.isPending ||
                 !code ||
-                (useBackupCode ? code.length !== 11 : code.length !== 6)
+                (useBackupCode ? code.replace(/-/g, '').length !== 10 : code.length !== 6)
               }
               className="w-full"
             >

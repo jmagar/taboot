@@ -47,7 +47,8 @@ async def check_neo4j_health() -> bool:
         driver = await loop.run_in_executor(
             None,
             lambda: GraphDatabase.driver(
-                config.neo4j_uri, auth=(config.neo4j_user, config.neo4j_password)
+                config.neo4j_uri,
+                auth=(config.neo4j_user, config.neo4j_password.get_secret_value()),
             ),
         )
         await loop.run_in_executor(None, driver.verify_connectivity)
@@ -73,7 +74,7 @@ async def check_qdrant_health() -> bool:
     try:
         async with httpx.AsyncClient(timeout=config.health_check_timeout) as client:
             response = await client.get(config.qdrant_url)
-            healthy = response.status_code == 200
+            healthy: bool = response.status_code == 200
             if healthy:
                 logger.debug("Qdrant health check: OK")
             else:
@@ -111,7 +112,7 @@ async def check_redis_health() -> bool:
         return False
     finally:
         if client:
-            await client.aclose()
+            await client.close()
 
 
 async def check_tei_health() -> bool:
@@ -126,7 +127,7 @@ async def check_tei_health() -> bool:
     try:
         async with httpx.AsyncClient(timeout=config.health_check_timeout) as client:
             response = await client.get(f"{config.tei_embedding_url}/health")
-            healthy = response.status_code == 200
+            healthy: bool = response.status_code == 200
             if healthy:
                 logger.debug("TEI health check: OK")
             else:
@@ -153,7 +154,7 @@ async def check_ollama_health() -> bool:
         ollama_url = f"http://localhost:{config.ollama_port}"
         async with httpx.AsyncClient(timeout=config.health_check_timeout) as client:
             response = await client.get(f"{ollama_url}/api/tags")
-            healthy = response.status_code == 200
+            healthy: bool = response.status_code == 200
             if healthy:
                 logger.debug("Ollama health check: OK")
             else:
@@ -179,7 +180,7 @@ async def check_firecrawl_health() -> bool:
     try:
         async with httpx.AsyncClient(timeout=config.health_check_timeout) as client:
             response = await client.get(f"{config.firecrawl_api_url}/health")
-            healthy = response.status_code == 200
+            healthy: bool = response.status_code == 200
             if healthy:
                 logger.debug("Firecrawl health check: OK")
             else:
@@ -207,7 +208,7 @@ async def check_playwright_health() -> bool:
         playwright_base_url = config.playwright_microservice_url.rsplit("/", 1)[0]
         async with httpx.AsyncClient(timeout=config.health_check_timeout) as client:
             response = await client.get(f"{playwright_base_url}/health")
-            healthy = response.status_code == 200
+            healthy: bool = response.status_code == 200
             if healthy:
                 logger.debug("Playwright health check: OK")
             else:

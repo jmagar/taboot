@@ -45,6 +45,7 @@ class TestIngestWebUseCase:
     def mock_chunker(self) -> Mock:
         """Create mock Chunker."""
         chunker = Mock()
+
         # Return 3 chunks per document
         def chunk_doc(doc: LlamaDocument) -> list[LlamaDocument]:
             return [
@@ -197,7 +198,7 @@ class TestIngestWebUseCase:
         )
 
         job = use_case.execute(url="https://example.com", limit=5)
-
+        assert job.state == JobState.COMPLETED
         assert job.pages_processed == 3
 
     def test_execute_updates_chunks_created_incrementally(
@@ -370,6 +371,7 @@ class TestIngestWebUseCase:
         )
 
         job = use_case.execute(url="https://example.com", limit=5)
+        assert job.state == JobState.COMPLETED
 
         # Verify upsert_batch was called with Chunk models
         mock_qdrant_writer.upsert_batch.assert_called_once()

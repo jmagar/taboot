@@ -41,9 +41,8 @@ class _MarkdownConverter(HTMLParser):
             self.heading_level = int(tag[1])
         elif tag == "br":
             self.current_text.append("\n")
-        elif tag == "p":
-            if self.current_text and self.current_text[-1] != "\n\n":
-                self.current_text.append("\n\n")
+        elif tag == "p" and self.current_text and self.current_text[-1] != "\n\n":
+            self.current_text.append("\n\n")
 
     def handle_endtag(self, tag: str) -> None:
         """Handle closing HTML tags."""

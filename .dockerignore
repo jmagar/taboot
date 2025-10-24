@@ -19,7 +19,7 @@ yarn.lock                # legacy
 # ------------------------------------------------------------------------------
 uv.lock                  # optional if not needed in image
 .turbo/                  # turborepo build cache (root and nested)
-**/turbo/
+**/.turbo/
 apps/web/.next/          # Next.js output
 apps/web/out/            # static exports
 apps/web/.vercel/        # vercel metadata

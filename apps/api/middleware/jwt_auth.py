@@ -19,7 +19,8 @@ Usage in routes:
 
 import logging
 import os
-from typing import Any
+from functools import lru_cache
+from typing import Final, NotRequired, TypedDict, cast
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -28,19 +29,71 @@ from starlette.requests import Request
 
 logger = logging.getLogger(__name__)
 
-# Better Auth JWT configuration
-AUTH_SECRET = os.getenv("AUTH_SECRET")
-if not AUTH_SECRET:
-    raise ValueError("AUTH_SECRET environment variable is required for JWT authentication")
 
-# JWT algorithm used by Better Auth
-JWT_ALGORITHM = "HS256"
+class AuthClaims(TypedDict, total=False):
+    """Typed representation of Better Auth JWT claims."""
+
+    sub: str
+    userId: str
+    sessionId: NotRequired[str]
+    exp: int
+    iat: NotRequired[int]
+    nbf: NotRequired[int]
+    iss: NotRequired[str]
+    aud: NotRequired[str | list[str]]
+
+
+AUTH_SECRET_ENV_VAR = "AUTH_SECRET"
+JWT_ALGORITHM: Final[str] = "HS256"
 
 # HTTP Bearer token scheme
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def decode_jwt(token: str) -> dict[str, Any]:
+@lru_cache(maxsize=1)
+def _get_auth_secret() -> str:
+    """Fetch and cache the AUTH_SECRET environment variable."""
+    auth_secret = os.getenv(AUTH_SECRET_ENV_VAR)
+    if not auth_secret:
+        logger.error("AUTH_SECRET environment variable is required for JWT authentication")
+        raise RuntimeError("AUTH_SECRET environment variable is required for JWT authentication")
+    return auth_secret
+
+
+def _token_log_metadata(token: str, exc: Exception) -> dict[str, object | None]:
+    """Collect non-PII metadata for structured logging."""
+    extra: dict[str, object | None] = {"error": str(exc)}
+
+    try:
+        header: dict[str, object] = jwt.get_unverified_header(token)
+    except jwt.InvalidTokenError:
+        header = {}
+
+    kid = header.get("kid")
+    if isinstance(kid, str):
+        extra["kid"] = kid
+
+    try:
+        claims: dict[str, object] = jwt.decode(
+            token,
+            options={"verify_signature": False, "verify_aud": False},
+            algorithms=[JWT_ALGORITHM],
+        )
+    except jwt.InvalidTokenError:
+        return extra
+
+    iss = claims.get("iss")
+    if isinstance(iss, str):
+        extra["iss"] = iss
+
+    aud = claims.get("aud")
+    if isinstance(aud, (str, list)):
+        extra["aud"] = aud
+
+    return extra
+
+
+def decode_jwt(token: str) -> AuthClaims:
     """Decode and validate JWT token from Better Auth.
 
     Args:
@@ -53,28 +106,28 @@ def decode_jwt(token: str) -> dict[str, Any]:
         HTTPException: If token is invalid or expired.
     """
     try:
-        # AUTH_SECRET is guaranteed to be a string (checked at module load)
-        payload: dict[str, Any] = jwt.decode(
+        payload_raw: dict[str, object] = jwt.decode(
             token,
-            AUTH_SECRET,  # type: ignore[arg-type]
+            _get_auth_secret(),
             algorithms=[JWT_ALGORITHM],
-            options={"verify_exp": True, "verify_signature": True},
+            options={"verify_exp": True, "verify_signature": True, "require": ["exp"]},
         )
-        return payload
     except jwt.ExpiredSignatureError as exc:
-        logger.warning("JWT token expired", extra={"error": str(exc)})
+        logger.warning("JWT token expired", extra=_token_log_metadata(token, exc))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
     except jwt.InvalidTokenError as exc:
-        logger.warning("Invalid JWT token", extra={"error": str(exc)})
+        logger.warning("Invalid JWT token", extra=_token_log_metadata(token, exc))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
+    else:
+        return cast(AuthClaims, payload_raw)
 
 
 def get_current_user_optional(
@@ -95,25 +148,30 @@ def get_current_user_optional(
 
     try:
         payload = decode_jwt(credentials.credentials)
-        user_id: str | None = payload.get("sub") or payload.get("userId")
-
-        if not user_id:
-            logger.warning("JWT token missing user identifier")
+    except HTTPException:
+        return None  # optional auth
+    else:
+        user_id = payload.get("sub") or payload.get("userId")
+        if not isinstance(user_id, str):
+            request_id = getattr(request.state, "request_id", None) or request.headers.get(
+                "X-Request-ID"
+            )
+            logger.warning(
+                "JWT token missing user identifier",
+                extra={"request_id": request_id},
+            )
             return None
 
-        # Store user info in request state for access in handlers
         request.state.user_id = user_id
-        request.state.session_id = payload.get("sessionId")
+        session_id = payload.get("sessionId")
+        if isinstance(session_id, str):
+            request.state.session_id = session_id
 
         return user_id
 
-    except HTTPException:
-        # Invalid token, but optional auth allows None
-        return None
-
 
 def require_auth(
-    user_id: str | None = Depends(get_current_user_optional),  # noqa: B008
+    user_id: str | None = Depends(get_current_user_optional),
 ) -> str:
     """Require valid JWT authentication (returns user_id or raises 401).
 

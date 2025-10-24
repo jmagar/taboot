@@ -98,9 +98,7 @@ class WebReader:
 
         # Build Firecrawl params
         # formats goes inside scrape_options per Firecrawl v2 API
-        params: dict[str, object] = {
-            "scrape_options": {"formats": ["markdown"]}
-        }
+        params: dict[str, object] = {"scrape_options": {"formats": ["markdown"]}}
         if limit is not None:
             params["limit"] = limit
 
@@ -137,9 +135,7 @@ class WebReader:
                     )
                     time.sleep(backoff)
                 else:
-                    logger.error(
-                        f"All {self.max_retries} attempts failed for {url}: {e}"
-                    )
+                    logger.error(f"All {self.max_retries} attempts failed for {url}: {e}")
 
         # All retries exhausted
         raise WebReaderError(

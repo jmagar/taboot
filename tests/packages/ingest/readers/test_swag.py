@@ -334,7 +334,7 @@ class TestSwagReader:
         """
 
         # Write config to temp file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.conf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
             f.write(config)
             temp_path = f.name
 

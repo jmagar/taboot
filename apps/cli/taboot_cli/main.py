@@ -13,7 +13,6 @@ from apps.cli.taboot_cli.commands import (
     graph_app,
     ingest_app,
     list_app,
-    migrate_app,
 )
 from apps.cli.taboot_cli.utils import async_command
 from packages.schemas.models import ExtractionState, SourceType
@@ -216,58 +215,6 @@ def graph_query(
 
 
 app.add_typer(graph_app, name="graph")
-
-
-# Register migrate subcommand group with commands
-@migrate_app.command(name="postgres")
-def migrate_postgres() -> None:
-    """
-    Apply PostgreSQL Alembic migrations.
-
-    Runs alembic upgrade head to apply all pending migrations.
-
-    Examples:
-        taboot migrate postgres
-    """
-    from apps.cli.taboot_cli.commands.migrate import migrate_postgres as run_postgres
-
-    run_postgres()
-
-
-@migrate_app.command(name="neo4j")
-def migrate_neo4j() -> None:
-    """
-    Apply Neo4j Cypher migrations.
-
-    Applies versioned Cypher migrations from packages/graph/migrations.
-    Tracks applied versions in PostgreSQL schema_versions table.
-
-    Examples:
-        taboot migrate neo4j
-    """
-    from apps.cli.taboot_cli.commands.migrate import migrate_neo4j as run_neo4j
-
-    run_neo4j()
-
-
-@migrate_app.command(name="all")
-def migrate_all() -> None:
-    """
-    Apply all database migrations in dependency order.
-
-    Applies:
-        1. PostgreSQL migrations (creates schema_versions table)
-        2. Neo4j migrations (uses schema_versions for tracking)
-
-    Examples:
-        taboot migrate all
-    """
-    from apps.cli.taboot_cli.commands.migrate import migrate_all as run_all
-
-    run_all()
-
-
-app.add_typer(migrate_app, name="migrate")
 
 
 @app.command()

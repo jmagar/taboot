@@ -3,7 +3,30 @@
   "version": "0.0.1",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./server": "./src/server.ts",
+    "./next-handlers": "./src/next-handlers.ts",
+    "./node-handlers": "./src/node-handlers.ts"
+  },
+  "typesVersions": {
+    "*": {
+      "client": [
+        "./src/client.ts"
+      ],
+      "server": [
+        "./src/server.ts"
+      ],
+      "next-handlers": [
+        "./src/next-handlers.ts"
+      ],
+      "node-handlers": [
+        "./src/node-handlers.ts"
+      ],
+      "*": [
+        "./src/index.ts"
+      ]
+    }
   },
   "scripts": {
     "build": "tsc --build",
@@ -14,6 +37,7 @@
   },
   "prettier": "@taboot/prettier-config",
   "dependencies": {
+    "@taboot/db": "workspace:*",
     "@taboot/email": "workspace:*",
     "@taboot/rate-limit": "workspace:*",
     "better-auth": "catalog:web"

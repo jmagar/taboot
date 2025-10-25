@@ -1,19 +1,19 @@
 # PostgreSQL/Database Infrastructure Analysis
 
 **Date**: 2025-10-22
+**Updated**: 2025-10-24 (Schema duplication cleanup)
 **Repository**: taboot (Doc-to-Graph RAG Platform)
 
 ## Executive Summary
 
-Taboot has **well-designed PostgreSQL infrastructure** with a comprehensive schema defined, but there is a **critical gap**: the `get_postgres_client()` function is **imported but never implemented**. This creates a breaking issue for the Document listing endpoints.
+Taboot has **well-designed PostgreSQL infrastructure** with SQL schema as the source of truth. The Alembic migration system has been removed to formalize the current reality: manual schema management via `specs/001-taboot-rag-platform/contracts/postgresql-schema.sql`.
 
-### Key Finding: Missing Implementation
-- **Status**: Schema ✓ defined, client function ✗ not implemented
-- **Impact**: High - endpoints that query documents will fail at runtime
-- **Files Affected**: 
-  - `/home/jmagar/code/taboot/apps/api/routes/documents.py` (line 77)
-  - `/home/jmagar/code/taboot/apps/cli/commands/list_documents.py` (line 80)
-- **Root Cause**: Function is imported from `packages.common.db_schema` but never defined there
+**Key Changes (2025-10-24):**
+- ✅ Removed Alembic directory and dependency
+- ✅ Deleted conflicting `ingestion_jobs` table definition from Alembic migration
+- ✅ SQL schema file is now the single source of truth
+- ✅ Added version tracking to SQL file
+- ✅ Updated documentation to reflect manual migration approach
 
 ---
 

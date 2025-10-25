@@ -1,6 +1,13 @@
 -- PostgreSQL Schema for Taboot Relational Storage
+-- Version: 1.0.0 (2025-10-24)
 -- Tables: Document, ExtractionWindow, IngestionJob, ExtractionJob
 -- Execute during initialization (taboot init command)
+--
+-- MIGRATION STRATEGY:
+-- This SQL file is the source of truth for PostgreSQL schema.
+-- Manual versioning: increment version comment when making schema changes.
+-- No Alembic/automated migrations - single-developer system, breaking changes OK.
+-- When in doubt: wipe and rebuild (docker volume rm taboot-db).
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

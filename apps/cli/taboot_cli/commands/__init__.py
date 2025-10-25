@@ -22,7 +22,6 @@ ingest_app = typer.Typer(name="ingest", help="Ingest documents from various sour
 extract_app = typer.Typer(name="extract", help="Run extraction pipeline")
 list_app = typer.Typer(name="list", help="List resources")
 graph_app = typer.Typer(name="graph", help="Execute Cypher queries")
-migrate_app = typer.Typer(name="migrate", help="Run database migrations")
 
 __all__ = [
     "extract_app",
@@ -43,7 +42,6 @@ __all__ = [
     "init",
     "list_app",
     "list_documents",
-    "migrate_app",
     "query",
     "status",
 ]

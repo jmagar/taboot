@@ -2,7 +2,7 @@
 
 import { validateCallbackUrl } from '@/lib/validate-callback-url';
 import { useMutation } from '@tanstack/react-query';
-import { twoFactor } from '@taboot/auth';
+import { twoFactor } from '@taboot/auth/client';
 import { Button } from '@taboot/ui/components/button';
 import {
   Card,
@@ -100,7 +100,6 @@ export function TwoFactorVerification() {
                     value={code}
                     onChange={(value: string) => setCode(value)}
                     onComplete={handleVerify}
-                    autoFocus
                     pattern="[a-zA-Z0-9-]*"
                   >
                     <InputOTPGroup>
@@ -123,7 +122,6 @@ export function TwoFactorVerification() {
                     value={code}
                     onChange={(value: string) => setCode(value)}
                     onComplete={handleVerify}
-                    autoFocus
                   >
                     <InputOTPGroup>
                       {Array.from({ length: 6 }, (_, i) => (

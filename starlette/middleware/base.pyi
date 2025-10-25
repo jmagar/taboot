@@ -1,6 +1,0 @@
-from typing import Any, Callable
-
-
-class BaseHTTPMiddleware:
-    def __init__(self, app: Callable[..., Any], *args: Any, **kwargs: Any) -> None: ...
-    async def dispatch(self, request: Any, call_next: Callable[..., Any]) -> Any: ...

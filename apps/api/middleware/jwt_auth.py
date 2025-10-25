@@ -29,7 +29,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.requests import Request
 
+from packages.common.config import ensure_env_loaded
+
 logger = logging.getLogger(__name__)
+
+ensure_env_loaded()
 
 
 class AuthClaims(TypedDict, total=False):

@@ -28,6 +28,7 @@
 **UI:** Dashboard with notebook grid/list view
 
 **Data Model:**
+
 ```typescript
 interface Notebook {
   id: string;
@@ -49,6 +50,7 @@ interface Notebook {
 - `DELETE /api/notebooks/:id` - Delete notebook + sources + chats
 
 **Neo4j:**
+
 ```cypher
 // Notebook node with namespace property
 CREATE (n:Notebook {
@@ -84,6 +86,7 @@ CREATE (n:Notebook {
 | **Audio** | File upload | Whisper transcription | 🔨 TODO |
 
 **Data Model:**
+
 ```typescript
 interface Source {
   id: string;
@@ -137,6 +140,7 @@ interface Source {
 **UI:** Center panel - conversation view with source citations
 
 **Data Model:**
+
 ```typescript
 interface Chat {
   id: string;
@@ -176,6 +180,7 @@ interface SourceCitation {
 7. Post-process: Extract source citations, format response
 
 **LlamaIndex Integration:**
+
 ```python
 # packages/retrieval/query_engines/notebook_engine.py
 from llama_index.core import VectorStoreIndex, PropertyGraphIndex
@@ -257,6 +262,7 @@ class NotebookQueryEngine:
 | **Briefing Doc** | Executive summary with sections | Hierarchical summarization |
 
 **Data Model:**
+
 ```typescript
 interface StudioDocument {
   id: string;
@@ -285,6 +291,7 @@ interface StudioDocument {
 8. Frontend polls status, displays result
 
 **LlamaIndex Implementation:**
+
 ```python
 # packages/retrieval/studio/generators.py
 from llama_index.core.response_synthesizers import TreeSummarize
@@ -334,7 +341,8 @@ class StudioGenerator:
 ### 5. Three-Panel Layout (MVP)
 
 **Desktop Layout:**
-```
+
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │ Header (Logo, Notebook Name, User Menu)                         │
 ├──────────┬────────────────────────────────┬─────────────────────┤
@@ -375,7 +383,8 @@ class StudioGenerator:
 ## Backend Architecture
 
 ### API Structure
-```
+
+```text
 apps/api/
 ├── routes/
 │   ├── notebooks.py         # CRUD for notebooks
@@ -393,6 +402,7 @@ apps/api/
 ```
 
 ### Worker Queue (Redis)
+
 ```python
 # Job types
 INGEST_SOURCE = "ingest:source"       # Process uploaded source
@@ -427,7 +437,8 @@ QUEUE_LOW = "queue:low"       # Studio generation
 ## Data Flow Diagrams
 
 ### Source Upload Flow
-```
+
+```text
 User uploads PDF
     ↓
 POST /api/notebooks/123/sources/upload
@@ -454,7 +465,8 @@ Frontend polls → receives ready status → shows checkmark
 ```
 
 ### Chat Query Flow
-```
+
+```text
 User types question
     ↓
 POST /api/notebooks/123/chat (SSE)
@@ -481,7 +493,8 @@ Frontend renders message + citation badges
 ```
 
 ### Studio Generation Flow
-```
+
+```text
 User clicks "Generate Summary"
     ↓
 POST /api/notebooks/123/studio/generate {type: "summary"}
@@ -615,7 +628,8 @@ Frontend polls → displays document
 - `app/(default)/notebooks/[id]/page.tsx` - Three-panel layout
 
 ### Components
-```
+
+```text
 components/
 ├── notebook/
 │   ├── notebook-card.tsx          # Card component
@@ -749,13 +763,15 @@ components/
 - 🔄 API test page → Remove (debug via devtools)
 
 ### New Routes
-```
+
+```text
 /notebooks               → Notebook list (new default)
 /notebooks/[id]          → Three-panel notebook view
 /notebooks/[id]/settings → Notebook settings
 ```
 
 ### Database Schema (PostgreSQL via Prisma)
+
 ```prisma
 model Notebook {
   id          String   @id @default(cuid())

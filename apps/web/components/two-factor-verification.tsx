@@ -100,7 +100,6 @@ export function TwoFactorVerification() {
                     value={code}
                     onChange={(value: string) => setCode(value)}
                     onComplete={handleVerify}
-                    autoFocus
                     pattern="[a-zA-Z0-9-]*"
                   >
                     <InputOTPGroup>
@@ -123,7 +122,6 @@ export function TwoFactorVerification() {
                     value={code}
                     onChange={(value: string) => setCode(value)}
                     onComplete={handleVerify}
-                    autoFocus
                   >
                     <InputOTPGroup>
                       {Array.from({ length: 6 }, (_, i) => (

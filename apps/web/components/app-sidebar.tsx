@@ -37,13 +37,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1">
-              <Link href="/" className="flex items-center gap-2 self-center font-medium">
+              <Link
+                href="/"
+                className="flex items-center gap-2 self-center font-medium"
+                aria-label="Go to home page"
+              >
                 <Logo variant="sidebar" />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <SidebarTrigger className="size-8" />
+        <SidebarTrigger className="size-11" aria-label="Toggle sidebar" />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -53,8 +57,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               {config.nav.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton tooltip={item.title} asChild>
-                    <Link href={item.href}>
-                      <item.icon />
+                    <Link href={item.href} aria-label={`Navigate to ${item.title}`}>
+                      <item.icon aria-hidden="true" />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>

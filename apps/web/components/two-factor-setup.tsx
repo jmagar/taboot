@@ -321,7 +321,6 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
                     value={totpCode}
                     onChange={(value: string) => setTotpCode(value.replace(/\D/g, ''))}
                     onComplete={handleVerify2FA}
-                    autoFocus
                   >
                     <InputOTPGroup>
                       {Array.from({ length: 6 }, (_, i) => (

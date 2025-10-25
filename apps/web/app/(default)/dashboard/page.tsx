@@ -1,23 +1,36 @@
-'use client';
+import { requireServerSession } from '@/lib/auth-server';
+import { Skeleton } from '@taboot/ui/components/skeleton';
+import { Suspense } from 'react';
 
-import { useRequiredAuthUser } from '@/hooks/use-auth-user';
-import DashboardLoading from './loading';
+async function WelcomeMessage() {
+  const session = await requireServerSession();
+  const user = session.user;
+
+  return (
+    <div className="rounded-md py-4">
+      <p>
+        <span>Welcome back, </span>
+        <span className="font-bold">{user.name || user.email}</span>!
+      </p>
+    </div>
+  );
+}
+
+function WelcomeMessageLoading() {
+  return (
+    <div className="rounded-md py-4">
+      <Skeleton className="h-5 w-64" />
+    </div>
+  );
+}
 
 export default function DashboardPage() {
-  const { user, isLoading } = useRequiredAuthUser();
-  if (isLoading) {
-    return <DashboardLoading />;
-  }
-
   return (
     <section className="max-w-2xl p-12">
       <h1 className="mb-4 text-2xl font-semibold">Dashboard</h1>
-      <div className="rounded-md py-4">
-        <p>
-          <span>Welcome back, </span>
-          <span className="font-bold">{user.name || user.email}</span>!
-        </p>
-      </div>
+      <Suspense fallback={<WelcomeMessageLoading />}>
+        <WelcomeMessage />
+      </Suspense>
     </section>
   );
 }

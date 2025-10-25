@@ -48,7 +48,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
       uvicorn \
       pydantic \
       typer \
-      spacy
+      spacy \
+      slowapi
 
 # Copy Node.js workspace files for web app
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./

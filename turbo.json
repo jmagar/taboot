@@ -36,7 +36,9 @@
         "FIRECRAWL_API_URL",
         "REDIS_URL",
         "QDRANT_URL",
-        "NEO4J_URI"
+        "NEO4J_URI",
+        "UPSTASH_REDIS_REST_URL",
+        "UPSTASH_REDIS_REST_TOKEN"
       ]
     },
     "test": {

@@ -1,0 +1,77 @@
+import { type Ratelimit } from '@upstash/ratelimit';
+import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
+import { getClientIdentifier } from '@/lib/rate-limit';
+
+type Handler = (req: Request) => Promise<NextResponse>;
+
+/**
+ * Higher-order function that wraps API route handlers with rate limiting.
+ *
+ * Features:
+ * - Returns 429 Too Many Requests when rate limit exceeded
+ * - Adds rate limit headers to all responses (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)
+ * - Logs rate limit violations
+ * - Fails open on errors (allows request but logs the error)
+ *
+ * @param handler - The original route handler
+ * @param ratelimit - The Ratelimit instance to use
+ * @returns Wrapped handler with rate limiting
+ */
+export function withRateLimit(handler: Handler, ratelimit: Ratelimit): Handler {
+  return async (req: Request): Promise<NextResponse> => {
+    const identifier = getClientIdentifier(req);
+
+    try {
+      const { success, limit, reset, remaining } = await ratelimit.limit(identifier);
+
+      // Build rate limit headers
+      const rateLimitHeaders = {
+        'X-RateLimit-Limit': limit.toString(),
+        'X-RateLimit-Remaining': remaining.toString(),
+        'X-RateLimit-Reset': new Date(reset).toISOString(),
+      };
+
+      if (!success) {
+        logger.warn('Rate limit exceeded', {
+          identifier,
+          limit,
+          remaining,
+          reset: new Date(reset).toISOString(),
+          path: new URL(req.url).pathname,
+        });
+
+        return NextResponse.json(
+          {
+            error: 'Too many requests. Please try again later.',
+            retryAfter: new Date(reset).toISOString(),
+          },
+          {
+            status: 429,
+            headers: rateLimitHeaders,
+          },
+        );
+      }
+
+      // Rate limit passed, execute handler
+      const response = await handler(req);
+
+      // Add rate limit headers to successful response
+      Object.entries(rateLimitHeaders).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
+
+      return response;
+    } catch (error) {
+      // Fail open: on rate limit check error, allow the request but log the issue
+      logger.error('Rate limit check failed, failing open', {
+        error,
+        identifier,
+        path: new URL(req.url).pathname,
+      });
+
+      // Continue with original handler
+      return handler(req);
+    }
+  };
+}

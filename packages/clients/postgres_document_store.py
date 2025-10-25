@@ -42,7 +42,7 @@ class PostgresDocumentStore:
             # Insert document metadata
             cur.execute(
                 """
-                INSERT INTO documents (
+                INSERT INTO rag.documents (
                     doc_id, source_url, source_type, content_hash,
                     ingested_at, extraction_state, extraction_version,
                     updated_at, metadata
@@ -65,7 +65,7 @@ class PostgresDocumentStore:
             # Store full content in separate table
             cur.execute(
                 """
-                INSERT INTO document_content (doc_id, content, created_at)
+                INSERT INTO rag.document_content (doc_id, content, created_at)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (doc_id) DO NOTHING
             """,
@@ -86,7 +86,7 @@ class PostgresDocumentStore:
         """
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             query = """
-                SELECT * FROM documents
+                SELECT * FROM rag.documents
                 WHERE extraction_state = 'pending'
                 ORDER BY ingested_at ASC
             """
@@ -128,7 +128,7 @@ class PostgresDocumentStore:
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT * FROM documents
+                SELECT * FROM rag.documents
                 WHERE updated_at >= %s
                 ORDER BY updated_at DESC
             """,
@@ -167,7 +167,7 @@ class PostgresDocumentStore:
             KeyError: If document not found.
         """
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT content FROM document_content WHERE doc_id = %s", (str(doc_id),))
+            cur.execute("SELECT content FROM rag.document_content WHERE doc_id = %s", (str(doc_id),))
             row = cur.fetchone()
 
         if row is None:
@@ -188,7 +188,7 @@ class PostgresDocumentStore:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                UPDATE documents SET
+                UPDATE rag.documents SET
                     extraction_state = %s,
                     extraction_version = %s,
                     updated_at = %s,
@@ -229,7 +229,7 @@ class PostgresDocumentStore:
         """
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Build query with optional filters
-            query = "SELECT * FROM documents WHERE 1=1"
+            query = "SELECT * FROM rag.documents WHERE 1=1"
             params: list[str | int] = []
 
             if source_type:
@@ -279,7 +279,7 @@ class PostgresDocumentStore:
             int: Total count of matching documents.
         """
         with self.conn.cursor() as cur:
-            query = "SELECT COUNT(*) FROM documents WHERE 1=1"
+            query = "SELECT COUNT(*) FROM rag.documents WHERE 1=1"
             params: list[str] = []
 
             if source_type:

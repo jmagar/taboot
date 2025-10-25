@@ -9,8 +9,8 @@
 ### 1. Sentry Error Tracking
 
 **Files Created:**
-- `/sentry.client.config.ts` - Client-side error tracking configuration
-- `/sentry.server.config.ts` - Server-side error tracking configuration (Node.js only)
+- `apps/web/sentry.client.config.ts` - Client-side error tracking configuration
+- `apps/web/sentry.server.config.ts` - Server-side error tracking configuration (Node.js only)
 
 **Configuration:**
 - Error capture with PII filtering
@@ -191,8 +191,8 @@ Import trace: apps/web/middleware.ts → @taboot/auth → Prisma
 ✅ **All requirements met:**
 
 1. ✅ Sentry installed and configured
-   - Client config: `/sentry.client.config.ts`
-   - Server config: `/sentry.server.config.ts`
+   - Client config: `apps/web/sentry.client.config.ts`
+   - Server config: `apps/web/sentry.server.config.ts`
    - Next.js integration: `next.config.mjs`
    - PII filtering: `beforeSend` hook
 
@@ -281,8 +281,8 @@ Before deploying to production:
 ## Files Summary
 
 ### Created (9 files)
-1. `/sentry.client.config.ts` - Sentry client configuration
-2. `/sentry.server.config.ts` - Sentry server configuration
+1. `apps/web/sentry.client.config.ts` - Sentry client configuration
+2. `apps/web/sentry.server.config.ts` - Sentry server configuration
 3. `apps/web/lib/posthog.ts` - PostHog initialization
 4. `apps/web/lib/analytics.ts` - Analytics wrapper
 5. `apps/web/__tests__/analytics.test.ts` - Unit tests

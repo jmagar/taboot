@@ -39,6 +39,7 @@
   "dependencies": {
     "@taboot/db": "workspace:*",
     "@taboot/email": "workspace:*",
+    "@taboot/logger": "workspace:*",
     "@taboot/rate-limit": "workspace:*",
     "better-auth": "catalog:web"
   },

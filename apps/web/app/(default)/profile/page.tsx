@@ -24,7 +24,7 @@ async function ProfileCard() {
         <div className="flex items-center gap-4">
           <Avatar className="ring-border h-20 w-20 rounded-md ring-2">
             <AvatarImage
-              src={user.image ?? ''}
+              src={user.image || undefined}
               alt={user.name ? `${user.name}'s profile photo` : 'User profile photo'}
             />
             <AvatarFallback className="text-3xl capitalize">
@@ -35,7 +35,7 @@ async function ProfileCard() {
             <CardTitle className="text-2xl font-semibold">
               {user.name || 'Unnamed User'}
             </CardTitle>
-            <p className="text-muted-foreground">{user.email}</p>
+            <p className="text-muted-foreground">{user.email ?? '—'}</p>
           </div>
         </div>
       </CardHeader>
@@ -44,7 +44,7 @@ async function ProfileCard() {
         {cardDetails.map(({ label, value }) => (
           <div key={label}>
             <p className="text-muted-foreground">{label}</p>
-            <p className="break-words font-medium">{value}</p>
+            <p className="wrap-break-word font-medium">{value}</p>
           </div>
         ))}
       </CardContent>

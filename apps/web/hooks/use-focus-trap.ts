@@ -31,6 +31,9 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>() {
       'input:not([disabled])',
       'select:not([disabled])',
       '[tabindex]:not([tabindex="-1"])',
+      '[contenteditable]:not([contenteditable="false"])',
+      'audio[controls]',
+      'video[controls]',
     ].join(', ');
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -43,8 +46,6 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>() {
 
       const firstElement = focusableArray[0];
       const lastElement = focusableArray[focusableArray.length - 1];
-
-      if (!firstElement || !lastElement) return;
 
       // Shift + Tab (backwards)
       if (event.shiftKey) {

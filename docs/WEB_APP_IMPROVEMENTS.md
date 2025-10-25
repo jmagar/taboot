@@ -1775,7 +1775,7 @@ const fontMono = Geist_Mono({
 
 2. **Configure Sentry**
    ```typescript
-   // sentry.client.config.ts
+   // apps/web/sentry.client.config.ts
    import * as Sentry from '@sentry/nextjs';
 
    Sentry.init({
@@ -1796,7 +1796,7 @@ const fontMono = Geist_Mono({
    ```
 
    ```typescript
-   // sentry.server.config.ts
+   // apps/web/sentry.server.config.ts
    import * as Sentry from '@sentry/nextjs';
 
    Sentry.init({
@@ -1884,8 +1884,8 @@ const fontMono = Geist_Mono({
    ```
 
 **Files Created:**
-- `sentry.client.config.ts`
-- `sentry.server.config.ts`
+- `apps/web/sentry.client.config.ts`
+- `apps/web/sentry.server.config.ts`
 - `apps/web/lib/posthog.ts`
 - `apps/web/lib/analytics.ts`
 

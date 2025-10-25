@@ -114,6 +114,121 @@ uv run apps/cli status
 uv run apps/cli extract reprocess --since 7d
 ```
 
+### Data Management
+```bash
+# Soft delete cleanup (production)
+pnpm tsx apps/web/scripts/cleanup-deleted-users.ts
+
+# Dry run to see what would be deleted
+pnpm tsx apps/web/scripts/cleanup-deleted-users.ts --dry-run
+
+# Custom retention period (e.g., 30 days)
+pnpm tsx apps/web/scripts/cleanup-deleted-users.ts --retention-days=30
+```
+
+## Security
+
+### CSRF Protection (Next.js Web App)
+
+**Implementation:** Defense-in-depth approach using multiple layers:
+
+1. **SameSite Cookies:** All authentication cookies use `sameSite: 'lax'` (configured in `packages-ts/auth/src/server.ts`)
+2. **Double-Submit Cookie Pattern:** Custom CSRF middleware (`apps/web/lib/csrf.ts`) with:
+   - HMAC-SHA256 signed tokens (32-byte random values)
+   - Cookie: `__Host-taboot.csrf` (HttpOnly, Secure in production)
+   - Header: `x-csrf-token` (must match cookie for state-changing requests)
+3. **Origin/Referer Validation:** All POST/PUT/PATCH/DELETE requests validate origin matches host
+
+**Protected Methods:** POST, PUT, PATCH, DELETE (all state-changing operations)
+
+**Excluded Routes:** Read-only endpoints (e.g., `/api/auth/session`, `/api/health`, `/api/test`)
+
+**Client-Side Integration:**
+- `apps/web/lib/csrf-client.ts` — Automatic token inclusion from cookies
+- `apps/web/lib/api.ts` — CsrfAwareAPIClient extends TabootAPIClient with automatic CSRF headers
+- All mutation requests automatically include `x-csrf-token` header
+
+**Middleware Flow:**
+1. GET request → Set CSRF cookie + expose token in header
+2. POST/PUT/PATCH/DELETE → Validate origin/referer → Validate token (cookie == header) → Allow or reject (403)
+
+**Testing:**
+- Unit tests: `apps/web/lib/__tests__/csrf.test.ts`
+- Client tests: `apps/web/lib/__tests__/csrf-client.test.ts`
+- Integration: CSRF validation in middleware
+
+**Environment Variables:**
+- `CSRF_SECRET` — HMAC signing key (defaults to `AUTH_SECRET` or development secret)
+
+**OWASP Compliance:** Implements CSRF Prevention Cheat Sheet recommendations (double-submit cookie + origin validation)
+
+### Data Integrity & Soft Delete
+
+**Soft Delete Implementation:**
+
+All user account deletions are soft deletes with full audit trail. This provides:
+- **Recovery grace period** (90 days default)
+- **GDPR compliance** (Article 30 audit requirements)
+- **Protection against accidents** (bugs, misclicks)
+- **Full audit trail** (who, when, why, from where)
+
+**How It Works:**
+
+1. **DELETE converted to UPDATE**: Prisma middleware intercepts `user.delete()` and sets `deletedAt` timestamp
+2. **Automatic filtering**: Queries exclude soft-deleted records automatically (unless explicitly included)
+3. **Audit logging**: Every deletion writes to `AuditLog` table with user, IP, timestamp, metadata
+4. **Restoration**: Admin API endpoint to undo deletions within retention period
+5. **Hard cleanup**: Scheduled job permanently removes users after 90 days
+
+**Developer Usage:**
+
+```typescript
+// Soft delete (standard operation)
+await prisma.user.delete({ where: { id: userId } });
+// → Sets deletedAt, writes audit log, user still in DB
+
+// Query active users (soft-deleted filtered automatically)
+const users = await prisma.user.findMany();
+// → Only returns users where deletedAt IS NULL
+
+// Query deleted users explicitly
+const deletedUsers = await prisma.user.findMany({
+  where: { deletedAt: { not: null } }
+});
+
+// Restore deleted user (admin only)
+await restoreUser(prisma, userId, currentUserId, {
+  ipAddress: req.headers['x-forwarded-for'],
+  userAgent: req.headers['user-agent'],
+});
+```
+
+**Setting Context for Audit Trail:**
+
+```typescript
+import { setSoftDeleteContext, clearSoftDeleteContext } from '@taboot/db';
+
+// In API middleware
+const requestId = `req-${Date.now()}`;
+setSoftDeleteContext(requestId, {
+  userId: session.user.id,
+  ipAddress: req.headers['x-forwarded-for'],
+  userAgent: req.headers['user-agent'],
+});
+
+// Perform operations...
+
+// Clean up after request
+clearSoftDeleteContext(requestId);
+```
+
+**Important Notes:**
+
+- Only User model has soft delete (Session/Account cascade naturally when User soft-deleted)
+- Hard cascade deletes (`onDelete: Cascade`) still work but won't trigger if User is soft-deleted
+- For testing, use raw SQL to bypass middleware: `prisma.$executeRaw`
+- Audit logs are never deleted (permanent compliance record)
+
 ## Code Style & Conventions
 
 - **Line length:** 100 characters (enforced by Ruff)
@@ -198,10 +313,48 @@ Per-source credentials (GitHub, Reddit, Gmail, Elasticsearch, Unifi, Tailscale) 
 
 **PostgreSQL:**
 - Source of truth: `specs/001-taboot-rag-platform/contracts/postgresql-schema.sql`
+- **Schema Isolation:** Uses PostgreSQL schemas for namespace separation
+  - `rag` schema: All RAG platform tables (documents, document_content, extraction_windows, ingestion_jobs, extraction_jobs)
+  - `auth` schema: All auth tables (managed by Prisma - User, Session, Account, Verification, TwoFactor, AuditLog)
+  - Prevents table name collisions between Python (RAG) and TypeScript (auth) systems
+  - Migration script: `todos/scripts/migrate-to-schema-namespaces.sql` (one-time migration from public schema)
 - No automated migrations (Alembic removed)
-- Manual versioning via version comment in SQL file
-- Breaking changes OK: wipe and rebuild with `docker volume rm taboot-db`
+- Version tracking via `schema_versions` table with SHA-256 checksums
+- Version constant: `packages.common.db_schema.CURRENT_SCHEMA_VERSION`
 - Schema created during `taboot init` via `packages.common.db_schema.create_schema()`
+- Breaking changes OK: wipe and rebuild with `docker volume rm taboot-db`
+
+**Schema Workflow:**
+```bash
+# 1. Check current version
+uv run apps/cli schema version
+
+# 2. Edit schema SQL file
+vim specs/001-taboot-rag-platform/contracts/postgresql-schema.sql
+# Update: -- THIS VERSION: X.Y.Z
+
+# 3. Update version constant in code
+vim packages/common/db_schema.py
+# Update: CURRENT_SCHEMA_VERSION = "X.Y.Z"
+
+# 4. Apply schema (automatic version tracking)
+uv run apps/cli init
+
+# 5. Verify version was applied
+uv run apps/cli schema version
+uv run apps/cli schema history
+
+# 6. View version history
+uv run apps/cli schema history --limit 20
+```
+
+**Version Tracking Details:**
+- `schema_versions` table logs all schema changes with timestamp, user, checksum, and execution time
+- Checksums detect manual schema modifications
+- Re-running `init` with same version+checksum is safe (no-op)
+- Re-running `init` with same version but different checksum logs warning and reapplies
+- Failed schema applications recorded with status='failed'
+- Version history available via `taboot schema history`
 
 **Neo4j:**
 - Constraints: `specs/001-taboot-rag-platform/contracts/neo4j-constraints.cypher`
@@ -216,8 +369,16 @@ Per-source credentials (GitHub, Reddit, Gmail, Elasticsearch, Unifi, Tailscale) 
 **Prisma (TypeScript/Next.js Auth):**
 - Schema: `packages-ts/db/prisma/schema.prisma`
 - Separate concern from Python RAG platform
-- Manages: User, Session, Account, Verification, TwoFactor tables
+- Manages: User, Session, Account, Verification, TwoFactor, AuditLog tables
 - Migrations: `pnpm db:migrate` in packages-ts/db
+- **Soft Delete:** User model implements soft delete with audit trail
+  - `deletedAt` and `deletedBy` fields track deletion
+  - DELETE operations converted to UPDATE via Prisma middleware
+  - Queries automatically filter soft-deleted records
+  - 90-day retention period before hard delete
+  - Full audit trail in AuditLog table
+  - Admin restoration via API endpoint
+  - Cleanup script: `pnpm tsx apps/web/scripts/cleanup-deleted-users.ts`
 
 ## Performance Targets (RTX 4070)
 
@@ -234,6 +395,93 @@ Per-source credentials (GitHub, Reddit, Gmail, Elasticsearch, Unifi, Tailscale) 
 - **Validation:** ~300 labeled windows with F1 guardrails; CI fails if F1 drops ≥2 points
 - **Logging:** JSON structured via `python-json-logger`
 
+## Security: Rate Limiting
+
+The Next.js web application (`apps/web/`) implements **fail-closed rate limiting** to prevent abuse:
+
+**Build-Time vs Runtime Behavior:**
+- **Build time** (`NEXT_PHASE=phase-production-build`): Uses stub that allows all requests (for static analysis)
+- **Runtime** (production/development): Requires Upstash Redis; throws error if not configured
+
+**Configuration:**
+```bash
+# Required for production deployments with rate limiting
+UPSTASH_REDIS_REST_URL="https://your-database.upstash.io"
+UPSTASH_REDIS_REST_TOKEN="your-upstash-token-here"
+
+# TRUST_PROXY: Only set to 'true' if behind verified reverse proxy
+# Default: 'false' (secure - ignores X-Forwarded-For)
+TRUST_PROXY="false"
+```
+
+**Rate Limits:**
+- Password endpoints (`/api/auth/password/*`): 5 requests per 10 minutes
+- General auth endpoints: 10 requests per 1 minute
+
+**Security Principles:**
+- **Fail-closed**: Missing Redis credentials at runtime → service throws error and refuses to start
+- **No silent failures**: Clear error messages with configuration instructions
+- **Build-time safety**: Only uses stub during `NEXT_PHASE=phase-production-build`
+- **Runtime enforcement**: All rate limit check failures return 503 Service Unavailable (fail-closed)
+- **IP spoofing protection**: X-Forwarded-For only trusted when TRUST_PROXY=true; IP format validated
+
+**Implementation Files:**
+- `apps/web/lib/rate-limit.ts` - Core rate limiting logic with fail-closed initialization
+
+### Rate Limiting Behind Reverse Proxy
+
+If deploying behind Cloudflare, nginx, or other reverse proxy:
+
+1. **Set TRUST_PROXY=true** in production `.env`:
+   ```bash
+   TRUST_PROXY="true"
+   ```
+
+2. **Configure proxy to set X-Forwarded-For correctly:**
+
+   **nginx:**
+   ```nginx
+   location / {
+     proxy_pass http://localhost:3000;
+     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+     proxy_set_header X-Real-IP $remote_addr;
+     proxy_set_header Host $host;
+   }
+   ```
+
+   **Cloudflare:**
+   - Automatically sets X-Forwarded-For and CF-Connecting-IP headers
+   - No additional configuration needed
+
+   **AWS Application Load Balancer:**
+   - Automatically sets X-Forwarded-For header
+   - No additional configuration needed
+
+3. **Verify configuration:**
+   ```bash
+   # Test that rate limiting uses real client IP, not proxy IP
+   curl -v https://yourdomain.com/api/auth/sign-in \
+     -H "Content-Type: application/json" \
+     -d '{"email":"test@example.com","password":"wrong"}'
+
+   # Make 6 requests rapidly to trigger rate limit (5 req/10min limit)
+   # Should see 429 Too Many Requests after 5th attempt
+   ```
+
+**SECURITY WARNING:**
+- Never set `TRUST_PROXY=true` if directly exposed to internet without reverse proxy
+- Only use behind verified proxy infrastructure (Cloudflare, nginx, AWS ALB, etc.)
+- When `TRUST_PROXY=false` (default), X-Forwarded-For headers are ignored to prevent IP spoofing
+- IP addresses are validated (IPv4/IPv6 format) even when proxy is trusted
+- `apps/web/lib/with-rate-limit.ts` - Higher-order function wrapper for route handlers
+
+**Testing:**
+```bash
+# Run rate limiting tests
+pnpm --filter @taboot/web test lib/rate-limit.test.ts
+pnpm --filter @taboot/web test lib/with-rate-limit.test.ts
+```
+
 ## Troubleshooting
 
 | Issue | Check |
@@ -244,6 +492,7 @@ Per-source credentials (GitHub, Reddit, Gmail, Elasticsearch, Unifi, Tailscale) 
 | Neo4j connection refused | Wait for healthcheck: `docker compose ps taboot-graph` |
 | Tests fail | Ensure `docker compose ps` shows all services healthy before running integration tests |
 | spaCy model missing | First run auto-downloads `en_core_web_md`; or manually `python -m spacy download en_core_web_md` |
+| Rate limiting error on web app startup | Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in `.env` (see `.env.example`) |
 
 ## Commits & PRs
 

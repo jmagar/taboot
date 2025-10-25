@@ -14,11 +14,25 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { twoFactor } from 'better-auth/plugins';
 import { prisma } from '@taboot/db';
+import { logger } from '@taboot/logger';
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, // 5 minutes
+    },
+  },
+  advanced: {
+    defaultCookieAttributes: {
+      sameSite: 'lax', // CSRF protection: prevents cross-site cookie transmission
+      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+      httpOnly: true, // XSS protection: prevents JavaScript access
+    },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
@@ -33,7 +47,10 @@ export const auth = betterAuth({
 
       const { success: rateLimitSuccess } = await resetPasswordRateLimiter.limit(user.email);
       if (!rateLimitSuccess) {
-        console.log('Rate limit exceeded. Please try again later.');
+        logger.warn('Password reset rate limit exceeded', {
+          userId: user.id,
+          operation: 'password-reset',
+        });
         return;
       }
 
@@ -63,7 +80,10 @@ export const auth = betterAuth({
 
       const { success: rateLimitSuccess } = await verifyEmailRateLimiter.limit(user.email);
       if (!rateLimitSuccess) {
-        console.log('Rate limit exceeded. Please try again later.');
+        logger.warn('Email verification rate limit exceeded', {
+          userId: user.id,
+          operation: 'send-verification',
+        });
         return;
       }
 
@@ -95,7 +115,10 @@ export const auth = betterAuth({
 
         const { success: rateLimitSuccess } = await changeEmailRateLimiter.limit(user.email);
         if (!rateLimitSuccess) {
-          console.log('Rate limit exceeded. Please try again later.');
+          logger.warn('Email change rate limit exceeded', {
+            userId: user.id,
+            operation: 'change-email',
+          });
           return;
         }
 

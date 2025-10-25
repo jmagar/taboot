@@ -3,6 +3,7 @@
 import { AppSidebar } from '@/components/app-sidebar';
 import { logger } from '@/lib/logger';
 import { initPostHog } from '@/lib/posthog';
+import { queryClientConfig } from '@/lib/query-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SidebarProvider } from '@taboot/ui/components/sidebar';
 import { TooltipProvider } from '@taboot/ui/components/tooltip';
@@ -14,15 +15,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = React.useState(
     () =>
       new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 5 * 60 * 1000, // 5 minutes - data is considered fresh for this duration
-            gcTime: 10 * 60 * 1000, // 10 minutes - cache garbage collection time (formerly cacheTime)
-            refetchOnWindowFocus: false, // Don't refetch when window regains focus
-            refetchOnReconnect: true, // Do refetch when reconnecting to network
-            retry: 1, // Retry failed queries once before giving up
-          },
-        },
+        defaultOptions: queryClientConfig,
       }),
   );
 
@@ -47,19 +40,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
   // Axe accessibility testing in development
   React.useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      import('@axe-core/react')
-        .then((axe) => {
-          import('react-dom')
-            .then((ReactDOM) => {
-              axe.default(React, ReactDOM, 1000);
-            })
-            .catch((error) => {
-              logger.error('Failed to load ReactDOM for axe', { error });
-            });
-        })
-        .catch((error) => {
-          logger.error('Failed to load @axe-core/react', { error });
-        });
+      (async () => {
+        try {
+          const axe = await import('@axe-core/react');
+          const ReactDOM = await import('react-dom');
+          axe.default(React, ReactDOM, 1000);
+        } catch (error) {
+          logger.error('Failed to load accessibility tools', { error });
+        }
+      })();
     }
   }, []);
 

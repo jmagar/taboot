@@ -46,6 +46,18 @@ function validateSchema<T>(schema: ZodSchema<T>, data: unknown, context: string)
 }
 
 /**
+ * Validates request data against schema if provided, otherwise returns data unchanged.
+ */
+function validateRequest<T>(
+  requestSchema: ZodSchema<T> | undefined,
+  data: T | undefined,
+): T | undefined {
+  return requestSchema && data
+    ? validateSchema(requestSchema, data, 'Request')
+    : data;
+}
+
+/**
  * Typed API client with automatic Zod validation.
  *
  * All API calls validate:
@@ -74,10 +86,7 @@ export class TypedAPIClient {
   async post<TRequest, TResponse>(
     options: TypedRequestOptions<TRequest>,
   ): Promise<TResponse> {
-    // Validate request if schema provided
-    const validatedData = options.requestSchema && options.data
-      ? validateSchema(options.requestSchema, options.data, 'Request')
-      : options.data;
+    const validatedData = validateRequest(options.requestSchema, options.data);
 
     const response = await api.post<TResponse>(options.path, validatedData);
 
@@ -94,10 +103,7 @@ export class TypedAPIClient {
   async put<TRequest, TResponse>(
     options: TypedRequestOptions<TRequest>,
   ): Promise<TResponse> {
-    // Validate request if schema provided
-    const validatedData = options.requestSchema && options.data
-      ? validateSchema(options.requestSchema, options.data, 'Request')
-      : options.data;
+    const validatedData = validateRequest(options.requestSchema, options.data);
 
     const response = await api.put<TResponse>(options.path, validatedData);
 
@@ -114,10 +120,7 @@ export class TypedAPIClient {
   async patch<TRequest, TResponse>(
     options: TypedRequestOptions<TRequest>,
   ): Promise<TResponse> {
-    // Validate request if schema provided
-    const validatedData = options.requestSchema && options.data
-      ? validateSchema(options.requestSchema, options.data, 'Request')
-      : options.data;
+    const validatedData = validateRequest(options.requestSchema, options.data);
 
     const response = await api.patch<TResponse>(options.path, validatedData);
 

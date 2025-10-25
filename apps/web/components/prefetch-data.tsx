@@ -1,6 +1,7 @@
 import { HydrationBoundary, QueryClient, dehydrate } from '@tanstack/react-query';
 import { auth } from '@taboot/auth';
 
+import { queryClientConfig } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { authService } from '@/services/auth.service';
 
@@ -10,12 +11,7 @@ import { authService } from '@/services/auth.service';
  */
 export async function PrefetchData({ children }: { children: React.ReactNode }) {
   const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 5 * 60 * 1000,
-        gcTime: 10 * 60 * 1000,
-      },
-    },
+    defaultOptions: queryClientConfig,
   });
 
   // Get session to check if we should prefetch user-specific data

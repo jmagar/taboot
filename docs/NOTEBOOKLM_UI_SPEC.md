@@ -847,7 +847,7 @@ When document is ready:
 ```text
 ┌─────────────────────────┐
 │ User Name               │
-│ [user email]            │
+│ [email]                 │
 ├─────────────────────────┤
 │ My notebooks            │
 │ Settings                │

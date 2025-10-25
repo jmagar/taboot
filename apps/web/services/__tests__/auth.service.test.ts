@@ -143,7 +143,7 @@ describe('AuthService', () => {
       vi.mocked(prisma.account.findFirst).mockResolvedValue(null);
 
       // Mock: successful password set (better-auth returns void on success)
-      vi.mocked(auth.api.setPassword).mockResolvedValue(undefined as never);
+      vi.mocked(auth.api.setPassword).mockResolvedValue(undefined);
 
       await authService.setPassword(userId, newPassword, headers);
 
@@ -251,7 +251,7 @@ describe('AuthService', () => {
       });
 
       // Mock: successful password change (better-auth returns void on success)
-      vi.mocked(auth.api.changePassword).mockResolvedValue(undefined as never);
+      vi.mocked(auth.api.changePassword).mockResolvedValue(undefined);
 
       await authService.changePassword(userId, currentPassword, newPassword, headers);
 

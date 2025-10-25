@@ -32,7 +32,7 @@ WORKDIR /app
 # Copy only dependency manifests for better layer caching
 COPY pyproject.toml uv.lock* ./
 
-# Install Python dependencies
+# Install Python dependencies (core packages only, full sync happens in runtime after copying source)
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system --compile-bytecode \
       llama-index-core \
@@ -49,7 +49,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
       pydantic \
       typer \
       spacy \
-      slowapi
+      slowapi \
+      pyjwt \
+      python-json-logger \
+      pydantic-settings
 
 # Copy Node.js workspace files for web app
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./

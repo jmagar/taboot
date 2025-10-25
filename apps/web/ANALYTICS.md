@@ -42,8 +42,8 @@ NEXT_PUBLIC_POSTHOG_HOST="https://app.posthog.com"  # Or self-hosted URL
 - Session replays on errors only (privacy-focused)
 
 **Configuration:**
-- Client config: `/sentry.client.config.ts`
-- Server config: `/sentry.server.config.ts`
+- Client config: `apps/web/sentry.client.config.ts`
+- Server config: `apps/web/sentry.server.config.ts`
 - Next.js integration: `apps/web/next.config.mjs`
 
 **Sampling rates:**
@@ -346,7 +346,7 @@ After deployment:
 │       Client-side (Browser)             │
 │  ┌────────────────────────────────┐     │
 │  │  Sentry.init()                 │     │
-│  │  - sentry.client.config.ts     │     │
+│  │  - ./sentry.client.config.ts   │     │
 │  │  - Error tracking              │     │
 │  │  - Performance traces          │     │
 │  │  - Session replay              │     │
@@ -370,8 +370,8 @@ After deployment:
 
 ### Created
 
-- `/sentry.client.config.ts` - Client-side Sentry configuration
-- `/sentry.server.config.ts` - Server-side Sentry configuration (Node.js only)
+- `apps/web/sentry.client.config.ts` - Client-side Sentry configuration
+- `apps/web/sentry.server.config.ts` - Server-side Sentry configuration (Node.js only)
 - `apps/web/lib/posthog.ts` - PostHog initialization
 - `apps/web/lib/analytics.ts` - Type-safe analytics wrapper
 - `apps/web/__tests__/analytics.test.ts` - Analytics tests

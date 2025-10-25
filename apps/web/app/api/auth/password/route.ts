@@ -1,3 +1,13 @@
+/**
+ * Password Management API
+ *
+ * Security Features:
+ * - CSRF Protection: All state-changing requests protected by middleware (origin/referer + double-submit token)
+ * - Rate Limiting: 5 requests per 15 minutes per IP
+ * - Authentication: Requires valid session
+ * - Input Validation: Zod schemas with strict password requirements
+ */
+
 import { auth } from '@taboot/auth';
 import { logger } from '@/lib/logger';
 import { passwordRateLimit } from '@/lib/rate-limit';

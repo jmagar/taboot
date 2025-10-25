@@ -13,6 +13,7 @@ from apps.cli.taboot_cli.commands import (
     graph_app,
     ingest_app,
     list_app,
+    schema_app,
 )
 from apps.cli.taboot_cli.utils import async_command
 from packages.schemas.models import ExtractionState, SourceType
@@ -215,6 +216,45 @@ def graph_query(
 
 
 app.add_typer(graph_app, name="graph")
+
+
+# Register schema subcommand group with commands
+@schema_app.command(name="version")
+def schema_version() -> None:
+    """
+    Show current database schema version.
+
+    Displays the currently applied schema version from the database along with
+    metadata including timestamp, user, execution time, status, and checksum.
+
+    Example:
+        taboot schema version
+    """
+    from apps.cli.taboot_cli.commands.schema import version_command
+
+    version_command()
+
+
+@schema_app.command(name="history")
+def schema_history(
+    limit: int = typer.Option(10, "--limit", "-l", help="Maximum versions to show"),
+) -> None:
+    """
+    Show schema version history.
+
+    Displays a table of all schema versions applied to the database, ordered by
+    most recent first.
+
+    Examples:
+        taboot schema history
+        taboot schema history --limit 20
+    """
+    from apps.cli.taboot_cli.commands.schema import history_command
+
+    history_command(limit=limit)
+
+
+app.add_typer(schema_app, name="schema")
 
 
 @app.command()

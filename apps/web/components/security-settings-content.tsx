@@ -27,7 +27,7 @@ export function SecuritySettingsContent({ user }: SecuritySettingsContentProps) 
 
   if (checkingPassword) {
     return (
-      <section className="w-xl mx-auto max-w-3xl space-y-6 px-4 py-10">
+      <section className="mx-auto max-w-3xl space-y-6 px-4 py-10">
         <div>
           <Skeleton className="mb-2 h-8 w-48" />
           <Skeleton className="h-4 w-96" />
@@ -41,7 +41,7 @@ export function SecuritySettingsContent({ user }: SecuritySettingsContentProps) 
   return (
     <>
       {/* Password management - shows Set Password or Change Password based on user's current state */}
-      <PasswordForm onSuccess={() => refetchPasswordStatus()} />
+      <PasswordForm onSuccess={refetchPasswordStatus} />
 
       <TwoFactorSetup isEnabled={user.twoFactorEnabled ?? false} />
 

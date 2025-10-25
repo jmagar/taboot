@@ -132,6 +132,8 @@ logs/
 *.db
 *.sqlite
 *.sqlite3
+backup_*.sql
+backup_pre_migration_*.sql
 data/
 tmp/
 temp/
@@ -158,6 +160,7 @@ exports/
 # Misc project files
 # --------------------------------------------
 .todos/
+todos/
 .docs/
 .editorconfig
 agent-responses

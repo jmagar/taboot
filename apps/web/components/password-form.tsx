@@ -107,8 +107,9 @@ export function PasswordForm({ onSuccess }: PasswordFormProps) {
       return result;
     },
     onSuccess: () => {
-      // Invalidate auth queries after password change
-      void queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
+      // Invalidate hasPassword query after password change
+      // Password change doesn't affect session state
+      void queryClient.invalidateQueries({ queryKey: queryKeys.auth.hasPassword() });
 
       toast.success('Password changed successfully!');
       form.reset();

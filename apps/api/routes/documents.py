@@ -6,6 +6,8 @@ Implements GET /documents with filtering and pagination.
 from __future__ import annotations
 
 import logging
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from apps.api.deps import get_document_store
@@ -21,27 +23,35 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 @router.get("", response_model=ResponseEnvelope[DocumentListResponse])
 def list_documents(
-    limit: int = Query(
-        default=10,
-        ge=1,
-        le=100,
-        description="Maximum documents to return",
-    ),
-    offset: int = Query(
-        default=0,
-        ge=0,
-        description="Number of documents to skip (pagination)",
-    ),
-    source_type: str | None = Query(
-        default=None,
-        description="Filter by source type (web, github, etc.)",
-    ),
-    extraction_state: str | None = Query(
-        default=None,
-        description="Filter by extraction state (pending, completed, etc.)",
-    ),
+    limit: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=100,
+            description="Maximum documents to return",
+        ),
+    ] = 10,
+    offset: Annotated[
+        int,
+        Query(
+            ge=0,
+            description="Number of documents to skip (pagination)",
+        ),
+    ] = 0,
+    source_type: Annotated[
+        str | None,
+        Query(
+            description="Filter by source type (web, github, etc.)",
+        ),
+    ] = None,
+    extraction_state: Annotated[
+        str | None,
+        Query(
+            description="Filter by extraction state (pending, completed, etc.)",
+        ),
+    ] = None,
     *,
-    document_store: PostgresDocumentStore = Depends(get_document_store),
+    document_store: Annotated[PostgresDocumentStore, Depends(get_document_store)],
 ) -> ResponseEnvelope[DocumentListResponse]:
     """List ingested documents with optional filters and pagination.
 

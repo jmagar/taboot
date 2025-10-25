@@ -38,7 +38,7 @@ class PostgresJobStore:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO ingestion_jobs (
+                INSERT INTO rag.ingestion_jobs (
                     job_id, source_type, source_target, state,
                     created_at, started_at, completed_at,
                     pages_processed, chunks_created, errors
@@ -71,7 +71,7 @@ class PostgresJobStore:
         """
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT * FROM ingestion_jobs WHERE job_id = %s",
+                "SELECT * FROM rag.ingestion_jobs WHERE job_id = %s",
                 (str(job_id),),
             )
             row = cur.fetchone()
@@ -101,7 +101,7 @@ class PostgresJobStore:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                UPDATE ingestion_jobs SET
+                UPDATE rag.ingestion_jobs SET
                     state = %s,
                     started_at = %s,
                     completed_at = %s,

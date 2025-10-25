@@ -1,6 +1,12 @@
 import posthog from 'posthog-js';
 
-export function initPostHog() {
+/**
+ * Initialize PostHog analytics client.
+ *
+ * @returns The PostHog client instance if initialized (client-side with API key),
+ *          or null if not initialized (server-side or missing API key).
+ */
+export function initPostHog(): typeof posthog | null {
   const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://app.posthog.com';
 
@@ -21,7 +27,8 @@ export function initPostHog() {
       // Capture page leaves
       capture_pageleave: true,
     });
+    return posthog;
   }
 
-  return posthog;
+  return null;
 }

@@ -68,7 +68,7 @@ class SystemStatusResponse(BaseModel):
 )
 async def trigger_extraction(
     request: Request,
-    limit: int | None = Query(None, ge=1, description="Maximum documents to process"),
+    limit: Annotated[int | None, Query(ge=1, description="Maximum documents to process")] = None,
     *,
     use_case: Annotated[ExtractPendingUseCase, Depends(get_extract_use_case)],
 ) -> ResponseEnvelope[ExtractionResponse]:

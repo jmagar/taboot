@@ -102,6 +102,24 @@ describe('Auth Schemas', () => {
       expect(() => changePasswordRequestSchema.parse({ currentPassword: 'password' })).toThrow();
       expect(() => changePasswordRequestSchema.parse({ newPassword: 'password' })).toThrow();
     });
+
+    test('strips unknown fields from request (security)', () => {
+      const result = changePasswordRequestSchema.parse({
+        currentPassword: 'oldpassword',
+        newPassword: 'newpassword',
+        // @ts-expect-error - testing runtime behavior
+        userId: 'malicious-user-id',
+        // @ts-expect-error - testing runtime behavior
+        isAdmin: true,
+      });
+      // Unknown fields are stripped to prevent injection attacks
+      expect(result).not.toHaveProperty('userId');
+      expect(result).not.toHaveProperty('isAdmin');
+      expect(result).toEqual({
+        currentPassword: 'oldpassword',
+        newPassword: 'newpassword',
+      });
+    });
   });
 
   describe('signInRequestSchema', () => {
@@ -194,6 +212,43 @@ describe('Auth Schemas', () => {
           },
         }),
       ).toThrow();
+    });
+
+    test('strips extraneous fields (Zod default behavior)', () => {
+      const result = signInResponseSchema.parse({
+        user: {
+          id: '123',
+          email: 'test@example.com',
+          name: 'Test User',
+          image: 'https://example.com/image.jpg',
+          // @ts-expect-error - testing runtime behavior with unknown fields
+          extraField: 'should be stripped',
+        },
+        session: {
+          id: 'session-123',
+          expiresAt: '2025-10-25T12:00:00Z',
+          // @ts-expect-error - testing runtime behavior with unknown fields
+          anotherExtra: 'also stripped',
+        },
+        // @ts-expect-error - testing runtime behavior with unknown fields
+        unknownTopLevel: 'stripped',
+      });
+      // Zod strips unknown fields by default (strip mode)
+      expect(result).not.toHaveProperty('unknownTopLevel');
+      expect(result.user).not.toHaveProperty('extraField');
+      expect(result.session).not.toHaveProperty('anotherExtra');
+      expect(result).toEqual({
+        user: {
+          id: '123',
+          email: 'test@example.com',
+          name: 'Test User',
+          image: 'https://example.com/image.jpg',
+        },
+        session: {
+          id: 'session-123',
+          expiresAt: '2025-10-25T12:00:00Z',
+        },
+      });
     });
   });
 
@@ -298,6 +353,24 @@ describe('Auth Schemas', () => {
       });
       expect(result.user.id).toBe('123');
       expect(result.session.id).toBe('session-123');
+    });
+
+    test('strips extraneous fields from session response', () => {
+      const result = sessionResponseSchema.parse({
+        user: {
+          id: '123',
+          email: 'test@example.com',
+          name: 'Test User',
+          image: 'https://example.com/image.jpg',
+          // @ts-expect-error - testing runtime behavior
+          internalField: 'stripped',
+        },
+        session: {
+          id: 'session-123',
+          expiresAt: '2025-10-25T12:00:00Z',
+        },
+      });
+      expect(result.user).not.toHaveProperty('internalField');
     });
   });
 

@@ -231,8 +231,8 @@ Successfully implemented all 13 improvements from [WEB_APP_IMPROVEMENTS.md](../.
 **Priority:** NICE-TO-HAVE
 
 **Files Created:**
-- `sentry.client.config.ts` - Client-side error tracking
-- `sentry.server.config.ts` - Server-side error tracking
+- `./sentry.client.config.ts` - Client-side error tracking
+- `./sentry.server.config.ts` - Server-side error tracking
 - `lib/posthog.ts` - Product analytics initialization
 - `lib/analytics.ts` - Type-safe analytics wrapper
 - `__tests__/analytics.test.ts` - Analytics tests (11 tests)
@@ -297,7 +297,8 @@ Successfully implemented all 13 improvements from [WEB_APP_IMPROVEMENTS.md](../.
 ## Final Validation Results
 
 ### Test Suite: ✅ PASSING
-```
+
+```text
 Test Files: 9 passed (9)
 Tests: 117 passed (117)
 Duration: 5.22s
@@ -309,14 +310,16 @@ Coverage:
 ```
 
 ### Linting: ✅ PASSING
-```
+
+```text
 ESLint: 0 errors, 0 warnings
 TypeScript: Strict mode, no `any` types
 Accessibility: JSX a11y rules enabled
 ```
 
 ### Build: ⚠️ Development Working
-```
+
+```text
 Development mode: ✅ Fully functional
 Production build: ⚠️ Pre-existing Prisma/Edge Runtime issue (unrelated)
 ```

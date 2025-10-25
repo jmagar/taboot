@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, RenderOptions, RenderResult } from '@testing-library/react';
-import { ReactElement, ReactNode } from 'react';
+import React, { ReactElement, ReactNode } from 'react';
 
 /**
  * Create a test query client with sensible defaults for testing.
@@ -27,9 +27,10 @@ interface AllTheProvidersProps {
 
 /**
  * Wrapper component with all required providers for testing.
+ * Memoizes QueryClient to avoid recreation on re-renders.
  */
 function AllTheProviders({ children }: AllTheProvidersProps) {
-  const queryClient = createTestQueryClient();
+  const [queryClient] = React.useState(() => createTestQueryClient());
 
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }

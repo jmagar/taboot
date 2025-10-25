@@ -62,7 +62,8 @@ done
 ```
 
 **Expected Output**:
-```
+
+```text
 Request 1:
 Status: 200
 Request 2:
@@ -76,6 +77,7 @@ Status: 200
 Request 6:
 Status: 429
 ```
+
 
 **Success Criteria**:
 - First 5 requests return 200
@@ -94,6 +96,7 @@ curl -X GET http://localhost:3000/api/auth/password \
 ```
 
 **Expected**:
+
 ```json
 {
   "error": "Too many requests. Please try again later.",
@@ -126,7 +129,8 @@ curl -X GET http://localhost:3000/api/auth/password \
 ```
 
 **Expected**:
-```
+
+```text
 IP1 Request 1: 200
 IP1 Request 2: 200
 IP1 Request 3: 200
@@ -134,6 +138,7 @@ IP1 Request 4: 200
 IP1 Request 5: 200
 IP2 Request 1: 200  ✓ (separate limit)
 ```
+
 
 **Success Criteria**: IP2 request succeeds even though IP1 exhausted limit
 
@@ -167,17 +172,20 @@ curl -X GET http://localhost:3000/api/auth/password \
 ```
 
 **Expected**:
-```
+
+```text
 Before wait: 429
 Waiting 10 minutes...
 After wait: 200
 ```
 
 **Alternative (Fast Test)**: Clear Redis key manually
+
 ```bash
 # Connect to Upstash Redis via CLI or dashboard
 # Delete key: ratelimit:password:192.168.1.1
 ```
+
 
 **Success Criteria**: Limit resets after window expires
 
@@ -202,6 +210,7 @@ tail -f apps/web/.next/server/logs/app.log | grep "Rate limit exceeded"
 ```
 
 **Expected Log**:
+
 ```json
 {
   "level": "warn",
@@ -216,6 +225,7 @@ tail -f apps/web/.next/server/logs/app.log | grep "Rate limit exceeded"
   }
 }
 ```
+
 
 **Success Criteria**: Log entry present with correct structure
 
@@ -243,11 +253,13 @@ docker compose logs taboot-app | grep "Rate limit check failed"
 ```
 
 **Expected**:
-```
+
+```text
 Status: 200  ✓ (request allowed)
 ```
 
 **Expected Log**:
+
 ```json
 {
   "level": "error",
@@ -255,6 +267,7 @@ Status: 200  ✓ (request allowed)
   ...
 }
 ```
+
 
 **Success Criteria**:
 - Request succeeds (200) despite Redis failure
@@ -278,7 +291,8 @@ done
 ```
 
 **Expected**:
-```
+
+```text
 Request 1:
 Status: 400  (or 200 if password not set)
 ...
@@ -287,6 +301,7 @@ Status: 400  (or 200)
 Request 6:
 Status: 429  ✓ (rate limited)
 ```
+
 
 **Success Criteria**: 6th request returns 429
 
@@ -369,10 +384,12 @@ wait
 **Cause**: Rate limiting not applied or wrapper not working
 
 **Fix**: Verify handlers wrapped with `withRateLimit()`:
+
 ```typescript
 export const GET = withRateLimit(handleGET, passwordRateLimit);
 export const POST = withRateLimit(handlePOST, passwordRateLimit);
 ```
+
 
 ---
 

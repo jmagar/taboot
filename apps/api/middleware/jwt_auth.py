@@ -51,6 +51,7 @@ class AuthClaims(TypedDict, total=False):
 
 AUTH_SECRET_ENV_VAR = "AUTH_SECRET"
 JWT_ALGORITHM: Final[str] = "HS256"
+MIN_SECRET_LENGTH: Final[int] = 32  # 256 bits for HS256
 
 # HTTP Bearer token scheme
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -58,11 +59,53 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 @lru_cache(maxsize=1)
 def _get_auth_secret() -> str:
-    """Fetch and cache the AUTH_SECRET environment variable."""
-    auth_secret = os.getenv(AUTH_SECRET_ENV_VAR)
+    """Get and validate the JWT signing secret from environment.
+
+    Tries AUTH_SECRET first, falls back to BETTER_AUTH_SECRET if not set.
+    This allows single-user systems to use one secret for both auth systems.
+
+    Validates that secret meets minimum security requirements:
+    - Minimum 32 characters (256 bits for HS256)
+    - Basic entropy check (not all repeated characters)
+
+    Returns:
+        Validated auth secret value.
+
+    Raises:
+        RuntimeError: If no secret found, too short, or has insufficient entropy.
+    """
+    auth_secret = os.getenv(AUTH_SECRET_ENV_VAR) or os.getenv("BETTER_AUTH_SECRET")
+
     if not auth_secret:
-        logger.error("AUTH_SECRET environment variable is required for JWT authentication")
-        raise RuntimeError("AUTH_SECRET environment variable is required for JWT authentication")
+        logger.error("AUTH_SECRET or BETTER_AUTH_SECRET required for JWT authentication")
+        raise RuntimeError(
+            "AUTH_SECRET (or BETTER_AUTH_SECRET) environment variable must be set. "
+            "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
+
+    # Validate minimum length (256 bits for HS256)
+    if len(auth_secret) < MIN_SECRET_LENGTH:
+        logger.error(
+            "AUTH_SECRET too short",
+            extra={"length": len(auth_secret), "minimum": MIN_SECRET_LENGTH},
+        )
+        raise RuntimeError(
+            f"AUTH_SECRET must be at least {MIN_SECRET_LENGTH} characters (256 bits). "
+            f"Current length: {len(auth_secret)}. "
+            "Generate strong secret with: "
+            "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
+
+    # Basic entropy check (not repeated characters)
+    if len(set(auth_secret)) < MIN_SECRET_LENGTH // 2:
+        logger.error("AUTH_SECRET has low entropy")
+        raise RuntimeError(
+            "AUTH_SECRET has insufficient entropy (too many repeated characters). "
+            "Generate cryptographically random secret with: "
+            "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
+
+    logger.info("AUTH_SECRET validated", extra={"length": len(auth_secret)})
     return auth_secret
 
 

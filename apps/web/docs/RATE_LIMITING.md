@@ -8,19 +8,19 @@ Rate limiting has been implemented for authentication endpoints using Upstash Re
 
 ### Core Components
 
-1. **`/home/jmagar/code/taboot/apps/web/lib/rate-limit.ts`**
+1. **`apps/web/lib/rate-limit.ts`**
    - Creates Redis connection using Upstash credentials
    - Defines rate limiters with sliding window algorithm
    - Implements client IP extraction
 
-2. **`/home/jmagar/code/taboot/apps/web/lib/with-rate-limit.ts`**
+2. **`apps/web/lib/with-rate-limit.ts`**
    - Higher-order function wrapper for route handlers
    - Adds rate limit checks before handler execution
    - Returns 429 responses when limits exceeded
    - Injects rate limit headers into all responses
    - Fails open on errors (allows requests but logs issues)
 
-3. **`/home/jmagar/code/taboot/apps/web/app/api/auth/password/route.ts`**
+3. **`apps/web/app/api/auth/password/route.ts`**
    - Updated to use rate limiting on GET and POST handlers
    - Protected against password enumeration and brute-force
 
@@ -54,11 +54,12 @@ This works with reverse proxies (nginx, Cloudflare, etc.) that inject these head
 
 All responses include rate limit information:
 
-```
+```text
 X-RateLimit-Limit: 5
 X-RateLimit-Remaining: 4
 X-RateLimit-Reset: 2025-10-25T12:34:56.789Z
 ```
+
 
 - **X-RateLimit-Limit**: Maximum requests allowed in the window
 - **X-RateLimit-Remaining**: Requests remaining in current window
@@ -86,6 +87,7 @@ The implementation follows a **fail-open** strategy:
 - This prevents rate limiting issues from breaking authentication for legitimate users
 
 Example log on failure:
+
 ```json
 {
   "level": "error",
@@ -103,12 +105,13 @@ Example log on failure:
 
 ### Environment Variables
 
-Add to `/home/jmagar/code/taboot/apps/web/.env`:
+Add to `.env.local`:
 
 ```env
 UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
 UPSTASH_REDIS_REST_TOKEN=your-token-here
 ```
+
 
 **Required**: Both variables must be set or the application will throw an error at startup.
 
@@ -142,6 +145,7 @@ export const POST = withRateLimit(handlePOST, authRateLimit);
 ### Manual Testing
 
 1. **Test rate limit threshold**:
+
    ```bash
    # Send 6 requests in quick succession
    for i in {1..6}; do
@@ -154,6 +158,7 @@ export const POST = withRateLimit(handlePOST, authRateLimit);
    ```
 
 2. **Verify headers**:
+
    ```bash
    curl -X GET http://localhost:3000/api/auth/password \
      -H "Cookie: your-session-cookie" \
@@ -161,6 +166,7 @@ export const POST = withRateLimit(handlePOST, authRateLimit);
    ```
 
 3. **Test different IPs**:
+
    ```bash
    # Simulate different clients
    curl -X GET http://localhost:3000/api/auth/password \
@@ -174,13 +180,15 @@ export const POST = withRateLimit(handlePOST, authRateLimit);
 
 ### Unit Tests
 
-Tests are located in `/home/jmagar/code/taboot/apps/web/lib/__tests__/rate-limit.test.ts`
+Tests are located in `apps/web/lib/__tests__/rate-limit.test.ts`
 
 Run tests:
+
 ```bash
-cd /home/jmagar/code/taboot/apps/web
+cd apps/web
 pnpm test lib/__tests__/rate-limit.test.ts
 ```
+
 
 ## Monitoring
 
@@ -202,6 +210,7 @@ Rate limit violations are logged with the following structure:
   }
 }
 ```
+
 
 ### Upstash Analytics
 

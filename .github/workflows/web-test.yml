@@ -12,10 +12,16 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
+    concurrency:
+      group: web-tests-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -33,12 +39,3 @@ jobs:
 
       - name: Run tests with coverage
         run: pnpm --filter=web test:ci
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./apps/web/coverage/lcov.info
-          flags: web
-          name: web-coverage
-          fail_ci_if_error: false

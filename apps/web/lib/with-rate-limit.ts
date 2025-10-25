@@ -12,7 +12,10 @@ type Handler = (req: Request) => Promise<NextResponse>;
  * - Returns 429 Too Many Requests when rate limit exceeded
  * - Adds rate limit headers to all responses (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)
  * - Logs rate limit violations
- * - Fails open on errors (allows request but logs the error)
+ * - Fails closed: if rate limit check fails, returns 503 Service Unavailable
+ *
+ * Security Note: This middleware fails closed. If rate limiting cannot be verified
+ * (e.g., Redis connection error), the request is rejected rather than allowed through.
  *
  * @param handler - The original route handler
  * @param ratelimit - The Ratelimit instance to use
@@ -63,15 +66,25 @@ export function withRateLimit(handler: Handler, ratelimit: Ratelimit): Handler {
 
       return response;
     } catch (error) {
-      // Fail open: on rate limit check error, allow the request but log the issue
-      logger.error('Rate limit check failed, failing open', {
+      // Fail closed: rate limit check failed, reject the request
+      logger.error('Rate limit check failed, failing closed (rejecting request)', {
         error,
         identifier,
         path: new URL(req.url).pathname,
       });
 
-      // Continue with original handler
-      return handler(req);
+      // Return 503 Service Unavailable
+      return NextResponse.json(
+        {
+          error: 'Service temporarily unavailable. Please try again later.',
+        },
+        {
+          status: 503,
+          headers: {
+            'Retry-After': '60', // Suggest retry after 60 seconds
+          },
+        },
+      );
     }
   };
 }

@@ -2,8 +2,8 @@ import { Skeleton } from '@taboot/ui/components/skeleton';
 
 export default function DashboardLoading() {
   return (
-    <section className="max-w-2xl p-12">
-      <div className="space-y-4">
+    <section className="max-w-2xl p-12" aria-busy="true" aria-label="Loading dashboard">
+      <div className="space-y-4" aria-hidden="true">
         <Skeleton className="h-8 w-48" />
         <div className="rounded-md py-4">
           <Skeleton className="h-5 w-64" />

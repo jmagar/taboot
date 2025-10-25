@@ -3,7 +3,7 @@
 import { validateCallbackUrl } from '@/lib/validate-callback-url';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { sendVerificationEmail, signIn, signUp } from '@taboot/auth';
+import { sendVerificationEmail, signIn, signUp } from '@taboot/auth/client';
 import { Button } from '@taboot/ui/components/button';
 import {
   Form,

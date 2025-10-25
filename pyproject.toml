@@ -83,7 +83,6 @@ dependencies = [
   "pybreaker>=1.2.0",
   "prometheus-client>=0.21.0",
   "tiktoken>=0.8.0",
-  "alembic>=1.15.2,<2",
 ]
 
 [project.optional-dependencies]

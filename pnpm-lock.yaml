@@ -170,6 +170,9 @@ importers:
       '@taboot/auth':
         specifier: workspace:*
         version: link:../../packages-ts/auth
+      '@taboot/db':
+        specifier: workspace:*
+        version: link:../../packages-ts/db
       '@taboot/ui':
         specifier: workspace:*
         version: link:../../packages-ts/ui
@@ -259,6 +262,9 @@ importers:
 
   packages-ts/auth:
     dependencies:
+      '@taboot/db':
+        specifier: workspace:*
+        version: link:../db
       '@taboot/email':
         specifier: workspace:*
         version: link:../email

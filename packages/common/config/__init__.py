@@ -7,6 +7,7 @@ All service URLs, credentials, and tuning parameters are defined here.
 import os
 from functools import lru_cache
 from pathlib import Path
+from threading import Lock
 
 from dotenv import load_dotenv
 from pydantic import Field, HttpUrl, SecretStr, field_validator
@@ -14,6 +15,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 _ENV_LOADED = False
+_ENV_LOCK = Lock()
 
 
 def _is_running_in_container() -> bool:
@@ -79,14 +81,15 @@ def ensure_env_loaded() -> None:
     """Load environment variables from disk exactly once."""
     global _ENV_LOADED
 
-    if _ENV_LOADED:
-        return
+    with _ENV_LOCK:
+        if _ENV_LOADED:
+            return
 
-    env_path = _DEFAULT_ENV_FILE or _resolve_env_file()
-    if env_path:
-        load_dotenv(env_path, override=False)
+        env_path = _DEFAULT_ENV_FILE or _resolve_env_file()
+        if env_path:
+            load_dotenv(env_path, override=False)
 
-    _ENV_LOADED = True
+        _ENV_LOADED = True
 
 
 ensure_env_loaded()

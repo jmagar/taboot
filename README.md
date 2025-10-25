@@ -289,8 +289,7 @@ taboot list RESOURCE [--limit N] [--filter EXPR]
 
 > Port and image settings align with `.env.example` provided below.
 
-`taboot-app` bundles the FastAPI surface, MCP server, and web dashboard into a single
-container to keep the compose stack compact. Override the start command in
+`taboot-app` bundles the FastAPI surface, MCP server, and web dashboard into a single container to keep the compose stack compact. Override the start command in
 `docker/app/Dockerfile` if you need a different process supervisor.
 
 Operational runbooks and production responses are documented in [apps/api/docs/RUNBOOK.md](apps/api/docs/RUNBOOK.md), while crawl etiquette and throttling live in [apps/api/docs/BACKPRESSURE_RATELIMITING.md](apps/api/docs/BACKPRESSURE_RATELIMITING.md).

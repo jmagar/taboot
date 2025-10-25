@@ -161,8 +161,14 @@ All services in `docker-compose.yaml`:
 | `taboot-db` | PostgreSQL 16 (Firecrawl metadata) | ❌ |
 | `taboot-playwright` | Playwright browser microservice | ❌ |
 | `taboot-crawler` | Firecrawl v2 API | ❌ |
-| `taboot-app` | Unified API + MCP + Web container | ❌ |
+| `taboot-app` | Unified API (8000) + MCP + Next.js Web (3000) | ❌ |
 | `taboot-worker` | Extraction worker (spaCy tiers + LLM windows) | ❌ |
+
+**taboot-app Details:**
+- Runs both FastAPI (port 8000) and Next.js web dashboard (port 3000)
+- Managed via supervisord for process orchestration
+- Includes Python (uv/FastAPI) and Node.js (pnpm/Next.js) runtimes
+- Web app includes auth (Prisma), UI components (shadcn/ui), and dashboard
 
 **GPU Notes:** Requires NVIDIA driver + `nvidia-container-toolkit`. Model downloads (Ollama, spaCy) happen on first run; pull sizes may exceed 20GB total.
 
@@ -187,6 +193,31 @@ LLAMACRAWL_API_URL=http://localhost:8000
 ```
 
 Per-source credentials (GitHub, Reddit, Gmail, Elasticsearch, Unifi, Tailscale) documented in `docs/`.
+
+## Schema Management
+
+**PostgreSQL:**
+- Source of truth: `specs/001-taboot-rag-platform/contracts/postgresql-schema.sql`
+- No automated migrations (Alembic removed)
+- Manual versioning via version comment in SQL file
+- Breaking changes OK: wipe and rebuild with `docker volume rm taboot-db`
+- Schema created during `taboot init` via `packages.common.db_schema.create_schema()`
+
+**Neo4j:**
+- Constraints: `specs/001-taboot-rag-platform/contracts/neo4j-constraints.cypher`
+- Applied idempotently during `taboot init`
+- No versioning needed (idempotent CREATE IF NOT EXISTS)
+
+**Qdrant:**
+- Collections created on-demand during `taboot init`
+- Config: `specs/001-taboot-rag-platform/contracts/qdrant-collection.json`
+- Versioning via aliases (managed by application)
+
+**Prisma (TypeScript/Next.js Auth):**
+- Schema: `packages-ts/db/prisma/schema.prisma`
+- Separate concern from Python RAG platform
+- Manages: User, Session, Account, Verification, TwoFactor tables
+- Migrations: `pnpm db:migrate` in packages-ts/db
 
 ## Performance Targets (RTX 4070)
 

@@ -2,7 +2,7 @@
 
 import { validateCallbackUrl } from '@/lib/validate-callback-url';
 import { useMutation } from '@tanstack/react-query';
-import { twoFactor } from '@taboot/auth';
+import { twoFactor } from '@taboot/auth/client';
 import { Button } from '@taboot/ui/components/button';
 import {
   Card,

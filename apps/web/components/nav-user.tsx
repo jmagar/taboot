@@ -1,3 +1,5 @@
+'use client';
+
 import { useRequiredAuthUser } from '@/hooks/use-auth-user';
 import type { ComponentType, SVGProps } from 'react';
 import { signOut } from '@taboot/auth/client';
@@ -131,14 +133,14 @@ function renderDropdownItems(dropdownItems: DropdownItem[][]) {
               <DropdownMenuItem asChild key={item.label}>
                 <Link href={item.href}>
                   <div className="flex items-center gap-2">
-                    <item.icon className="h-4 w-4" />
+                    <item.icon className="h-4 w-4" aria-hidden="true" />
                     {item.label}
                   </div>
                 </Link>
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem key={item.label} onClick={item.onClick}>
-                <item.icon className="h-4 w-4" />
+                <item.icon className="h-4 w-4" aria-hidden="true" />
                 {item.label}
               </DropdownMenuItem>
             ),

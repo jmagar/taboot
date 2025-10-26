@@ -44,7 +44,7 @@ export function MobileNav() {
                 href={item.href}
                 className="flex items-center gap-3 rounded-md px-3 py-2 text-base font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
               >
-                <item.icon className="h-5 w-5" />
+                <item.icon className="h-5 w-5" aria-hidden="true" />
                 {item.title}
               </Link>
             </SheetClose>

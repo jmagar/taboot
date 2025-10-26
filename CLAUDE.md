@@ -92,14 +92,27 @@ uv run mypy .                                       # strict type-check
 
 ### Running Services
 ```bash
-# Start API (via Docker only - no CLI entry point)
-docker compose up taboot-app
+# Start API service only
+docker compose up taboot-api
+
+# Start web service only
+docker compose up taboot-web
+
+# Start both API and web
+docker compose up taboot-api taboot-web
+
+# Scale API service (independent scaling)
+docker compose up --scale taboot-api=3 taboot-api
 
 # View logs
 docker compose logs -f <service-name>
 
 # Health check
 docker compose ps
+
+# Test health endpoints
+curl http://localhost:8000/health        # API health
+curl http://localhost:3000/api/health    # Web health
 ```
 
 ### Debugging
@@ -277,14 +290,16 @@ All services in `docker-compose.yaml`:
 | `taboot-db` | PostgreSQL 16 (Firecrawl metadata) | ❌ |
 | `taboot-playwright` | Playwright browser microservice | ❌ |
 | `taboot-crawler` | Firecrawl v2 API | ❌ |
-| `taboot-app` | Unified API (8000) + MCP + Next.js Web (3000) | ❌ |
+| `taboot-api` | FastAPI service (port 8000) | ❌ |
+| `taboot-web` | Next.js web dashboard (port 3000) | ❌ |
 | `taboot-worker` | Extraction worker (spaCy tiers + LLM windows) | ❌ |
 
-**taboot-app Details:**
-- Runs both FastAPI (port 8000) and Next.js web dashboard (port 3000)
-- Managed via supervisord for process orchestration
-- Includes Python (uv/FastAPI) and Node.js (pnpm/Next.js) runtimes
-- Web app includes auth (Prisma), UI components (shadcn/ui), and dashboard
+**Service Separation Benefits:**
+- **Independent scaling:** Scale API and web separately based on load
+- **Independent deployments:** Deploy and restart services without affecting each other
+- **Dedicated health checks:** `/health` (API) and `/api/health` (web) endpoints
+- **Cloud-native compliance:** Follows single-process-per-container best practices
+- **Simplified debugging:** Isolated logs and process inspection per service
 
 **GPU Notes:** Requires NVIDIA driver + `nvidia-container-toolkit`. Model downloads (Ollama, spaCy) happen on first run; pull sizes may exceed 20GB total.
 

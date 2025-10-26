@@ -244,24 +244,21 @@ services:
       retries: 5
       start_period: 15s
 
-  taboot-app:
+  taboot-api:
     <<: *common-base
     build:
       context: .
-      dockerfile: docker/app/Dockerfile
-    container_name: taboot-app
+      dockerfile: apps/api/Dockerfile
+    container_name: taboot-api
     env_file:
       - .env
     environment:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      NODE_ENV: ${NODE_ENV:-production}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     volumes:
-      - taboot-app:/app/.venv
+      - taboot-api:/app/.venv
       - ${HOME}/.ssh:/home/llamacrawl/.ssh:ro
     ports:
       - "${TABOOT_HTTP_PORT:-8000}:8000"
-      - "${TABOOT_WEB_PORT:-3000}:3000"
     depends_on:
       taboot-cache:
         condition: service_healthy
@@ -274,7 +271,33 @@ services:
       taboot-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health && curl -f http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  taboot-web:
+    <<: *common-base
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: taboot-web
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      # Internal API URL for server-side requests within Docker network
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://taboot-api:8000}
+    ports:
+      - "${TABOOT_WEB_PORT:-3000}:3000"
+    depends_on:
+      taboot-api:
+        condition: service_healthy
+      taboot-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -319,7 +342,7 @@ volumes:
   taboot-cache:
   taboot-ollama:
   taboot-db:
-  taboot-app:
+  taboot-api:
 
 networks:
   taboot-net:

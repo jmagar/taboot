@@ -1,0 +1,82 @@
+# Node.js and web app files
+node_modules/
+.next/
+apps/web/
+packages-ts/
+pnpm-workspace.yaml
+pnpm-lock.yaml
+turbo.json
+
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+**/*.test.py
+**/__tests__/
+tests/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Documentation
+*.md
+docs/
+specs/
+todos/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore

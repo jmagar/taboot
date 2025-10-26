@@ -1,28 +1,18 @@
 import { NextResponse } from 'next/server';
+import { isIP } from 'node:net';
 import { prisma, restoreUser } from '@taboot/db';
 import { auth } from '@taboot/auth';
 import { logger } from '@/lib/logger';
 
 /**
  * Validate IP address format (IPv4 or IPv6).
+ * Uses Node.js built-in validator for comprehensive IPv4/IPv6 support
+ * including IPv6-mapped IPv4 addresses and all valid formats.
  * @param ip - IP address string to validate
  * @returns true if valid IPv4 or IPv6 address
  */
 function isValidIp(ip: string): boolean {
-  // IPv4 regex pattern
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  // IPv6 regex pattern (simplified - matches most common formats)
-  const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-  // IPv6 compressed format (with ::)
-  const ipv6CompressedRegex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
-
-  if (ipv4Regex.test(ip)) {
-    // Validate octets are 0-255
-    const octets = ip.split('.').map(Number);
-    return octets.every((octet) => octet >= 0 && octet <= 255);
-  }
-
-  return ipv6Regex.test(ip) || ipv6CompressedRegex.test(ip);
+  return isIP(ip) !== 0;
 }
 
 /**
@@ -110,13 +100,6 @@ export async function POST(
       return NextResponse.json(
         { error: 'User not found or not deleted' },
         { status: 404 }
-      );
-    }
-
-    if (!user.deletedAt) {
-      return NextResponse.json(
-        { error: 'User is not deleted' },
-        { status: 400 }
       );
     }
 

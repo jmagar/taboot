@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@taboot/db';
 import { auth } from '@taboot/auth';
 import { logger } from '@/lib/logger';
@@ -69,20 +69,20 @@ function getClientIp(request: Request): string | undefined {
  * This is IRREVERSIBLE unlike soft delete
  */
 export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
+  // Await params in Next.js 15+
+  const { id } = await params;
   try {
     // Get authenticated session
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+    const session = await auth();
 
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = params.id;
+    const userId = id;
     const currentUserId = session.user.id;
 
     // Authorization: user can erase own account OR admin can erase any account
@@ -218,20 +218,20 @@ export async function POST(
  * User can preview own account erasure, admin can preview any
  */
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
+  // Await params in Next.js 15+
+  const { id } = await params;
   try {
     // Get authenticated session
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+    const session = await auth();
 
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = params.id;
+    const userId = id;
     const currentUserId = session.user.id;
 
     // Authorization: user can preview own erasure OR admin can preview any

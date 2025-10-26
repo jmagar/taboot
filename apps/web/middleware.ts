@@ -1,6 +1,86 @@
-import { auth } from '@taboot/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { csrfMiddleware } from '@/lib/csrf';
+import { AUTH_COOKIE_NAME, AUTH_COOKIE_LEGACY_NAME, AUTH_BEARER_PREFIX } from '@taboot/auth';
+
+/**
+ * Transfer CSRF-related cookies and headers from one response to another.
+ * Used to merge CSRF data for safe HTTP methods.
+ */
+function transferCsrfData(source: NextResponse, target: NextResponse): void {
+  // Copy all cookies from source response
+  source.cookies.getAll().forEach((cookie) => {
+    target.cookies.set(cookie);
+  });
+
+  // Copy CSRF-specific headers
+  source.headers.forEach((value, key) => {
+    if (key.toLowerCase().startsWith('x-csrf')) {
+      target.headers.set(key, value);
+    }
+  });
+}
+
+/**
+ * Check if the request has a valid authentication session.
+ * Checks both bearer token authorization header and session cookies.
+ */
+function hasValidSession(request: NextRequest): boolean {
+  // Check for bearer token
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith(AUTH_BEARER_PREFIX)) {
+    return true;
+  }
+
+  // Check for session cookies
+  const sessionCookie =
+    request.cookies.get(AUTH_COOKIE_NAME)?.value ||
+    request.cookies.get(AUTH_COOKIE_LEGACY_NAME)?.value;
+
+  return Boolean(sessionCookie);
+}
+
+/**
+ * Apply security headers to the response including CSP with nonce.
+ */
+function applySecurityHeaders(response: NextResponse): void {
+  // Generate nonce for CSP script tags
+  const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64');
+
+  // Content Security Policy configuration
+  const cspConfig = {
+    'default-src': "'self'",
+    'script-src': `'self' 'nonce-${nonce}' https://app.posthog.com https://vercel.live https://*.sentry.io`,
+    'style-src': "'self' 'unsafe-inline'", // Required for Tailwind CSS
+    'img-src': "'self' data: https:",
+    'font-src': "'self' data:",
+    'connect-src': "'self' https://*.posthog.com https://*.sentry.io https://*.ingest.sentry.io",
+    'frame-ancestors': "'none'",
+    'base-uri': "'self'",
+    'form-action': "'self'",
+    'upgrade-insecure-requests': '',
+  };
+
+  // Build CSP string
+  const csp = Object.entries(cspConfig)
+    .map(([key, value]) => (value ? `${key} ${value}` : key))
+    .join('; ');
+
+  // Security headers
+  const securityHeaders = {
+    'Content-Security-Policy': csp,
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'X-XSS-Protection': '1; mode=block',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    'x-nonce': nonce, // Pass nonce for script tags in layout
+  };
+
+  // Apply all security headers
+  Object.entries(securityHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+}
 
 // Routes that require authentication
 const protectedRoutes = ['/dashboard', '/profile', '/settings'];
@@ -21,33 +101,24 @@ export async function middleware(request: NextRequest) {
 
   // Apply CSRF protection to API routes (unless excluded)
   if (pathname.startsWith('/api')) {
-    // Fix #2: Boundary-aware route exclusion check
     const isExcluded = csrfExcludedRoutes.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`)
     );
 
     if (!isExcluded) {
-      // Fix #4: Call CSRF middleware only once
       const csrfResponse = await csrfMiddleware(request);
 
-      // For safe methods (GET/HEAD/OPTIONS), merge CSRF cookies/headers and continue
-      if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
+      // Handle safe methods (GET/HEAD/OPTIONS) - merge CSRF headers and continue
+      const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
+      if (safeMethods.includes(request.method)) {
         const response = NextResponse.next();
 
-        // Copy CSRF cookies and headers to the response
-        csrfResponse.cookies.getAll().forEach((cookie) => {
-          response.cookies.set(cookie);
-        });
-        csrfResponse.headers.forEach((value, key) => {
-          if (key.toLowerCase().startsWith('x-csrf')) {
-            response.headers.set(key, value);
-          }
-        });
-
+        // Transfer CSRF-related cookies and headers
+        transferCsrfData(csrfResponse, response);
         return response;
       }
 
-      // For unsafe methods (POST/PUT/PATCH/DELETE), return 403 if CSRF check failed
+      // For unsafe methods, enforce CSRF validation
       if (csrfResponse.status === 403) {
         return csrfResponse;
       }
@@ -57,18 +128,12 @@ export async function middleware(request: NextRequest) {
   // Helper to check if pathname matches route exactly or starts with route/
   const startsWithRoute = (route: string) => pathname === route || pathname.startsWith(route + '/');
 
-  // Check if current route is protected or an auth route
+  // Check if current route needs authentication handling
   const isProtectedRoute = protectedRoutes.some(startsWithRoute);
   const isAuthRoute = authRoutes.some(startsWithRoute);
 
-  // Only fetch session if needed for protected or auth routes
-  let isAuthenticated = false;
-  if (isProtectedRoute || isAuthRoute) {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-    isAuthenticated = !!session?.user;
-  }
+  // Check authentication status if needed for route decision
+  const isAuthenticated = (isProtectedRoute || isAuthRoute) && hasValidSession(request);
 
   // Redirect unauthenticated users from protected routes to sign-in with callback
   if (isProtectedRoute && !isAuthenticated) {
@@ -83,35 +148,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // Generate nonce for CSP
-  const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64');
-
-  // Create response with CSP headers
+  // Create response with security headers
   const response = NextResponse.next();
-
-  // Set Content-Security-Policy header with nonce for scripts
-  const csp = [
-    "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://app.posthog.com https://vercel.live https://*.sentry.io`,
-    "style-src 'self' 'unsafe-inline'", // Tailwind requires unsafe-inline
-    "img-src 'self' data: https:",
-    "font-src 'self' data:",
-    "connect-src 'self' https://*.posthog.com https://*.sentry.io https://*.ingest.sentry.io",
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "upgrade-insecure-requests",
-  ].join('; ');
-
-  response.headers.set('Content-Security-Policy', csp);
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('X-XSS-Protection', '1; mode=block');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-
-  // Pass nonce to response for script tags in layout
-  response.headers.set('x-nonce', nonce);
+  applySecurityHeaders(response);
 
   return response;
 }

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { isIP } from 'node:net';
 import { prisma, restoreUser } from '@taboot/db';
 import { auth } from '@taboot/auth';
@@ -57,9 +57,11 @@ function getClientIp(request: Request): string | undefined {
  * Requires admin role and authentication
  */
 export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
+  // Await params in Next.js 15+
+  const { id } = await params;
   try {
     // Get authenticated session
     const session = await auth();
@@ -81,12 +83,12 @@ export async function POST(
     if (session.user.id !== adminUserId) {
       logger.warn('Unauthorized restore attempt', {
         attemptedBy: session.user.id,
-        targetUser: params.id,
+        targetUser: id,
       });
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const userId = params.id;
+    const userId = id;
 
     // Find the soft-deleted user (using findFirst since deletedAt is not unique)
     const user = await prisma.user.findFirst({
@@ -141,9 +143,11 @@ export async function POST(
  * Get soft-deleted user information
  */
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
+  // Await params in Next.js 15+
+  const { id } = await params;
   try {
     // Get authenticated session
     const session = await auth();
@@ -165,12 +169,12 @@ export async function GET(
     if (session.user.id !== adminUserId) {
       logger.warn('Unauthorized restore attempt', {
         attemptedBy: session.user.id,
-        targetUser: params.id,
+        targetUser: id,
       });
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const userId = params.id;
+    const userId = id;
 
     // Find the soft-deleted user (using findFirst since deletedAt is not unique)
     const user = await prisma.user.findFirst({

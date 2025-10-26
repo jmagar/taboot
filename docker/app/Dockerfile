@@ -5,12 +5,13 @@
 # -------------------------------
 FROM python:3.13-slim AS builder
 
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# Enable fail-fast: exit immediately on error, fail on pipe errors
+SHELL ["/bin/bash", "-e", "-o", "pipefail", "-c"]
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG NODE_MAJOR=20
 
-# System deps for building wheels used by spaCy, Neo4j, etc.
+# System dependencies for building Python wheels and Node.js apps
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential \
       git \
@@ -19,14 +20,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libpq-dev \
       pkg-config \
       python3-dev \
+    && curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs=20.* \
+    && npm install -g pnpm@10.4.1 \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js 20.x LTS
-RUN apt-get update && \
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \
-    apt-get install -y --no-install-recommends nodejs=20.* && \
-    npm install -g pnpm@10.4.1 && \
-    rm -rf /var/lib/apt/lists/*
 
 # Install uv for fast, reproducible installs
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
@@ -34,51 +31,30 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
 
 WORKDIR /app
 
-# Copy only dependency manifests for better layer caching
-COPY pyproject.toml uv.lock* ./
-
-# Install Python dependencies (core packages only, full sync happens in runtime after copying source)
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system --compile-bytecode \
-      llama-index-core \
-      llama-index-vector-stores-qdrant \
-      llama-index-graph-stores-neo4j \
-      llama-index-llms-ollama \
-      llama-index-embeddings-huggingface \
-      firecrawl-py \
-      qdrant-client \
-      neo4j \
-      redis \
-      fastapi \
-      uvicorn \
-      pydantic \
-      typer \
-      spacy \
-      slowapi \
-      pyjwt \
-      python-json-logger \
-      pydantic-settings
-
-# Copy Node.js workspace files for web app
+# Copy dependency manifests
+COPY pyproject.toml uv.lock* README.md ./
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 
-# Copy all packages-ts and apps/web source (needed for workspace resolution)
+# Install Python dependencies with cache
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+# Copy source code for Next.js build
 COPY packages-ts ./packages-ts
 COPY apps/web ./apps/web
 
-# Install Node.js dependencies with frozen lockfile for deterministic builds
+# Install Node.js dependencies and build production bundle
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
-
-# Build Next.js production bundle
-RUN pnpm --filter @taboot/web build
+    pnpm install --frozen-lockfile \
+    && pnpm --filter @taboot/web build
 
 # -------------------------------
 # Runtime image
 # -------------------------------
 FROM python:3.13-slim AS runtime
 
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# Enable fail-fast in runtime stage too
+SHELL ["/bin/bash", "-e", "-o", "pipefail", "-c"]
 
 ARG NODE_MAJOR=20
 
@@ -91,19 +67,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Non-root user for app
 RUN useradd -m -u 10001 llamacrawl
 
-# Minimal runtime packages + Node.js + supervisor
+# Install runtime packages (Node.js + supervisor)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
       supervisor \
+    && curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs=20.* \
+    && npm install -g pnpm@10.4.1 \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js 20.x LTS (runtime only)
-RUN apt-get update && \
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \
-    apt-get install -y --no-install-recommends nodejs=20.* && \
-    npm install -g pnpm@10.4.1 && \
-    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -112,30 +84,21 @@ COPY --from=builder /usr/local/lib/python3.13 /usr/local/lib/python3.13
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
 COPY --from=builder /root/.local/bin/ /root/.local/bin/
 
-# Copy Python application code
+# Copy application assets
 COPY apps ./apps
 COPY packages ./packages
 COPY README.md pyproject.toml uv.lock ./
+COPY docker/app/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Copy standalone Next.js app (optimized output with minimal dependencies)
+# Copy Next.js standalone build
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
-# Install Python workspace dependencies
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
-
-# Copy supervisord config
-COPY docker/app/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Create log directories for supervisor
-RUN mkdir -p /var/log/supervisor && chmod 755 /var/log/supervisor
-
-# Create a writable home for SSH mounts (from compose)
-RUN mkdir -p /home/llamacrawl/.ssh && chown -R llamacrawl:llamacrawl /home/llamacrawl
-
-# Note: supervisord runs as root to manage processes, but apps run as llamacrawl user
+# Setup runtime directories and permissions
+RUN mkdir -p /var/log/supervisor /home/llamacrawl/.ssh \
+    && chmod 755 /var/log/supervisor \
+    && chown -R llamacrawl:llamacrawl /home/llamacrawl
 
 EXPOSE 8000 3000
 

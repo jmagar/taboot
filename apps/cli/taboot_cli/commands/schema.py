@@ -93,10 +93,11 @@ def version_command() -> None:
                     console.print(f"\n{version_line}")
                     console.print(f"  Applied at: {applied_at}")
                     console.print(f"  Applied by: {applied_by}")
-                    if exec_time:
+                    if exec_time is not None:
                         console.print(f"  Execution time: {exec_time}ms")
                     console.print(f"  Status: {status_text}")
-                    console.print(f"  Checksum: {checksum[:16]}...")
+                    checksum_display = (checksum[:16] + "..." if checksum and len(checksum) >= 16 else (checksum or "N/A"))
+                    console.print(f"  Checksum: {checksum_display}")
 
         finally:
             conn.close()
@@ -176,9 +177,9 @@ def history_command(limit: int = 10) -> None:
                         version_styled,
                         str(applied_at),
                         applied_by,
-                        f"{exec_time}ms" if exec_time else "-",
+                        f"{exec_time}ms" if exec_time is not None else "-",
                         status_styled,
-                        checksum[:16] + "...",
+                        (checksum[:16] + "..." if checksum and len(checksum) >= 16 else (checksum or "N/A")),
                     )
 
                 console.print(table)

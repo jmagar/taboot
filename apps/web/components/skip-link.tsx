@@ -1,5 +1,3 @@
-'use client';
-
 import { cn } from '@taboot/ui/lib/utils';
 
 interface SkipLinkProps {
@@ -23,7 +21,6 @@ export function SkipLink({
   return (
     <a
       href={`#${targetId}`}
-      aria-label="Skip to main content"
       className={cn(
         // Screen reader only by default
         'sr-only',

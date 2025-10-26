@@ -271,16 +271,12 @@ async function main(): Promise<void> {
   }
 }
 
-// Run if executed directly (ESM module check)
-const isMainModule =
-  import.meta.url === `file://${process.argv[1]}` ||
-  import.meta.url.endsWith(process.argv[1]);
-
-if (isMainModule) {
-  main().catch((error) => {
-    console.error('Unhandled error:', error);
-    process.exit(1);
-  });
-}
+// Run if executed directly (via tsx or node)
+// When executed as a script, tsx/node will always load and run this
+// The exports above allow importing functions for testing
+main().catch((error) => {
+  console.error('Unhandled error:', error);
+  process.exit(1);
+});
 
 export { cleanupDeletedUsers, parseArgs };

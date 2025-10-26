@@ -67,8 +67,7 @@ Description=Run Taboot User Cleanup Daily
 Requires=taboot-cleanup.service
 
 [Timer]
-OnCalendar=daily
-OnCalendar=02:00
+OnCalendar=*-*-* 02:00:00
 Persistent=true
 
 [Install]

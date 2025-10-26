@@ -29,13 +29,13 @@ const fontMono = Geist_Mono({
   display: 'swap',
 });
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Get nonce from headers set by middleware
-  const nonce = headers().get('x-nonce');
+  // Get nonce from headers set by middleware (async in Next.js 15+)
+  const nonce = (await headers()).get('x-nonce');
 
   return (
     <html lang="en" suppressHydrationWarning>

@@ -1,0 +1,18 @@
+# Test outputs
+outputs/
+*.log
+
+# Temporary test files
+test-data/docker-compose/invalid.yaml
+test-data/web/*.tmp
+
+# IDE
+.DS_Store
+.vscode/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

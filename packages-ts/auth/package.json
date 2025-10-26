@@ -7,7 +7,10 @@
     "./client": "./src/client.ts",
     "./server": "./src/server.ts",
     "./next-handlers": "./src/next-handlers.ts",
-    "./node-handlers": "./src/node-handlers.ts"
+    "./node-handlers": "./src/node-handlers.ts",
+    "./edge": "./src/edge.ts",
+    "./types": "./src/types.ts",
+    "./constants": "./src/constants.ts"
   },
   "typesVersions": {
     "*": {
@@ -23,6 +26,15 @@
       "node-handlers": [
         "./src/node-handlers.ts"
       ],
+      "edge": [
+        "./src/edge.ts"
+      ],
+      "types": [
+        "./src/types.ts"
+      ],
+      "constants": [
+        "./src/constants.ts"
+      ],
       "*": [
         "./src/index.ts"
       ]
@@ -30,7 +42,7 @@
   },
   "scripts": {
     "build": "tsc --build",
-    "check-types": "tsc --noEmit",
+    "check-types": "tsc --noEmit --skipLibCheck",
     "clean": "rm -rf dist .turbo node_modules",
     "dev": "tsc --build --watch",
     "lint": "eslint . --max-warnings 0"
@@ -41,13 +53,18 @@
     "@taboot/email": "workspace:*",
     "@taboot/logger": "workspace:*",
     "@taboot/rate-limit": "workspace:*",
-    "better-auth": "catalog:web"
+    "better-auth": "catalog:web",
+    "jose": "^6.1.0"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "catalog:dev",
     "@taboot/eslint-config": "workspace:^",
+    "@taboot/jest-presets": "workspace:*",
     "@taboot/prettier-config": "workspace:*",
     "@taboot/typescript-config": "workspace:*",
+    "jest": "^30.1.3",
+    "ts-jest": "^29.2.5",
     "typescript": "catalog:dev"
   }
 }

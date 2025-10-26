@@ -81,7 +81,9 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
           });
           nameUpdateSuccess = true;
         } catch (error) {
-          logger.error('Name update failed:', error);
+          logger.error('Name update failed:', {
+            error: error instanceof Error ? error.message : String(error),
+          });
           throw new Error('Failed to update name');
         }
       }
@@ -95,7 +97,9 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
           });
           emailUpdateSuccess = true;
         } catch (error) {
-          logger.error('Email update failed:', error);
+          logger.error('Email update failed:', {
+            error: error instanceof Error ? error.message : String(error),
+          });
           // If name succeeded but email failed, inform user about partial success
           if (nameUpdateSuccess) {
             throw new Error('Name updated, but failed to change email');

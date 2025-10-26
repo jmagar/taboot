@@ -1,4 +1,4 @@
-import { auth } from '@taboot/auth';
+import { auth, AUTH_COOKIE_NAME } from '@taboot/auth';
 import type { Session } from '@taboot/auth';
 import { headers as getHeaders, cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -15,7 +15,7 @@ export async function getServerSession(): Promise<Session | null> {
 
   // Extract session token for cache key using Next.js cookies API
   const cookieStore = await cookies();
-  const sessionToken = cookieStore.get('better-auth.session_token')?.value;
+  const sessionToken = cookieStore.get(AUTH_COOKIE_NAME)?.value;
 
   // Cache session for 1 minute to reduce auth checks
   // Cache key includes session token to ensure different users get different caches

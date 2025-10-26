@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { csrfMiddleware } from '@/lib/csrf';
-import { AUTH_COOKIE_NAME, AUTH_COOKIE_LEGACY_NAME, AUTH_BEARER_PREFIX } from '@taboot/auth';
+import { AUTH_COOKIE_NAME, AUTH_COOKIE_LEGACY_NAME, AUTH_BEARER_PREFIX } from '@taboot/auth/constants';
+import { verifySession } from '@taboot/auth/edge';
 
 /**
  * Transfer CSRF-related cookies and headers from one response to another.
@@ -21,22 +22,41 @@ function transferCsrfData(source: NextResponse, target: NextResponse): void {
 }
 
 /**
- * Check if the request has a valid authentication session.
+ * Verify the request has a valid authenticated session.
+ * Uses proper JWT validation instead of weak cookie presence checks.
  * Checks both bearer token authorization header and session cookies.
+ *
+ * @returns Promise<boolean> - True if session is valid, false otherwise (fail-closed)
  */
-function hasValidSession(request: NextRequest): boolean {
-  // Check for bearer token
-  const authHeader = request.headers.get('authorization');
-  if (authHeader?.startsWith(AUTH_BEARER_PREFIX)) {
-    return true;
+async function hasValidSession(request: NextRequest): Promise<boolean> {
+  try {
+    // Get token from cookie or bearer header
+    const sessionToken =
+      request.cookies.get(AUTH_COOKIE_NAME)?.value ||
+      request.cookies.get(AUTH_COOKIE_LEGACY_NAME)?.value;
+
+    const authHeader = request.headers.get('authorization');
+    const bearerToken = authHeader?.startsWith(AUTH_BEARER_PREFIX)
+      ? authHeader.slice(AUTH_BEARER_PREFIX.length)
+      : undefined;
+
+    const token = sessionToken || bearerToken;
+
+    // Verify session with proper JWT validation (not just presence check)
+    const session = await verifySession({
+      sessionToken: token,
+      secret: process.env.AUTH_SECRET!,
+    });
+
+    return !!session?.user;
+  } catch (error) {
+    // FAIL CLOSED: Log error, deny access
+    console.error('Auth session check failed - denying access (fail-closed)', {
+      pathname: request.nextUrl.pathname,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
   }
-
-  // Check for session cookies
-  const sessionCookie =
-    request.cookies.get(AUTH_COOKIE_NAME)?.value ||
-    request.cookies.get(AUTH_COOKIE_LEGACY_NAME)?.value;
-
-  return Boolean(sessionCookie);
 }
 
 /**
@@ -106,21 +126,35 @@ export async function middleware(request: NextRequest) {
     );
 
     if (!isExcluded) {
-      const csrfResponse = await csrfMiddleware(request);
+      try {
+        const csrfResponse = await csrfMiddleware(request);
 
-      // Handle safe methods (GET/HEAD/OPTIONS) - merge CSRF headers and continue
-      const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
-      if (safeMethods.includes(request.method)) {
-        const response = NextResponse.next();
+        // Handle safe methods (GET/HEAD/OPTIONS) - merge CSRF headers and continue
+        const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
+        if (safeMethods.includes(request.method)) {
+          const response = NextResponse.next();
 
-        // Transfer CSRF-related cookies and headers
-        transferCsrfData(csrfResponse, response);
-        return response;
-      }
+          // Transfer CSRF-related cookies and headers
+          transferCsrfData(csrfResponse, response);
+          return response;
+        }
 
-      // For unsafe methods, enforce CSRF validation
-      if (csrfResponse.status === 403) {
-        return csrfResponse;
+        // For unsafe methods, enforce CSRF validation
+        if (csrfResponse.status === 403) {
+          return csrfResponse;
+        }
+      } catch (error) {
+        // FAIL CLOSED: Reject request on CSRF validation error
+        console.error('CSRF validation failed - rejecting request (fail-closed)', {
+          pathname: request.nextUrl.pathname,
+          method: request.method,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
+        return NextResponse.json(
+          { error: 'Security validation failed' },
+          { status: 403 }
+        );
       }
     }
   }
@@ -133,7 +167,7 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute = authRoutes.some(startsWithRoute);
 
   // Check authentication status if needed for route decision
-  const isAuthenticated = (isProtectedRoute || isAuthRoute) && hasValidSession(request);
+  const isAuthenticated = (isProtectedRoute || isAuthRoute) && await hasValidSession(request);
 
   // Redirect unauthenticated users from protected routes to sign-in with callback
   if (isProtectedRoute && !isAuthenticated) {

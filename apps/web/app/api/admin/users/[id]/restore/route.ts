@@ -60,11 +60,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
-  // Await params in Next.js 15+
   const { id } = await params;
   try {
     // Get authenticated session
-    const session = await auth();
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
 
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -146,11 +147,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
-  // Await params in Next.js 15+
   const { id } = await params;
   try {
     // Get authenticated session
-    const session = await auth();
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
 
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -72,11 +72,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
-  // Await params in Next.js 15+
   const { id } = await params;
   try {
     // Get authenticated session
-    const session = await auth();
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
 
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -221,11 +222,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
-  // Await params in Next.js 15+
   const { id } = await params;
   try {
     // Get authenticated session
-    const session = await auth();
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
 
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -259,8 +261,7 @@ export async function GET(
           select: {
             sessions: true,
             accounts: true,
-            twoFactor: true,
-            auditLogs: true,
+            twofactors: true,
           },
         },
       },
@@ -291,7 +292,7 @@ export async function GET(
           sessions: user._count.sessions,
           oauthAccounts: user._count.accounts,
           verificationTokens: 'will_be_deleted',
-          twoFactorAuth: user._count.twoFactor,
+          twoFactorAuth: user._count.twofactors,
         },
         auditTrail: {
           total: auditLogEntries,

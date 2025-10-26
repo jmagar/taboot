@@ -38,9 +38,10 @@ FROM base AS builder
 
 WORKDIR /app
 
+# Copy entire repo so turbo can understand workspace structure
+COPY . .
+
 # Prune workspace to only include @taboot/web and its dependencies
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
-COPY turbo.json ./
 RUN turbo prune @taboot/web --docker
 
 # -------------------------------
@@ -55,15 +56,15 @@ COPY --from=builder /app/out/json ./
 COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=builder /app/out/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
-# Install production dependencies only
+# Install all dependencies (needed for build)
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --prod
+    pnpm install --frozen-lockfile
 
 # Copy source files and build configuration
 COPY --from=builder /app/out/full ./
 
 # Generate Prisma client (required before build)
-RUN pnpm --filter @taboot/db prisma:generate
+RUN pnpm --filter @taboot/db db:generate
 
 # Build Next.js app with turbo (standalone output)
 RUN turbo build --filter=@taboot/web

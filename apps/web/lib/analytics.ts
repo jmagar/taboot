@@ -1,6 +1,7 @@
 'use client';
 
 import posthog from 'posthog-js';
+import { logger } from './logger';
 
 /**
  * Analytics event properties
@@ -34,16 +35,30 @@ export const analytics = {
 
   /**
    * Identify a user
-   * @param userId - Unique user identifier (hashed/anonymized)
-   * @param traits - User traits (no PII)
+   * @param userId - Unique user identifier (MUST be hashed/anonymized - never use email or PII)
+   * @param traits - User traits (no PII - use hashed values or categories only)
    */
   identify(userId: string, traits?: UserTraits): void {
     if (typeof window === 'undefined') return;
 
+    // Validate userId is not email format
+    if (userId.includes('@')) {
+      logger.error('[Analytics] userId appears to be an email - must use hashed ID', {
+        userId: '[REDACTED]',
+      });
+      return;
+    }
+
+    // Validate userId is not phone number
+    if (/^\+?\d{10,15}$/.test(userId)) {
+      logger.error('[Analytics] userId appears to be a phone number - must use hashed ID');
+      return;
+    }
+
     try {
       posthog.identify(userId, traits);
     } catch (error) {
-      console.warn('[Analytics] Failed to identify user:', userId, error);
+      logger.error('[Analytics] Failed to identify user', { error });
     }
   },
 

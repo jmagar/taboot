@@ -18,7 +18,17 @@ vi.hoisted(() => {
 
 import { NextResponse } from 'next/server';
 import { withRateLimit } from '../with-rate-limit';
-import type { Ratelimit } from '@upstash/ratelimit';
+
+interface RateLimitResponse {
+  success: boolean;
+  limit: number;
+  remaining: number;
+  reset: number; // Unix timestamp in seconds
+}
+
+interface MockRateLimiter {
+  limit: (key: string) => Promise<RateLimitResponse>;
+}
 
 describe('withRateLimit', () => {
   let originalTrustProxy: string | undefined;
@@ -45,14 +55,15 @@ describe('withRateLimit', () => {
 
   describe('successful rate limit check', () => {
     it('should call handler when rate limit passes', async () => {
-      const mockRatelimit: Ratelimit = {
+      const resetSeconds = Math.floor(Date.now() / 1000) + 60;
+      const mockRatelimit: MockRateLimiter = {
         limit: vi.fn().mockResolvedValue({
           success: true,
           limit: 10,
           remaining: 9,
-          reset: Date.now() + 60000,
+          reset: resetSeconds,
         }),
-      } as unknown as Ratelimit;
+      };
 
       const mockHandler = vi.fn().mockResolvedValue(
         NextResponse.json({ message: 'Success' }, { status: 200 }),
@@ -78,15 +89,15 @@ describe('withRateLimit', () => {
     });
 
     it('should add rate limit headers to successful response', async () => {
-      const resetTime = Date.now() + 60000;
-      const mockRatelimit: Ratelimit = {
+      const resetSeconds = Math.floor(Date.now() / 1000) + 60;
+      const mockRatelimit: MockRateLimiter = {
         limit: vi.fn().mockResolvedValue({
           success: true,
           limit: 10,
           remaining: 7,
-          reset: resetTime,
+          reset: resetSeconds,
         }),
-      } as unknown as Ratelimit;
+      };
 
       const mockHandler = vi.fn().mockResolvedValue(
         NextResponse.json({ message: 'Success' }),
@@ -106,19 +117,20 @@ describe('withRateLimit', () => {
       expect(response.headers.get('X-RateLimit-Limit')).toBe('10');
       expect(response.headers.get('X-RateLimit-Remaining')).toBe('7');
       expect(response.headers.get('X-RateLimit-Reset')).toBe(
-        new Date(resetTime).toISOString(),
+        new Date(resetSeconds * 1000).toISOString(),
       );
     });
 
     it('should call rate limiter with correct identifier', async () => {
-      const mockRatelimit: Ratelimit = {
+      const resetSeconds = Math.floor(Date.now() / 1000) + 60;
+      const mockRatelimit: MockRateLimiter = {
         limit: vi.fn().mockResolvedValue({
           success: true,
           limit: 10,
           remaining: 9,
-          reset: Date.now() + 60000,
+          reset: resetSeconds,
         }),
-      } as unknown as Ratelimit;
+      };
 
       const mockHandler = vi.fn().mockResolvedValue(
         NextResponse.json({ message: 'Success' }),
@@ -141,15 +153,15 @@ describe('withRateLimit', () => {
 
   describe('rate limit exceeded', () => {
     it('should return 429 when rate limit exceeded', async () => {
-      const resetTime = Date.now() + 60000;
-      const mockRatelimit: Ratelimit = {
+      const resetSeconds = Math.floor(Date.now() / 1000) + 60;
+      const mockRatelimit: MockRateLimiter = {
         limit: vi.fn().mockResolvedValue({
           success: false,
           limit: 5,
           remaining: 0,
-          reset: resetTime,
+          reset: resetSeconds,
         }),
-      } as unknown as Ratelimit;
+      };
 
       const mockHandler = vi.fn().mockResolvedValue(
         NextResponse.json({ message: 'Success' }),
@@ -173,19 +185,19 @@ describe('withRateLimit', () => {
 
       const body = await response.json();
       expect(body.error).toBe('Too many requests. Please try again later.');
-      expect(body.retryAfter).toBe(new Date(resetTime).toISOString());
+      expect(body.retryAfter).toBe(new Date(resetSeconds * 1000).toISOString());
     });
 
     it('should add rate limit headers to 429 response', async () => {
-      const resetTime = Date.now() + 600000;
-      const mockRatelimit: Ratelimit = {
+      const resetSeconds = Math.floor(Date.now() / 1000) + 600;
+      const mockRatelimit: MockRateLimiter = {
         limit: vi.fn().mockResolvedValue({
           success: false,
           limit: 5,
           remaining: 0,
-          reset: resetTime,
+          reset: resetSeconds,
         }),
-      } as unknown as Ratelimit;
+      };
 
       const mockHandler = vi.fn();
       const wrappedHandler = withRateLimit(mockHandler, mockRatelimit);
@@ -202,22 +214,22 @@ describe('withRateLimit', () => {
       expect(response.headers.get('X-RateLimit-Limit')).toBe('5');
       expect(response.headers.get('X-RateLimit-Remaining')).toBe('0');
       expect(response.headers.get('X-RateLimit-Reset')).toBe(
-        new Date(resetTime).toISOString(),
+        new Date(resetSeconds * 1000).toISOString(),
       );
     });
 
     it('should log rate limit violations', async () => {
       const mockWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      const resetTime = Date.now() + 60000;
-      const mockRatelimit: Ratelimit = {
+      const resetSeconds = Math.floor(Date.now() / 1000) + 60;
+      const mockRatelimit: MockRateLimiter = {
         limit: vi.fn().mockResolvedValue({
           success: false,
           limit: 5,
           remaining: 0,
-          reset: resetTime,
+          reset: resetSeconds,
         }),
-      } as unknown as Ratelimit;
+      };
 
       const mockHandler = vi.fn();
       const wrappedHandler = withRateLimit(mockHandler, mockRatelimit);
@@ -248,9 +260,9 @@ describe('withRateLimit', () => {
 
   describe('fail-closed behavior', () => {
     it('should return 503 when rate limit check fails', async () => {
-      const mockRatelimit: Ratelimit = {
+      const mockRatelimit: MockRateLimiter = {
         limit: vi.fn().mockRejectedValue(new Error('Redis connection failed')),
-      } as unknown as Ratelimit;
+      };
 
       const mockHandler = vi.fn().mockResolvedValue(
         NextResponse.json({ message: 'Success' }),
@@ -277,9 +289,9 @@ describe('withRateLimit', () => {
     });
 
     it('should add Retry-After header on 503 response', async () => {
-      const mockRatelimit: Ratelimit = {
+      const mockRatelimit: MockRateLimiter = {
         limit: vi.fn().mockRejectedValue(new Error('Redis connection failed')),
-      } as unknown as Ratelimit;
+      };
 
       const mockHandler = vi.fn();
       const wrappedHandler = withRateLimit(mockHandler, mockRatelimit);
@@ -299,9 +311,9 @@ describe('withRateLimit', () => {
       const mockError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const error = new Error('Redis connection failed');
-      const mockRatelimit: Ratelimit = {
+      const mockRatelimit: MockRateLimiter = {
         limit: vi.fn().mockRejectedValue(error),
-      } as unknown as Ratelimit;
+      };
 
       const mockHandler = vi.fn();
       const wrappedHandler = withRateLimit(mockHandler, mockRatelimit);
@@ -334,16 +346,17 @@ describe('withRateLimit', () => {
 
   describe('different client identifiers', () => {
     it('should track different IPs separately', async () => {
+      const resetSeconds = Math.floor(Date.now() / 1000) + 60;
       const limitFn = vi.fn();
-      const mockRatelimit: Ratelimit = {
+      const mockRatelimit: MockRateLimiter = {
         limit: limitFn,
-      } as unknown as Ratelimit;
+      };
 
       limitFn.mockResolvedValue({
         success: true,
         limit: 10,
         remaining: 9,
-        reset: Date.now() + 60000,
+        reset: resetSeconds,
       });
 
       const mockHandler = vi.fn().mockResolvedValue(
@@ -374,14 +387,15 @@ describe('withRateLimit', () => {
     });
 
     it('should handle unknown identifier gracefully', async () => {
-      const mockRatelimit: Ratelimit = {
+      const resetSeconds = Math.floor(Date.now() / 1000) + 60;
+      const mockRatelimit: MockRateLimiter = {
         limit: vi.fn().mockResolvedValue({
           success: true,
           limit: 10,
           remaining: 9,
-          reset: Date.now() + 60000,
+          reset: resetSeconds,
         }),
-      } as unknown as Ratelimit;
+      };
 
       const mockHandler = vi.fn().mockResolvedValue(
         NextResponse.json({ message: 'Success' }),

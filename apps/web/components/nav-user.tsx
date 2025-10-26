@@ -26,7 +26,7 @@ type DropdownItem = {
   label: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   href?: string;
-  onClick?: () => void;
+  onClick?: () => void | Promise<void>;
 };
 
 export function NavUser() {
@@ -60,15 +60,10 @@ export function NavUser() {
       {
         label: 'Log out',
         onClick: async () => {
-          await signOut({
-            fetchOptions: {
-              onSuccess: async () => {
-                await revalidateSessionCache();
-                refetch();
-                router.push('/');
-              },
-            },
-          });
+          await signOut();
+          await revalidateSessionCache();
+          refetch();
+          router.push('/');
         },
         icon: LogOut,
       },

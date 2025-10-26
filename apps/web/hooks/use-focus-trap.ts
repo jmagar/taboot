@@ -34,6 +34,7 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>() {
       '[contenteditable]:not([contenteditable="false"])',
       'audio[controls]',
       'video[controls]',
+      'details > summary',
     ].join(', ');
 
     const handleKeyDown = (event: KeyboardEvent) => {

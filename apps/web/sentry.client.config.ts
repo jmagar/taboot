@@ -3,25 +3,35 @@ import * as Sentry from '@sentry/nextjs';
 const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
+// Validate and clamp sample rate to [0, 1] range
+const parseSampleRate = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value ?? fallback);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.min(1, parsed));
+};
+
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
 
     // Environment-driven sampling rates with production/dev defaults
-    tracesSampleRate: Number(
-      process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE ?? (IS_PRODUCTION ? '0.1' : '1.0'),
+    tracesSampleRate: parseSampleRate(
+      process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
+      IS_PRODUCTION ? 0.1 : 1.0,
     ),
 
     // Setting this option to true will print useful information to the console while you're setting up Sentry.
     debug: false,
 
-    replaysOnErrorSampleRate: Number(
-      process.env.NEXT_PUBLIC_SENTRY_REPLAYS_ON_ERROR_RATE ?? '1.0',
+    replaysOnErrorSampleRate: parseSampleRate(
+      process.env.NEXT_PUBLIC_SENTRY_REPLAYS_ON_ERROR_RATE,
+      1.0,
     ),
 
     // Environment-driven session replay rate
-    replaysSessionSampleRate: Number(
-      process.env.NEXT_PUBLIC_SENTRY_REPLAYS_SESSION_RATE ?? (IS_PRODUCTION ? '0.1' : '1.0'),
+    replaysSessionSampleRate: parseSampleRate(
+      process.env.NEXT_PUBLIC_SENTRY_REPLAYS_SESSION_RATE,
+      IS_PRODUCTION ? 0.1 : 1.0,
     ),
 
     // You can remove this option if you're not planning to use the Sentry Session Replay feature:

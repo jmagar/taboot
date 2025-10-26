@@ -122,7 +122,7 @@ UPSTASH_REDIS_REST_TOKEN=your-token-here
 1. Create account at [upstash.com](https://upstash.com)
 2. Create a Redis database (choose region close to your deployment)
 3. Copy REST URL and token from dashboard
-4. Add to `.env` file
+4. Add to `.env.local` file
 
 ## Usage in Other Endpoints
 

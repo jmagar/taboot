@@ -1,34 +1,49 @@
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
+import Redis from 'ioredis';
+import { RateLimiterRedis, RateLimiterRes } from 'rate-limiter-flexible';
+import { isIP } from 'node:net';
 
-const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+const redisUrl = process.env.REDIS_URL || 'redis://taboot-cache:6379';
 
 // Only allow stub during actual Next.js build phase
 const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build';
+
+/**
+ * Response type that mimics Upstash Ratelimit response
+ */
+interface RateLimitResponse {
+  success: boolean;
+  limit: number;
+  remaining: number;
+  reset: number;
+}
 
 /**
  * Create a build-time stub for rate limiting.
  * This is only used during Next.js build phase to allow static analysis.
  * @param limit - The rate limit count
  * @param windowMs - The time window in milliseconds
- * @returns A stub Ratelimit instance
+ * @returns A stub rate limit function
  */
-function createBuildTimeStub(limit: number, windowMs: number): Ratelimit {
+function createBuildTimeStub(
+  limit: number,
+  windowMs: number
+): (key: string) => Promise<RateLimitResponse> {
   console.warn('[RATE_LIMIT] Using build-time stub - rate limiting DISABLED during build');
-  return {
-    limit: async () => ({ success: true, limit, remaining: limit, reset: Date.now() + windowMs }),
-  } as unknown as Ratelimit;
+  return async () => ({
+    success: true,
+    limit,
+    remaining: limit,
+    reset: Date.now() + windowMs,
+  });
 }
 
+// Build-time: create stub Redis and limiter
 let redis: Redis | undefined;
+let rateLimiter: RateLimiterRedis | undefined;
+
 if (isBuildTime) {
-  // Create stub Redis for build time only
-  redis = {
-    get: async () => null,
-    set: async () => 'OK',
-    del: async () => 1,
-  } as unknown as Redis;
+  redis = undefined; // Don't connect during build
+  rateLimiter = undefined;
 }
 
 /**
@@ -39,69 +54,125 @@ if (isBuildTime) {
  * @param prefix - Rate limit key prefix (e.g., 'ratelimit:password')
  * @param limit - Maximum number of requests allowed
  * @param windowMs - Time window in milliseconds
- * @returns Ratelimit instance
+ * @returns Rate limit function
  */
-function createRateLimit(prefix: string, limit: number, windowMs: number): Ratelimit {
+function createRateLimit(
+  prefix: string,
+  limit: number,
+  windowMs: number
+): (key: string) => Promise<RateLimitResponse> {
   // Only allow stub during build time
   if (isBuildTime) {
     return createBuildTimeStub(limit, windowMs);
   }
 
-  // Runtime: fail-closed if Redis not configured
-  if (!redisUrl || !redisToken) {
+  // Runtime: fail-closed if no Redis URL
+  if (!redisUrl) {
     throw new Error(
       '[RATE_LIMIT] Rate limiting requires Redis configuration. ' +
-        'Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables. ' +
-        'See .env.example for details.',
+        'Set REDIS_URL environment variable (default: redis://taboot-cache:6379). ' +
+        'See .env.example for details.'
     );
   }
 
-  // Lazy initialization of Redis client
-  if (!redis) {
-    redis = new Redis({
-      url: redisUrl,
-      token: redisToken,
-    });
+  // Lazy initialization of Redis client and limiter
+  if (!redis || !rateLimiter) {
+    try {
+      redis = new Redis(redisUrl, {
+        maxRetriesPerRequest: 3,
+        enableReadyCheck: true,
+        lazyConnect: false,
+        retryStrategy: (times) => {
+          const delay = Math.min(times * 50, 2000);
+          return delay;
+        },
+      });
+
+      // Test connection immediately to fail-closed if Redis unavailable
+      redis.on('error', (err) => {
+        console.error('[RATE_LIMIT] Redis connection error:', err);
+        throw new Error(`[RATE_LIMIT] Failed to connect to Redis at ${redisUrl}: ${err.message}`);
+      });
+
+      rateLimiter = new RateLimiterRedis({
+        storeClient: redis,
+        points: limit, // Number of requests
+        duration: windowMs / 1000, // Window duration in seconds
+        keyPrefix: prefix,
+        insuranceLimiter: undefined, // No fallback during rate limit check
+      });
+    } catch (error) {
+      throw new Error(
+        `[RATE_LIMIT] Failed to initialize rate limiter: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
-  // Runtime: Redis must be configured (already validated above)
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(limit, `${windowMs / 1000} s`),
-    prefix,
-    analytics: true,
-  });
+  // Return async function that limits requests
+  return async (key: string): Promise<RateLimitResponse> => {
+    try {
+      // Consume 1 point (request)
+      const rateLimiterRes: RateLimiterRes = await rateLimiter!.consume(key, 1);
+
+      return {
+        success: true,
+        limit,
+        remaining: Math.max(0, rateLimiterRes.remainingPoints),
+        reset: Math.floor((Date.now() + rateLimiterRes.msBeforeNext) / 1000),
+      };
+    } catch (error) {
+      // RateLimiterRedis throws RateLimiterRes when limit exceeded
+      if (error instanceof RateLimiterRes) {
+        return {
+          success: false,
+          limit,
+          remaining: Math.max(0, error.remainingPoints),
+          reset: Math.floor((Date.now() + error.msBeforeNext) / 1000),
+        };
+      }
+
+      // Fail-closed: any other error is treated as rate limit exceeded
+      console.error('[RATE_LIMIT] Rate limit check error:', error);
+      throw new Error(
+        `[RATE_LIMIT] Failed to check rate limit: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  };
 }
 
 // Get environment for key scoping to prevent collisions across environments
 const env = process.env.APP_ENV ?? process.env.NODE_ENV ?? 'unknown';
 
-// Password endpoints: 5 requests per 10 minutes (600,000 ms)
-export const passwordRateLimit = createRateLimit(`ratelimit:${env}:password`, 5, 600000);
-
-// General auth endpoints: 10 requests per 1 minute (60,000 ms)
-export const authRateLimit = createRateLimit(`ratelimit:${env}:auth`, 10, 60000);
+// Create rate limiters with fixed environment scope
+const passwordLimiter = createRateLimit(`ratelimit:${env}:password`, 5, 600000); // 5 req/10min
+const authLimiter = createRateLimit(`ratelimit:${env}:auth`, 10, 60000); // 10 req/1min
 
 /**
- * Validate IP address format (IPv4 or IPv6).
+ * Password endpoints: 5 requests per 10 minutes
+ * @param key - Client identifier (IP address)
+ * @returns Rate limit response
+ */
+export const passwordRateLimit = {
+  limit: passwordLimiter,
+};
+
+/**
+ * General auth endpoints: 10 requests per 1 minute
+ * @param key - Client identifier (IP address)
+ * @returns Rate limit response
+ */
+export const authRateLimit = {
+  limit: authLimiter,
+};
+
+/**
+ * Validate IP address format (IPv4 or IPv6) using Node.js built-in validation.
  * @param ip - IP address string to validate
  * @returns true if valid IPv4 or IPv6 address
  */
 function isValidIp(ip: string): boolean {
-  // IPv4 regex pattern
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  // IPv6 regex pattern (simplified - matches most common formats)
-  const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-  // IPv6 compressed format (with ::)
-  const ipv6CompressedRegex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
-
-  if (ipv4Regex.test(ip)) {
-    // Validate octets are 0-255
-    const octets = ip.split('.').map(Number);
-    return octets.every((octet) => octet >= 0 && octet <= 255);
-  }
-
-  return ipv6Regex.test(ip) || ipv6CompressedRegex.test(ip);
+  // Node.js isIP returns: 4 for IPv4, 6 for IPv6, 0 for invalid
+  return isIP(ip) !== 0;
 }
 
 /**

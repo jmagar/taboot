@@ -31,12 +31,18 @@ const BATCH_SIZE = 100;
 
 /**
  * Log audit entry for hard deletion
+ *
+ * SECURITY: Uses Prisma tagged template literals for SQL injection protection.
+ * All ${...} values are sent as query parameters, not string interpolation.
+ *
+ * @see /home/jmagar/code/taboot/docs/security/AUDIT_SQL_INJECTION_AUDIT_LOG.md
  */
 async function logHardDeletion(
   userId: string,
   deletedAt: Date,
   retentionDays: number
 ): Promise<void> {
+  // SAFE: Prisma tagged templates use parameterized queries
   await prisma.$executeRaw`
     INSERT INTO "audit_log" (
       id, user_id, target_id, target_type, action,

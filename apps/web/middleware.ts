@@ -83,7 +83,37 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  return NextResponse.next();
+  // Generate nonce for CSP
+  const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64');
+
+  // Create response with CSP headers
+  const response = NextResponse.next();
+
+  // Set Content-Security-Policy header with nonce for scripts
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' https://app.posthog.com https://vercel.live https://*.sentry.io`,
+    "style-src 'self' 'unsafe-inline'", // Tailwind requires unsafe-inline
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.posthog.com https://*.sentry.io https://*.ingest.sentry.io",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "upgrade-insecure-requests",
+  ].join('; ');
+
+  response.headers.set('Content-Security-Policy', csp);
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
+  // Pass nonce to response for script tags in layout
+  response.headers.set('x-nonce', nonce);
+
+  return response;
 }
 
 export const config = {

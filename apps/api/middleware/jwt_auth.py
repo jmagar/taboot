@@ -82,7 +82,7 @@ def _get_auth_secret() -> str:
             "Generate AUTH_SECRET with: "
             "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
         )
-        raise RuntimeError("AUTH_SECRET (or BETTER_AUTH_SECRET) environment variable must be set")
+        raise RuntimeError("AUTH_SECRET environment variable required")
 
     # Validate minimum length (256 bits for HS256)
     if len(auth_secret) < MIN_SECRET_LENGTH:
@@ -94,10 +94,7 @@ def _get_auth_secret() -> str:
             "Generate strong secret with: "
             "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
         )
-        raise RuntimeError(
-            f"AUTH_SECRET must be at least {MIN_SECRET_LENGTH} characters (256 bits). "
-            f"Current length: {len(auth_secret)}"
-        )
+        raise RuntimeError(f"AUTH_SECRET too short: {len(auth_secret)} < {MIN_SECRET_LENGTH}")
 
     # Basic entropy check (not repeated characters)
     if len(set(auth_secret)) < MIN_SECRET_LENGTH // 2:
@@ -106,11 +103,9 @@ def _get_auth_secret() -> str:
             "Generate cryptographically random secret with: "
             "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
         )
-        raise RuntimeError(
-            "AUTH_SECRET has insufficient entropy (too many repeated characters)"
-        )
+        raise RuntimeError("AUTH_SECRET has insufficient entropy")
 
-    logger.info("AUTH_SECRET validated", extra={"length": len(auth_secret)})
+    logger.debug("AUTH_SECRET validated", extra={"length": len(auth_secret)})
     return auth_secret
 
 

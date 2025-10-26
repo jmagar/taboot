@@ -4391,6 +4391,7 @@ dependencies = [
     { name = "google-api-python-client" },
     { name = "google-auth-oauthlib" },
     { name = "praw" },
+    { name = "psycopg2-binary" },
     { name = "pydantic" },
     { name = "pygithub" },
 ]
@@ -4407,6 +4408,7 @@ requires-dist = [
     { name = "google-api-python-client", specifier = ">=2.184.0,<3" },
     { name = "google-auth-oauthlib", specifier = ">=1.2.2,<2" },
     { name = "praw", specifier = ">=7.8.1,<8" },
+    { name = "psycopg2-binary", specifier = ">=2.9.11,<3" },
     { name = "pydantic", specifier = ">=2.12.0,<3" },
     { name = "pygithub", specifier = ">=2.8.1,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.2" },
@@ -4419,6 +4421,7 @@ name = "taboot-common"
 version = "0.4.0"
 source = { editable = "packages/common" }
 dependencies = [
+    { name = "psycopg2-binary" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "python-json-logger" },
@@ -4431,6 +4434,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "psycopg2-binary", specifier = ">=2.9.11,<3" },
     { name = "pydantic", specifier = ">=2.12.0,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.2" },
     { name = "python-dotenv", specifier = ">=1.1.1,<2" },

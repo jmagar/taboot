@@ -10,6 +10,8 @@ import { viewportConfig } from '@/config/viewport';
 import '@taboot/ui/globals.css';
 import { Analytics } from '@vercel/analytics/react';
 import { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
+import { CSPScripts } from '@/components/csp-scripts';
 
 export const metadata: Metadata = siteConfig;
 
@@ -32,6 +34,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Get nonce from headers set by middleware
+  const nonce = headers().get('x-nonce');
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased`}>
@@ -45,7 +50,8 @@ export default function RootLayout({
             <ViewportDebug />
           </PrefetchData>
         </Providers>
-        <Analytics />
+        {/* Analytics and monitoring scripts with CSP nonce */}
+        <CSPScripts nonce={nonce || undefined} />
       </body>
     </html>
   );

@@ -1,9 +1,19 @@
-import { type Ratelimit } from '@upstash/ratelimit';
 import { NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { getClientIdentifier } from '@/lib/rate-limit';
 
 type Handler = (req: Request) => Promise<NextResponse>;
+
+interface RateLimitResponse {
+  success: boolean;
+  limit: number;
+  remaining: number;
+  reset: number; // Unix timestamp in seconds
+}
+
+interface RateLimiter {
+  limit: (key: string) => Promise<RateLimitResponse>;
+}
 
 /**
  * Higher-order function that wraps API route handlers with rate limiting.
@@ -18,10 +28,10 @@ type Handler = (req: Request) => Promise<NextResponse>;
  * (e.g., Redis connection error), the request is rejected rather than allowed through.
  *
  * @param handler - The original route handler
- * @param ratelimit - The Ratelimit instance to use
+ * @param ratelimit - The RateLimiter instance to use
  * @returns Wrapped handler with rate limiting
  */
-export function withRateLimit(handler: Handler, ratelimit: Ratelimit): Handler {
+export function withRateLimit(handler: Handler, ratelimit: RateLimiter): Handler {
   return async (req: Request): Promise<NextResponse> => {
     const identifier = getClientIdentifier(req);
 

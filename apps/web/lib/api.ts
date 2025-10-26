@@ -14,6 +14,12 @@ import { TabootAPIClient } from "@taboot/api-client";
 import { csrfFetch } from "./csrf-client";
 
 /**
+ * Type-safe configuration for TabootAPIClient constructor.
+ * Extracted using ConstructorParameters to ensure type safety.
+ */
+type TabootAPIClientConfig = ConstructorParameters<typeof TabootAPIClient>[0];
+
+/**
  * CSRF-aware API client that wraps TabootAPIClient.
  *
  * Automatically includes CSRF tokens in state-changing requests by
@@ -23,7 +29,7 @@ class CsrfAwareAPIClient extends TabootAPIClient {
   private readonly _baseUrl: string;
   private readonly _credentials: RequestCredentials;
 
-  constructor(config?: Parameters<typeof TabootAPIClient.prototype.constructor>[0]) {
+  constructor(config?: TabootAPIClientConfig) {
     super(config);
     this._baseUrl = config?.baseUrl || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     this._credentials = config?.credentials || "include";

@@ -13,8 +13,8 @@
   },
   "prettier": "@taboot/prettier-config",
   "dependencies": {
-    "@upstash/ratelimit": "catalog:core",
-    "@upstash/redis": "catalog:core"
+    "ioredis": "^5.4.2",
+    "rate-limiter-flexible": "^2.4.1"
   },
   "devDependencies": {
     "@types/node": "catalog:dev",

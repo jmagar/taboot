@@ -38,6 +38,17 @@ export function clearSoftDeleteContext(requestId: string): void {
 
 /**
  * Log audit trail for data operations
+ *
+ * SECURITY: Uses raw SQL to avoid middleware recursion.
+ * SQL injection protection is provided by:
+ * 1. Prisma tagged template literals (automatic parameterization)
+ * 2. JSON.stringify() serialization before parameterization
+ * 3. PostgreSQL JSONB type validation
+ *
+ * All ${...} values are sent as query parameters ($1, $2, etc.),
+ * NOT string interpolation. Verified safe by security audit.
+ *
+ * @see /home/jmagar/code/taboot/docs/security/AUDIT_SQL_INJECTION_AUDIT_LOG.md
  */
 async function logAudit(
   prisma: any,
@@ -53,6 +64,7 @@ async function logAudit(
 ): Promise<void> {
   try {
     // Use raw query to avoid middleware recursion
+    // SAFE: Prisma tagged templates use parameterized queries (not string interpolation)
     await prisma.$executeRaw`
       INSERT INTO "audit_log" (
         id, user_id, target_id, target_type, action,

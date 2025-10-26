@@ -2,7 +2,8 @@ import { Skeleton } from '@taboot/ui/components/skeleton';
 
 export default function TwoFactorLoading() {
   return (
-    <div className="flex min-h-svh items-center justify-center p-6 md:p-10" role="status" aria-live="polite" aria-busy="true" aria-label="Loading two-factor verification">
+    <div className="flex min-h-svh items-center justify-center p-6 md:p-10" role="status" aria-live="polite" aria-busy="true" aria-labelledby="loading-2fa-status">
+      <span id="loading-2fa-status" className="sr-only">Loading two-factor verification</span>
       <div className="w-full max-w-md">
         <div className="rounded-xl border shadow" aria-hidden="true">
           <div className="flex flex-col space-y-1.5 p-6 text-center">

@@ -41,8 +41,8 @@ catalogs:
     date-fns: ^4.1.0
     "@prisma/client": ^6.2.1
     prisma: ^6.2.1
-    "@upstash/ratelimit": ^2.0.6
-    "@upstash/redis": ^1.35.6
+    ioredis: ^5.4.2
+    rate-limiter-flexible: ^2.4.1
 
   dev:
     typescript: ^5.9.2

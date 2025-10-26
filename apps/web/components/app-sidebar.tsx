@@ -77,12 +77,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ) : (
           <div className={cn('flex flex-col gap-2', { 'self-center': !isSidebarExpanded })}>
             <ThemeSwitcher />
-            <Button asChild size={isSidebarExpanded ? 'sm' : 'icon'} aria-label="Sign up">
+            <Button asChild size={isSidebarExpanded ? 'sm' : 'icon'} {...(!isSidebarExpanded && { 'aria-label': 'Sign up' })}>
               <Link
                 href="/sign-up"
                 className={cn('flex flex-row items-center justify-center', isSidebarExpanded && 'space-x-2')}
               >
-                <UserPlus className="h-4 w-4" />
+                <UserPlus className="h-4 w-4" aria-hidden={isSidebarExpanded ? 'true' : undefined} />
                 <span>{isSidebarExpanded ? 'Sign up' : ''}</span>
               </Link>
             </Button>
@@ -90,13 +90,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               variant="secondary"
               size={isSidebarExpanded ? 'sm' : 'icon'}
-              aria-label="Sign in"
+              {...(!isSidebarExpanded && { 'aria-label': 'Sign in' })}
             >
               <Link
                 href="/sign-in"
                 className={cn('flex flex-row items-center justify-center', isSidebarExpanded && 'space-x-2')}
               >
-                <LogIn className="h-4 w-4" />
+                <LogIn className="h-4 w-4" aria-hidden={isSidebarExpanded ? 'true' : undefined} />
                 <span>{isSidebarExpanded ? 'Sign in' : ''}</span>
               </Link>
             </Button>

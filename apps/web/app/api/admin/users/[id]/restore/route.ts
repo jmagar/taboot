@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma, restoreUser } from '@taboot/db';
 import { auth } from '@taboot/auth';
+import { logger } from '@/lib/logger';
 
 /**
  * Validate IP address format (IPv4 or IPv6).
@@ -79,7 +80,19 @@ export async function POST(
 
     // Admin authorization check (single-user system: allow first user or env-configured admin)
     const adminUserId = process.env.ADMIN_USER_ID;
-    if (adminUserId && session.user.id !== adminUserId) {
+    if (!adminUserId) {
+      logger.error('ADMIN_USER_ID not configured for restore operation');
+      return NextResponse.json(
+        { error: 'Service not configured' },
+        { status: 503 }
+      );
+    }
+
+    if (session.user.id !== adminUserId) {
+      logger.warn('Unauthorized restore attempt', {
+        attemptedBy: session.user.id,
+        targetUser: params.id,
+      });
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -158,7 +171,19 @@ export async function GET(
 
     // Admin authorization check (single-user system: allow first user or env-configured admin)
     const adminUserId = process.env.ADMIN_USER_ID;
-    if (adminUserId && session.user.id !== adminUserId) {
+    if (!adminUserId) {
+      logger.error('ADMIN_USER_ID not configured for restore operation');
+      return NextResponse.json(
+        { error: 'Service not configured' },
+        { status: 503 }
+      );
+    }
+
+    if (session.user.id !== adminUserId) {
+      logger.warn('Unauthorized restore attempt', {
+        attemptedBy: session.user.id,
+        targetUser: params.id,
+      });
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

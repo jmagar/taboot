@@ -1,5 +1,5 @@
 export * from './auth';
 export * from './limiter';
 
-// Re-export types from Upstash for convenience
-export type { Ratelimit } from '@upstash/ratelimit';
+// Export types for convenience
+export type { RateLimiterRedis } from 'rate-limiter-flexible';

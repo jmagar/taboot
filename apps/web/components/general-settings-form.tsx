@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { changeEmail, updateUser } from '@taboot/auth/client';
 
+import { logger } from '@/lib/logger';
 import { queryKeys } from '@/lib/query-keys';
 import { Button } from '@taboot/ui/components/button';
 import {
@@ -52,6 +53,7 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
   });
 
   // Update form values when user data is loaded
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (user) {
       form.reset({
@@ -59,7 +61,7 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
         email: user.email,
       });
     }
-  }, [user, form]);
+  }, [user, form.reset]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (values: UpdateProfileFormValues) => {
@@ -79,7 +81,7 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
           });
           nameUpdateSuccess = true;
         } catch (error) {
-          console.error('Name update failed:', error);
+          logger.error('Name update failed:', error);
           throw new Error('Failed to update name');
         }
       }
@@ -93,7 +95,7 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
           });
           emailUpdateSuccess = true;
         } catch (error) {
-          console.error('Email update failed:', error);
+          logger.error('Email update failed:', error);
           // If name succeeded but email failed, inform user about partial success
           if (nameUpdateSuccess) {
             throw new Error('Name updated, but failed to change email');
@@ -120,11 +122,13 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
         );
       } else if (result.nameChanged) {
         toast.success('Profile updated successfully!');
+      } else {
+        toast.info('No changes were made to your profile.');
       }
       onSuccess?.();
     },
     onError: (error: Error) => {
-      console.error('Error updating profile:', error);
+      logger.error('Error updating profile:', error);
       toast.error(error.message || 'Failed to update profile');
     },
   });

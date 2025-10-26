@@ -1,7 +1,9 @@
 # Deployment Complete Summary
 
 **Date:** 2025-10-25
+
 **Branch:** feat/web
+
 **PR:** #5 - feat: ensure env auto loads for api
 
 ---
@@ -11,6 +13,7 @@
 All database migrations and infrastructure setup have been successfully completed.
 
 ### 1. Schema Isolation Migration
+
 - **Status:** ✅ Complete
 - **Backup Created:** `backup_pre_migration_20251025_175359.sql` (25MB)
 - **Migration Script:** `todos/scripts/migrate-to-schema-namespaces.sql`
@@ -21,6 +24,7 @@ All database migrations and infrastructure setup have been successfully complete
   - Zero data loss, all foreign keys and indexes preserved
 
 **Verification:**
+
 ```bash
 # Verify schemas created
 docker exec taboot-db psql -U taboot -d taboot -c "\dn"
@@ -30,6 +34,7 @@ docker exec taboot-db psql -U taboot -d taboot -c "SELECT 'rag' as schema, COUNT
 ```
 
 ### 2. Prisma Soft Delete Migration
+
 - **Status:** ✅ Complete
 - **Method:** `pnpm prisma db push` (development sync)
 - **Changes:**
@@ -40,6 +45,7 @@ docker exec taboot-db psql -U taboot -d taboot -c "SELECT 'rag' as schema, COUNT
   - Regenerated Prisma client with new schema
 
 **Verification:**
+
 ```bash
 # Check User table has soft delete fields
 docker exec taboot-db psql -U taboot -d taboot -c "\d auth.user"
@@ -53,12 +59,14 @@ docker exec taboot-db psql -U taboot -d taboot -c "\d auth.AuditLog"
 ## ✅ Environment Configuration
 
 ### AUTH_SECRET Added
+
 - **Location:** `.env` line 11
 - **Value:** Same as `BETTER_AUTH_SECRET` (44 characters, strong)
 - **Purpose:** JWT signing for Python FastAPI middleware
 - **Validation:** Meets 32-character minimum requirement (✅ passes)
 
 ### Configuration Files Updated
+
 1. **`.env`** - Added `AUTH_SECRET` with documentation
 2. **`.env.example`** - Added both `BETTER_AUTH_SECRET` and `AUTH_SECRET` sections
 3. **`.gitignore`** - Added patterns for backup SQL files (`backup_*.sql`)
@@ -68,6 +76,7 @@ docker exec taboot-db psql -U taboot -d taboot -c "\d auth.AuditLog"
 ## ✅ Cron Job Setup
 
 ### Cleanup Job Installed
+
 - **Schedule:** Daily at 2:00 AM
 - **Command:** `pnpm tsx apps/web/scripts/cleanup-deleted-users.ts`
 - **Log File:** `${PROJECT_ROOT}/logs/cleanup.log`
@@ -76,17 +85,20 @@ docker exec taboot-db psql -U taboot -d taboot -c "\d auth.AuditLog"
 **Note:** Replace `${PROJECT_ROOT}` with your Taboot installation path (e.g., `/opt/taboot` or `$HOME/code/taboot`).
 
 **View Cron:**
+
 ```bash
 crontab -l
 ```
 
 **Test Dry Run:**
+
 ```bash
 cd ${PROJECT_ROOT}
 pnpm tsx apps/web/scripts/cleanup-deleted-users.ts --dry-run
 ```
 
 **Monitor Logs:**
+
 ```bash
 tail -f ${PROJECT_ROOT}/logs/cleanup.log
 ```
@@ -96,6 +108,7 @@ tail -f ${PROJECT_ROOT}/logs/cleanup.log
 ## ✅ Documentation Updates
 
 ### Files Updated
+
 1. **CLAUDE.md**
    - Added Schema Isolation section (PostgreSQL schemas)
    - Updated migration workflow with schema namespaces
@@ -123,6 +136,7 @@ tail -f ${PROJECT_ROOT}/logs/cleanup.log
 ## 🔍 Verification Checklist
 
 ### Database Schema
+
 - [x] PostgreSQL `rag` schema exists with 5 tables
 - [x] PostgreSQL `auth` schema exists with 5 tables
 - [x] User table has `deletedAt` and `deletedBy` columns
@@ -131,17 +145,20 @@ tail -f ${PROJECT_ROOT}/logs/cleanup.log
 - [x] Backup file created (25MB)
 
 ### Environment Variables
+
 - [x] `AUTH_SECRET` set in `.env` (44 chars)
 - [x] `BETTER_AUTH_SECRET` set in `.env` (44 chars)
 - [x] Both secrets documented in `.env.example`
 - [x] Secrets pass validation (≥32 characters)
 
 ### Cron Jobs
+
 - [x] Cleanup job installed in crontab
 - [x] Log directory created (`${PROJECT_ROOT}/logs/`)
 - [x] Log file exists (`cleanup.log`)
 
 ### Code Quality
+
 - [x] Ruff linting passes on modified files
 - [x] Mypy strict mode passes on modified files
 - [x] ESLint warnings only (no errors)
@@ -162,6 +179,7 @@ tail -f ${PROJECT_ROOT}/logs/cleanup.log
 | **Total** | **9 todos** | **24 hrs** | **✅ 100%** |
 
 ### Security Posture
+
 - **7 vulnerabilities fixed** (CVSS 6.5-9.1)
 - **GDPR compliant** audit trail
 - **Fail-closed** rate limiting
@@ -169,6 +187,7 @@ tail -f ${PROJECT_ROOT}/logs/cleanup.log
 - **Strong secrets** enforced (32+ chars)
 
 ### Code Changes
+
 - **23 files created**
 - **23 files modified**
 - **28+ tests added**
@@ -179,6 +198,7 @@ tail -f ${PROJECT_ROOT}/logs/cleanup.log
 ## 🚀 Next Steps
 
 ### 1. Verify Application Startup
+
 ```bash
 # Start all services
 docker compose up -d
@@ -191,6 +211,7 @@ docker compose logs taboot-app | grep "AUTH_SECRET"
 ```
 
 ### 2. Test Soft Delete Functionality
+
 ```bash
 # Create test user via API or web UI
 # Delete user (should soft delete)
@@ -200,6 +221,7 @@ docker compose logs taboot-app | grep "AUTH_SECRET"
 ```
 
 ### 3. Monitor Cleanup Job
+
 ```bash
 # Wait until 2 AM or manually trigger
 pnpm tsx apps/web/scripts/cleanup-deleted-users.ts --dry-run
@@ -209,6 +231,7 @@ tail -f ${PROJECT_ROOT}/logs/cleanup.log
 ```
 
 ### 4. Update Production Checklist
+
 - [ ] Update `TRUST_PROXY=true` if deploying behind reverse proxy
 - [ ] Setup Upstash Redis for production rate limiting
 - [ ] Configure CSRF_SECRET for production (separate from AUTH_SECRET)
@@ -220,12 +243,14 @@ tail -f ${PROJECT_ROOT}/logs/cleanup.log
 ## 📝 Important Notes
 
 ### Schema Isolation
+
 - All Python code now uses `rag.` prefix for table names
 - All Prisma models use `@@schema("auth")` directive
 - No more table name collision risk between systems
 - Migration script is **one-time only** (do not re-run)
 
 ### Soft Delete
+
 - User deletions are now soft deletes (sets `deletedAt`)
 - 90-day grace period before permanent deletion
 - Full audit trail in `AuditLog` table
@@ -233,12 +258,14 @@ tail -f ${PROJECT_ROOT}/logs/cleanup.log
 - Cleanup job runs daily at 2 AM
 
 ### Authentication
+
 - Python API uses `AUTH_SECRET` for JWT signing
 - TypeScript uses `BETTER_AUTH_SECRET` for better-auth
 - Both secrets validated at startup (min 32 chars)
 - Using same secret for both is acceptable for single-user system
 
 ### Backups
+
 - Pre-migration backup: `backup_pre_migration_20251025_175359.sql` (25MB)
 - Gitignored via `backup_*.sql` pattern
 - Keep backup for at least 30 days

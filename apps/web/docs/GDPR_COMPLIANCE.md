@@ -58,6 +58,7 @@ This document covers the erasure mechanism required by EU data protection law.
 7. **Audit Trail**: New entry logged: `USER_ERASE_GDPR` action with minimal PII
 
 **Request**:
+
 ```bash
 POST /api/users/{userId}/erase
 Authorization: Bearer {token}
@@ -65,6 +66,7 @@ Content-Type: application/json
 ```
 
 **Response** (200 OK):
+
 ```json
 {
   "success": true,
@@ -91,6 +93,7 @@ Content-Type: application/json
 **Authorization**: Same as POST (user or admin)
 
 **Response** (200 OK):
+
 ```json
 {
   "user": {
@@ -150,6 +153,7 @@ Content-Type: application/json
 ### Audit Log Retention
 
 **Before Erasure**:
+
 ```json
 {
   "userId": "user-123",
@@ -160,6 +164,7 @@ Content-Type: application/json
 ```
 
 **After Erasure**:
+
 ```json
 {
   "userId": "user-123",
@@ -176,7 +181,7 @@ Content-Type: application/json
 
 ### 1. User Requests Erasure (via UI)
 
-```
+```text
 User → Settings → "Delete Account" → Confirmation
      → Confirm → POST /api/users/{id}/erase
      → Success → Redirect to login (sessions deleted)
@@ -184,7 +189,7 @@ User → Settings → "Delete Account" → Confirmation
 
 ### 2. User Sees Preview (optional)
 
-```
+```text
 GET /api/users/{id}/erase
 ↓
 Display what will be deleted
@@ -196,7 +201,7 @@ POST /api/users/{id}/erase
 
 ### 3. Admin Erases User (compliance/support)
 
-```
+```text
 Admin → Admin Dashboard → Users → [user] → "Erase Account"
      → Confirm GDPR erasure
      → POST /api/admin/users/{id} (or uses regular endpoint with admin token)
@@ -266,7 +271,7 @@ if (!canErase) {
 }
 ```
 
-**Non-admin users cannot erase other accounts**
+#### Non-admin users cannot erase other accounts
 
 ### Transaction Safety
 

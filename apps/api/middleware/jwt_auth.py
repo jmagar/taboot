@@ -29,11 +29,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.requests import Request
 
-from packages.common.config import ensure_env_loaded
-
 logger = logging.getLogger(__name__)
-
-ensure_env_loaded()
 
 
 class AuthClaims(TypedDict, total=False):
@@ -49,7 +45,7 @@ class AuthClaims(TypedDict, total=False):
     aud: NotRequired[str | list[str]]
 
 
-AUTH_SECRET_ENV_VAR = "AUTH_SECRET"
+AUTH_SECRET_ENV_VAR: Final[str] = "AUTH_SECRET"
 JWT_ALGORITHM: Final[str] = "HS256"
 MIN_SECRET_LENGTH: Final[int] = 32  # 256 bits for HS256
 
@@ -82,7 +78,7 @@ def _get_auth_secret() -> str:
             "Generate AUTH_SECRET with: "
             "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
         )
-        raise RuntimeError("AUTH_SECRET environment variable required")
+        raise RuntimeError("AUTH_SECRET or BETTER_AUTH_SECRET environment variable required")
 
     # Validate minimum length (256 bits for HS256)
     if len(auth_secret) < MIN_SECRET_LENGTH:

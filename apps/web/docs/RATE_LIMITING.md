@@ -2,23 +2,26 @@
 
 ## Overview
 
-Rate limiting has been implemented for authentication endpoints using Upstash Redis and the `@upstash/ratelimit` library. This prevents abuse and protects against brute-force attacks.
+Rate limiting has been implemented for authentication endpoints using Redis and the `rate-limiter-flexible` library. This prevents abuse and protects against brute-force attacks.
+
+The implementation follows a **fail-closed** security model: if rate limiting cannot be verified (e.g., Redis unavailable), requests are rejected with `503 Service Unavailable` rather than allowed through.
 
 ## Architecture
 
 ### Core Components
 
 1. **`apps/web/lib/rate-limit.ts`**
-   - Creates Redis connection using Upstash credentials
-   - Defines rate limiters with sliding window algorithm
-   - Implements client IP extraction
+   - Creates Redis connection using `ioredis` client
+   - Defines rate limiters with `rate-limiter-flexible` sliding window algorithm
+   - Implements client IP extraction with proxy trust configuration
+   - Enforces fail-closed behavior: throws error if Redis not configured
 
 2. **`apps/web/lib/with-rate-limit.ts`**
    - Higher-order function wrapper for route handlers
    - Adds rate limit checks before handler execution
    - Returns 429 responses when limits exceeded
    - Injects rate limit headers into all responses
-   - Fails open on errors (allows requests but logs issues)
+   - Fails closed on errors (rejects requests with 503 and logs issues)
 
 3. **`apps/web/app/api/auth/password/route.ts`**
    - Updated to use rate limiting on GET and POST handlers
@@ -29,7 +32,7 @@ Rate limiting has been implemented for authentication endpoints using Upstash Re
 ### Password Endpoints
 
 - **Limit**: 5 requests per 10 minutes
-- **Prefix**: `ratelimit:password`
+- **Prefix**: `ratelimit:{env}:password` (e.g., `ratelimit:production:password`)
 - **Algorithm**: Sliding window
 - **Applied to**:
   - `GET /api/auth/password` (check if user has password)
@@ -38,19 +41,26 @@ Rate limiting has been implemented for authentication endpoints using Upstash Re
 ### General Auth Endpoints
 
 - **Limit**: 10 requests per 1 minute
-- **Prefix**: `ratelimit:auth`
+- **Prefix**: `ratelimit:{env}:auth` (e.g., `ratelimit:production:auth`)
 - **Algorithm**: Sliding window
 - **Applied to**: (extensible to other auth endpoints)
 
+**Note**: Rate limit keys are scoped by environment (`APP_ENV` or `NODE_ENV`) to prevent collisions between development, staging, and production.
+
 ## Client Identification
 
-The system identifies clients using IP addresses extracted from request headers:
+The system identifies clients using IP addresses with the following priority:
 
-1. **Primary**: `x-forwarded-for` header (first IP in comma-separated list)
-2. **Fallback**: `x-real-ip` header
-3. **Default**: `'unknown'` if no headers present
+1. **Primary** (when `TRUST_PROXY=true`): `x-forwarded-for` header (first IP in comma-separated list)
+   - Only used when `TRUST_PROXY=true` is set in environment
+   - Takes the leftmost IP (original client, not proxy IP)
+   - IP format is validated before use
+2. **Fallback**: Connection IP from Next.js request object
+   - Uses platform-provided `remoteAddress` or `ip` field
+   - IP format is validated before use
+3. **Default**: `'unknown'` if no valid IP can be determined
 
-This works with reverse proxies (nginx, Cloudflare, etc.) that inject these headers.
+**SECURITY WARNING**: Only set `TRUST_PROXY=true` when behind a verified reverse proxy (nginx, Cloudflare, AWS ALB, etc.). When `false` (default), `x-forwarded-for` headers are ignored to prevent IP spoofing.
 
 ## Response Headers
 
@@ -82,18 +92,30 @@ When limits are exceeded, the API returns:
 
 ## Error Handling
 
-The implementation follows a **fail-open** strategy:
+The implementation follows a **fail-closed** strategy:
 
-- If Redis is unavailable or rate limit check fails, the request is **allowed**
+- If Redis is unavailable or rate limit check fails, the request is **rejected**
+- Returns `503 Service Unavailable` with `Retry-After: 60` header
 - Errors are logged with full context
-- This prevents rate limiting issues from breaking authentication for legitimate users
+- This prevents bypassing rate limits during service degradation
+
+**Response on rate limit check failure:**
+
+```json
+{
+  "error": "Service temporarily unavailable. Please try again later."
+}
+```
+
+**Status Code**: `503 Service Unavailable`
+**Header**: `Retry-After: 60`
 
 Example log on failure:
 
 ```json
 {
   "level": "error",
-  "message": "Rate limit check failed, failing open",
+  "message": "Rate limit check failed, failing closed (rejecting request)",
   "timestamp": "2025-10-25T12:34:56.789Z",
   "meta": {
     "error": { "name": "...", "message": "...", "stack": "..." },
@@ -107,22 +129,27 @@ Example log on failure:
 
 ### Environment Variables
 
-Add to `.env.local`:
+Add to `.env` or `.env.local`:
 
 ```env
-UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
-UPSTASH_REDIS_REST_TOKEN=your-token-here
+# Redis connection (required for rate limiting)
+REDIS_URL=redis://taboot-cache:6379
+
+# Proxy trust configuration (optional, default: false)
+TRUST_PROXY=false
 ```
 
+**Required**: `REDIS_URL` must be set or the application will throw an error at startup (fail-closed).
 
-**Required**: Both variables must be set or the application will throw an error at startup.
+**Optional**: Set `TRUST_PROXY=true` only when behind a verified reverse proxy (nginx, Cloudflare, AWS ALB, etc.).
 
-### Upstash Setup
+### Redis Setup
 
-1. Create account at [upstash.com](https://upstash.com)
-2. Create a Redis database (choose region close to your deployment)
-3. Copy REST URL and token from dashboard
-4. Add to `.env.local` file
+The application uses Redis for rate limiting state:
+
+- **Docker Compose**: Redis is provided as `taboot-cache` service (default: `redis://taboot-cache:6379`)
+- **Production**: Point to your Redis instance (Redis 7.2+ recommended)
+- **Cloud Options**: Compatible with any Redis-compatible service (AWS ElastiCache, Upstash, Redis Cloud, etc.)
 
 ## Usage in Other Endpoints
 
@@ -214,27 +241,43 @@ Rate limit violations are logged with the following structure:
 ```
 
 
-### Upstash Analytics
+### Redis Monitoring
 
-Upstash provides built-in analytics:
-- Request counts per identifier
-- Hit/miss ratios
-- Window statistics
+Monitor rate limiting via Redis:
 
-Access via Upstash dashboard → Your Database → Analytics
+```bash
+# Connect to Redis (Docker Compose)
+docker exec -it taboot-cache redis-cli
+
+# View rate limit keys
+KEYS ratelimit:*
+
+# Check specific rate limit state
+GET ratelimit:production:password:192.168.1.1
+
+# Monitor real-time commands
+MONITOR
+```
+
+For production deployments, use Redis monitoring tools:
+- Redis Insight (GUI)
+- RedisInsight Cloud
+- Datadog/Prometheus Redis exporters
 
 ## Security Considerations
 
-1. **IP Spoofing**: Trust proxy headers (`x-forwarded-for`) only when behind a trusted reverse proxy
-2. **Distributed Attacks**: Rate limits are per-IP; distributed attacks from many IPs may bypass limits
-3. **Legitimate Users**: Fail-open strategy ensures Redis issues don't lock out users
-4. **Sliding Window**: More accurate than fixed windows, prevents burst attacks at window boundaries
+1. **IP Spoofing**: Proxy headers (`x-forwarded-for`) are only trusted when `TRUST_PROXY=true`. Default is `false` to prevent IP spoofing.
+2. **IP Validation**: All IPs are validated (IPv4/IPv6 format) before use, even when proxy is trusted
+3. **Distributed Attacks**: Rate limits are per-IP; distributed attacks from many IPs may bypass limits
+4. **Fail-Closed Security**: Redis failures result in request rejection (503), preventing rate limit bypass during service degradation
+5. **Sliding Window**: More accurate than fixed windows, prevents burst attacks at window boundaries
 
 ## Performance
 
-- **Latency**: ~10-50ms overhead per request (Redis round-trip)
-- **Throughput**: Upstash Redis can handle thousands of requests per second
+- **Latency**: ~1-10ms overhead per request (local Redis) or ~10-50ms (cloud Redis)
+- **Throughput**: Redis can handle tens of thousands of requests per second
 - **Scalability**: Horizontal scaling supported (shared Redis state)
+- **Retry Strategy**: Automatic reconnection with exponential backoff (max 2 seconds)
 
 ## Future Enhancements
 

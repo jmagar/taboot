@@ -2,10 +2,9 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { changeEmail, updateUser } from '@taboot/auth/client';
 
-import { logger } from '@/lib/logger';
 import { queryKeys } from '@/lib/query-keys';
+import { updateProfile } from '@/lib/services/profile-service';
 import { Button } from '@taboot/ui/components/button';
 import {
   Card,
@@ -53,7 +52,6 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
   });
 
   // Update form values when user data is loaded
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (user) {
       form.reset({
@@ -61,54 +59,14 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
         email: user.email,
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, form.reset]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (values: UpdateProfileFormValues) => {
       if (!user) throw new Error('User not authenticated');
 
-      const nameChanged = values.name !== user.name;
-      const emailChanged = values.email !== user.email;
-
-      let nameUpdateSuccess = false;
-      let emailUpdateSuccess = false;
-
-      // Try to update name first
-      if (nameChanged) {
-        try {
-          await updateUser({
-            name: values.name,
-          });
-          nameUpdateSuccess = true;
-        } catch (error) {
-          logger.error('Name update failed:', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-          throw new Error('Failed to update name');
-        }
-      }
-
-      // Try to update email second
-      if (emailChanged) {
-        try {
-          await changeEmail({
-            newEmail: values.email,
-            callbackURL: '/settings/general',
-          });
-          emailUpdateSuccess = true;
-        } catch (error) {
-          logger.error('Email update failed:', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-          // If name succeeded but email failed, inform user about partial success
-          if (nameUpdateSuccess) {
-            throw new Error('Name updated, but failed to change email');
-          }
-          throw new Error('Failed to change email');
-        }
-      }
-
-      return { nameChanged: nameUpdateSuccess, emailChanged: emailUpdateSuccess };
+      return updateProfile(user.id, user, values);
     },
     onSuccess: (result) => {
       // Invalidate auth-related queries when profile is updated
@@ -132,7 +90,6 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
       onSuccess?.();
     },
     onError: (error: Error) => {
-      logger.error('Error updating profile:', error);
       toast.error(error.message || 'Failed to update profile');
     },
   });

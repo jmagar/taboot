@@ -8,7 +8,6 @@ import { ViewportDebug } from '@/components/viewport-debug';
 import { siteConfig } from '@/config/site';
 import { viewportConfig } from '@/config/viewport';
 import '@taboot/ui/globals.css';
-import { Analytics } from '@vercel/analytics/react';
 import { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import { CSPScripts } from '@/components/csp-scripts';

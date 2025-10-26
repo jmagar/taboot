@@ -504,9 +504,133 @@ def get_postgres_client() -> connection:
         raise ConnectionError("Failed to connect to PostgreSQL") from e
 
 
+class SchemaVersionDetails:
+    """Details of a schema version record from the database."""
+
+    def __init__(
+        self,
+        version: str,
+        applied_at: datetime,
+        applied_by: str,
+        execution_time_ms: int | None,
+        status: str,
+        checksum: str | None,
+    ) -> None:
+        """Initialize SchemaVersionDetails.
+
+        Args:
+            version: Schema version string (e.g., '2.0.0')
+            applied_at: Timestamp when schema was applied
+            applied_by: Database user who applied the schema
+            execution_time_ms: Time taken to execute schema in milliseconds
+            status: Status of schema application ('success' or 'failed')
+            checksum: SHA-256 checksum of schema SQL (first 16 chars displayed)
+        """
+        self.version = version
+        self.applied_at = applied_at
+        self.applied_by = applied_by
+        self.execution_time_ms = execution_time_ms
+        self.status = status
+        self.checksum = checksum
+
+    def to_tuple(self) -> tuple:
+        """Convert to tuple for unpacking."""
+        return (self.version, self.applied_at, self.applied_by, self.execution_time_ms, self.status, self.checksum)
+
+
+def get_schema_version_details() -> SchemaVersionDetails | None:
+    """Get current schema version with full details from database.
+
+    Queries the schema_versions table to retrieve the most recently applied
+    schema version along with all metadata.
+
+    Returns:
+        SchemaVersionDetails if a schema version is recorded, None otherwise.
+
+    Raises:
+        ConnectionError: If database connection fails.
+
+    Example:
+        >>> details = get_schema_version_details()
+        >>> if details:
+        ...     print(f"Version: {details.version}")
+        ...     print(f"Applied at: {details.applied_at}")
+        ...     print(f"Status: {details.status}")
+        ... else:
+        ...     print("No schema version recorded")
+    """
+    config = get_config()
+    conn = get_connection(config)
+    try:
+        with conn.cursor() as cursor:
+            current_version = get_current_version(cursor)
+            if not current_version:
+                return None
+
+            cursor.execute(
+                """
+                SELECT version, applied_at, applied_by, execution_time_ms, status, checksum
+                FROM schema_versions
+                WHERE version = %s
+                ORDER BY applied_at DESC
+                LIMIT 1
+                """,
+                (current_version,),
+            )
+            result = cursor.fetchone()
+            if result:
+                return SchemaVersionDetails(*result)
+            return None
+    finally:
+        conn.close()
+
+
+def get_schema_version_history(limit: int = 10) -> list[tuple]:
+    """Get schema version history from database with limit clamping.
+
+    Retrieves a historical record of schema versions applied to the database,
+    ordered by most recent first. Limits are clamped to [1, 100] for safety.
+
+    Args:
+        limit: Maximum number of versions to retrieve (default: 10). Will be
+            clamped to the range [1, 100].
+
+    Returns:
+        List of tuples containing (version, applied_at, applied_by,
+        execution_time_ms, status, checksum) for each recorded schema version.
+        Returns empty list if no versions recorded.
+
+    Raises:
+        ConnectionError: If database connection fails.
+
+    Example:
+        >>> history = get_schema_version_history(limit=20)
+        >>> for version, applied_at, applied_by, exec_time, status, checksum in history:
+        ...     print(f"{version} - {status}")
+    """
+    clamped_limit = max(1, min(int(limit), 100))
+    config = get_config()
+    conn = get_connection(config)
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT version, applied_at, applied_by, execution_time_ms, status, checksum
+                FROM schema_versions
+                ORDER BY applied_at DESC
+                LIMIT %s
+                """,
+                (clamped_limit,),
+            )
+            return cursor.fetchall()
+    finally:
+        conn.close()
+
+
 # Export public API
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
+    "SchemaVersionDetails",
     "create_postgresql_schema",
     "create_schema",
     "extract_schema_version",
@@ -514,6 +638,8 @@ __all__ = [
     "get_current_version",
     "get_postgres_client",
     "get_schema_checksum",
+    "get_schema_version_details",
+    "get_schema_version_history",
     "load_schema_file",
     "verify_schema",
 ]

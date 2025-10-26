@@ -403,33 +403,37 @@ The Next.js web application (`apps/web/`) implements **fail-closed rate limiting
 
 **Build-Time vs Runtime Behavior:**
 - **Build time** (`NEXT_PHASE=phase-production-build`): Uses stub that allows all requests (for static analysis)
-- **Runtime** (production/development): Requires Upstash Redis; throws error if not configured
+- **Runtime** (production/development): Uses Redis (ioredis) with lazy initialization; connection errors surface on first rate limit check
 
 **Configuration:**
 
+The rate limiter requires Redis, configured via environment variables:
+
 ```bash
-# Required for production deployments with rate limiting
-UPSTASH_REDIS_REST_URL="https://your-database.upstash.io"
-UPSTASH_REDIS_REST_TOKEN="your-upstash-token-here"
+# Redis connection (defaults to docker-compose service)
+REDIS_URL="redis://taboot-cache:6379"
 
 # TRUST_PROXY: Only set to 'true' if behind verified reverse proxy
 # Default: 'false' (secure - ignores X-Forwarded-For)
 TRUST_PROXY="false"
 ```
 
+See [Configuration section](#configuration) for full Redis setup details.
+
 **Rate Limits:**
 - Password endpoints (`/api/auth/password/*`): 5 requests per 10 minutes
 - General auth endpoints: 10 requests per 1 minute
 
 **Security Principles:**
-- **Fail-closed**: Missing Redis credentials at runtime → service throws error and refuses to start
+- **Fail-closed semantics**: Missing `REDIS_URL` or Redis unavailable → throws error, rate limit requests rejected
+- **Lazy initialization**: Redis connection established on first rate limit call (not startup); errors surface immediately on first use
 - **No silent failures**: Clear error messages with configuration instructions
 - **Build-time safety**: Only uses stub during `NEXT_PHASE=phase-production-build`
-- **Runtime enforcement**: All rate limit check failures return 503 Service Unavailable (fail-closed)
-- **IP spoofing protection**: X-Forwarded-For only trusted when TRUST_PROXY=true; IP format validated
+- **Runtime enforcement**: All rate limit check failures return 503 Service Unavailable
+- **IP spoofing protection**: X-Forwarded-For only trusted when `TRUST_PROXY=true`; IP format validated
 
 **Implementation Files:**
-- `apps/web/lib/rate-limit.ts` - Core rate limiting logic with fail-closed initialization
+- `apps/web/lib/rate-limit.ts` — Core rate limiting logic with ioredis client and fail-closed error handling
 
 ### Rate Limiting Behind Reverse Proxy
 
@@ -471,7 +475,7 @@ If deploying behind Cloudflare, nginx, or other reverse proxy:
      -d '{"email":"test@example.com","password":"wrong"}'
 
    # Make 6 requests rapidly to trigger rate limit (5 req/10min limit)
-   # Should see 503 Service Unavailable after 5th attempt (fail-closed)
+   # Should see 503 Service Unavailable after 5th attempt
    ```
 
 **SECURITY WARNING:**
@@ -499,7 +503,7 @@ pnpm --filter @taboot/web test lib/with-rate-limit.test.ts
 | Neo4j connection refused | Wait for healthcheck: `docker compose ps taboot-graph` |
 | Tests fail | Ensure `docker compose ps` shows all services healthy before running integration tests |
 | spaCy model missing | First run auto-downloads `en_core_web_md`; or manually `python -m spacy download en_core_web_md` |
-| Rate limiting error on web app startup | Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in `.env` (see `.env.example`) |
+| Rate limiting connection error | Set `REDIS_URL` in `.env` (defaults to `redis://taboot-cache:6379`); see `.env.example` for details |
 
 ## Commits & PRs
 

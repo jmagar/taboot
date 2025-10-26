@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 
-const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
+const SENTRY_DSN = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN;
 
 if (SENTRY_DSN) {
   Sentry.init({
@@ -13,7 +13,7 @@ if (SENTRY_DSN) {
     // Setting this option to true will print useful information to the console while you're setting up Sentry.
     debug: false,
 
-    environment: process.env.NODE_ENV,
+    environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV,
 
     // Configure beforeSend to filter sensitive data
     beforeSend(event, hint) {
@@ -36,26 +36,30 @@ if (SENTRY_DSN) {
         'ssn',
       ]);
 
-      // Helper function to scrub sensitive data from any object
-      const scrubData = (data: Record<string, unknown>): Record<string, unknown> => {
-        const scrubbed: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(data)) {
-          if (scrubKeys.has(key.toLowerCase())) {
-            scrubbed[key] = '[Filtered]';
-          } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-            scrubbed[key] = scrubData(value as Record<string, unknown>);
-          } else {
-            scrubbed[key] = value;
+      // Helper function to scrub sensitive data from any object (recursive with array support)
+      const scrubData = (data: unknown): unknown => {
+        if (data === null || data === undefined) return data;
+        if (Array.isArray(data)) return data.map((v) => scrubData(v));
+        if (typeof data === 'object') {
+          const input = data as Record<string, unknown>;
+          const out: Record<string, unknown> = {};
+          for (const [key, value] of Object.entries(input)) {
+            if (scrubKeys.has(key.toLowerCase())) {
+              out[key] = '[Filtered]';
+            } else {
+              out[key] = scrubData(value);
+            }
           }
+          return out;
         }
-        return scrubbed;
+        return data;
       };
 
       // Filter out PII from breadcrumbs
       if (event.breadcrumbs) {
         event.breadcrumbs = event.breadcrumbs.map((breadcrumb) => {
           if (breadcrumb.data) {
-            return { ...breadcrumb, data: scrubData(breadcrumb.data) };
+            return { ...breadcrumb, data: scrubData(breadcrumb.data) as Record<string, unknown> };
           }
           return breadcrumb;
         });
@@ -63,29 +67,33 @@ if (SENTRY_DSN) {
 
       // Filter out PII from request data
       if (event.request?.data && typeof event.request.data === 'object') {
-        event.request.data = scrubData(event.request.data as Record<string, unknown>);
+        event.request.data = scrubData(event.request.data) as Record<string, unknown>;
       }
 
       // Filter out PII from request headers
       if (event.request?.headers) {
-        event.request.headers = scrubData(event.request.headers as Record<string, unknown>);
+        event.request.headers = scrubData(event.request.headers) as Record<string, string>;
       }
 
       // Filter out PII from contexts
       if (event.contexts) {
         for (const [contextKey, contextValue] of Object.entries(event.contexts)) {
           if (contextValue && typeof contextValue === 'object') {
-            event.contexts[contextKey] = scrubData(contextValue as Record<string, unknown>);
+            event.contexts[contextKey] = scrubData(contextValue) as Record<string, unknown>;
           }
         }
       }
 
       // Filter out PII from extra data
       if (event.extra) {
-        event.extra = scrubData(event.extra as Record<string, unknown>);
+        event.extra = scrubData(event.extra) as Record<string, unknown>;
       }
 
       return event;
     },
   });
+}
+
+if (!SENTRY_DSN) {
+  console.log('Sentry integration disabled (SENTRY_DSN or NEXT_PUBLIC_SENTRY_DSN not configured)');
 }

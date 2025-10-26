@@ -65,6 +65,7 @@ export function withRateLimit(handler: Handler, ratelimit: RateLimiter): Handler
             headers: {
               ...rateLimitHeaders,
               'Retry-After': String(retryAfterSeconds),
+              'Cache-Control': 'no-store',
             },
           },
         );

@@ -8,7 +8,7 @@ Taboot implements **strict Content-Security-Policy (CSP) headers** with nonce-ba
 
 ### Directives
 
-```
+```text
 default-src 'self'
   → Only allow resources from same origin by default
 

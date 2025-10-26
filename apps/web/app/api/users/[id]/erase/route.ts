@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@taboot/db';
 import { auth } from '@taboot/auth';
 import { logger } from '@/lib/logger';
+import type { prisma as prismaType } from '@taboot/db';
 
 /**
  * Validate IP address format (IPv4 or IPv6).
@@ -88,7 +89,21 @@ export async function POST(
 
     // Authorization: user can erase own account OR admin can erase any account
     const adminUserId = process.env.ADMIN_USER_ID;
-    const isAdmin = currentUserId === adminUserId;
+
+    // SECURITY: Fail closed on admin operations
+    // If attempting to erase another user's account but admin not configured, reject
+    if (currentUserId !== userId && !adminUserId) {
+      logger.error('Admin erasure attempted but ADMIN_USER_ID not configured', {
+        attemptedBy: currentUserId,
+        targetUser: userId,
+      });
+      return NextResponse.json(
+        { error: 'Service not configured for admin operations' },
+        { status: 503 }
+      );
+    }
+
+    const isAdmin = adminUserId !== undefined && currentUserId === adminUserId;
     const canErase = currentUserId === userId || isAdmin;
 
     if (!canErase) {
@@ -111,10 +126,9 @@ export async function POST(
 
     // Get request metadata for audit trail with safe proxy header handling
     const ipAddress = getClientIp(request);
-    const userAgent = request.headers.get('user-agent') || undefined;
 
     // GDPR erasure: atomic transaction to ensure consistency
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: typeof prismaType) => {
       // 1. Anonymize user PII in the user record
       await tx.user.update({
         where: { id: userId },
@@ -137,9 +151,9 @@ export async function POST(
         where: { userId },
       });
 
-      // 4. Delete all verification tokens
+      // 4. Delete all verification tokens (use userId FK for efficiency)
       await tx.verification.deleteMany({
-        where: { identifier: userToErase.email },
+        where: { userId },
       });
 
       // 5. Delete all two-factor auth entries
@@ -238,7 +252,21 @@ export async function GET(
 
     // Authorization: user can preview own erasure OR admin can preview any
     const adminUserId = process.env.ADMIN_USER_ID;
-    const isAdmin = currentUserId === adminUserId;
+
+    // SECURITY: Fail closed on admin operations
+    // If attempting to preview another user's erasure but admin not configured, reject
+    if (currentUserId !== userId && !adminUserId) {
+      logger.error('Admin preview attempted but ADMIN_USER_ID not configured', {
+        attemptedBy: currentUserId,
+        targetUser: userId,
+      });
+      return NextResponse.json(
+        { error: 'Service not configured for admin operations' },
+        { status: 503 }
+      );
+    }
+
+    const isAdmin = adminUserId !== undefined && currentUserId === adminUserId;
     const canPreview = currentUserId === userId || isAdmin;
 
     if (!canPreview) {
@@ -262,6 +290,8 @@ export async function GET(
             sessions: true,
             accounts: true,
             twofactors: true,
+            verifications: true,
+            auditLogs: true,
           },
         },
       },
@@ -270,10 +300,6 @@ export async function GET(
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
-    const auditLogEntries = await prisma.auditLog.count({
-      where: { userId },
-    });
 
     return NextResponse.json({
       user: {
@@ -291,11 +317,11 @@ export async function GET(
         data: {
           sessions: user._count.sessions,
           oauthAccounts: user._count.accounts,
-          verificationTokens: 'will_be_deleted',
+          verificationTokens: user._count.verifications,
           twoFactorAuth: user._count.twofactors,
         },
         auditTrail: {
-          total: auditLogEntries,
+          total: user._count.auditLogs,
           action: 'PII removed, action log retained for compliance',
         },
       },

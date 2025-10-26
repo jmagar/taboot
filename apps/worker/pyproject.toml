@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "taboot-worker"
 version = "0.4.0"
 description = "Taboot background extraction worker"
-readme = "README.md"
+readme = "../README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Jacob Magar", email = "jmagar@gmail.com" }]
 license = { text = "Proprietary" }

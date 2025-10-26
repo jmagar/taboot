@@ -33,17 +33,8 @@ function createBuildTimeStub(
     success: true,
     limit,
     remaining: limit,
-    reset: Date.now() + windowMs,
+    reset: Math.floor((Date.now() + windowMs) / 1000), // Convert to seconds
   });
-}
-
-// Build-time: create stub Redis and limiter
-let redis: Redis | undefined;
-let rateLimiter: RateLimiterRedis | undefined;
-
-if (isBuildTime) {
-  redis = undefined; // Don't connect during build
-  rateLimiter = undefined;
 }
 
 /**
@@ -75,50 +66,55 @@ function createRateLimit(
     );
   }
 
-  // Lazy initialization of Redis client and limiter
-  if (!redis || !rateLimiter) {
-    try {
-      redis = new Redis(redisUrl, {
-        maxRetriesPerRequest: 3,
-        enableReadyCheck: true,
-        lazyConnect: false,
-        retryStrategy: (times) => {
-          const delay = Math.min(times * 50, 2000);
-          return delay;
-        },
-      });
+  // Create dedicated Redis client and limiter instance for this prefix
+  let redis: Redis;
+  let rateLimiter: RateLimiterRedis;
 
-      // Test connection immediately to fail-closed if Redis unavailable
-      redis.on('error', (err) => {
-        console.error('[RATE_LIMIT] Redis connection error:', err);
-        throw new Error(`[RATE_LIMIT] Failed to connect to Redis at ${redisUrl}: ${err.message}`);
-      });
+  try {
+    redis = new Redis(redisUrl, {
+      maxRetriesPerRequest: 3,
+      enableReadyCheck: true,
+      lazyConnect: false,
+      retryStrategy: (times) => {
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+      },
+    });
 
-      rateLimiter = new RateLimiterRedis({
-        storeClient: redis,
-        points: limit, // Number of requests
-        duration: windowMs / 1000, // Window duration in seconds
-        keyPrefix: prefix,
-        insuranceLimiter: undefined, // No fallback during rate limit check
-      });
-    } catch (error) {
-      throw new Error(
-        `[RATE_LIMIT] Failed to initialize rate limiter: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
+    // Event handler should log errors, not throw (async handler)
+    redis.on('error', (err) => {
+      console.error('[RATE_LIMIT] Redis connection error:', err);
+    });
+
+    rateLimiter = new RateLimiterRedis({
+      storeClient: redis,
+      points: limit, // Number of requests
+      duration: windowMs / 1000, // Window duration in seconds
+      keyPrefix: prefix,
+      insuranceLimiter: undefined, // No fallback during rate limit check
+    });
+  } catch (error) {
+    throw new Error(
+      `[RATE_LIMIT] Failed to initialize rate limiter: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
+
+  // Test connection explicitly (fail-closed if unavailable)
+  redis.ping().catch((err) => {
+    throw new Error(`[RATE_LIMIT] Failed to connect to Redis at ${redisUrl}: ${err.message}`);
+  });
 
   // Return async function that limits requests
   return async (key: string): Promise<RateLimitResponse> => {
     try {
       // Consume 1 point (request)
-      const rateLimiterRes: RateLimiterRes = await rateLimiter!.consume(key, 1);
+      const rateLimiterRes: RateLimiterRes = await rateLimiter.consume(key, 1);
 
       return {
         success: true,
         limit,
         remaining: Math.max(0, rateLimiterRes.remainingPoints),
-        reset: Math.floor((Date.now() + rateLimiterRes.msBeforeNext) / 1000),
+        reset: Math.floor(Date.now() / 1000) + Math.ceil(rateLimiterRes.msBeforeNext / 1000),
       };
     } catch (error) {
       // RateLimiterRedis throws RateLimiterRes when limit exceeded
@@ -127,7 +123,7 @@ function createRateLimit(
           success: false,
           limit,
           remaining: Math.max(0, error.remainingPoints),
-          reset: Math.floor((Date.now() + error.msBeforeNext) / 1000),
+          reset: Math.floor(Date.now() / 1000) + Math.ceil(error.msBeforeNext / 1000),
         };
       }
 

@@ -102,10 +102,10 @@ RUN mkdir -p /var/log/supervisor /home/llamacrawl/.ssh \
 
 EXPOSE 8000 3000
 
-# Health check: verify both FastAPI (8000) and Next.js (3000) are responding
-# Checks API /health endpoint first, falls back to Next.js /api/test endpoint
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || curl -f http://localhost:3000/api/test || exit 1
+# Health check: verify Redis connectivity (fail-closed approach)
+# Uses python-redis to check if Redis is reachable from app container
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import os, sys, redis; r = redis.Redis(host=os.getenv('REDIS_HOST','redis'), port=int(os.getenv('REDIS_PORT','6379'))); sys.exit(0 if r.ping() else 1)"
 
 # Run both API and web via supervisord
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

@@ -37,6 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage application lifecycle: startup and shutdown.
 
     Startup:
+        - Bootstrap environment configuration (JWT secrets, etc.)
         - Initialize Redis client with connection pooling
         - Initialize Neo4j driver with connection pooling
         - Initialize Qdrant client with connection pooling
@@ -47,6 +48,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         - Close all client connections gracefully
         - Clean up resources
     """
+    from packages.common.config import ensure_env_loaded
+
+    # Bootstrap environment configuration early
+    ensure_env_loaded()
+
     config = get_config()
 
     # Startup

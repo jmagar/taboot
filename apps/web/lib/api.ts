@@ -58,7 +58,13 @@ class CsrfAwareAPIClient extends TabootAPIClient {
     return this.requestWithCsrf<T>(path, {
       ...options,
       method: "POST",
-      body: data ? JSON.stringify(data) : undefined,
+      body: options?.body ?? (
+        data == null
+          ? undefined
+          : (data instanceof FormData || data instanceof Blob || data instanceof ArrayBuffer
+              ? (data as BodyInit)
+              : JSON.stringify(data))
+      ),
     });
   }
 
@@ -70,7 +76,13 @@ class CsrfAwareAPIClient extends TabootAPIClient {
     return this.requestWithCsrf<T>(path, {
       ...options,
       method: "PUT",
-      body: data ? JSON.stringify(data) : undefined,
+      body: options?.body ?? (
+        data == null
+          ? undefined
+          : (data instanceof FormData || data instanceof Blob || data instanceof ArrayBuffer
+              ? (data as BodyInit)
+              : JSON.stringify(data))
+      ),
     });
   }
 
@@ -82,7 +94,13 @@ class CsrfAwareAPIClient extends TabootAPIClient {
     return this.requestWithCsrf<T>(path, {
       ...options,
       method: "PATCH",
-      body: data ? JSON.stringify(data) : undefined,
+      body: options?.body ?? (
+        data == null
+          ? undefined
+          : (data instanceof FormData || data instanceof Blob || data instanceof ArrayBuffer
+              ? (data as BodyInit)
+              : JSON.stringify(data))
+      ),
     });
   }
 
@@ -127,13 +145,13 @@ class CsrfAwareAPIClient extends TabootAPIClient {
     const contentType = response.headers.get("content-type");
     const isJson = contentType?.includes("application/json");
 
-    let data: import("@taboot/api-client").APIResponse<T> | { data?: string };
+    let data: import("@taboot/api-client").APIResponse<T>;
     if (isJson) {
       data = await response.json();
     } else {
-      // For non-JSON responses, return text or empty object
+      // For non-JSON responses, return text wrapped in success response
       const text = await response.text();
-      data = text ? { data: text } : {};
+      data = { data: (text || null) as T, error: null };
     }
 
     if (!response.ok) {

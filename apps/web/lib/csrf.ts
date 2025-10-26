@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
+import { toBase64Url } from '@/lib/crypto-utils';
 
 // FIX 1: Use __Host- prefix only in production (requires Secure flag)
 // In development, use plain cookie name to avoid HTTPS requirement
@@ -31,13 +32,9 @@ async function generateCsrfToken(): Promise<string> {
   const buffer = new Uint8Array(32);
   crypto.getRandomValues(buffer);
 
-  // FIX 2: Use Buffer instead of btoa for Node.js runtime compatibility
-  // btoa is undefined in Next.js middleware (Node runtime)
-  const token = Buffer.from(buffer)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
+  // Use cross-runtime base64url encoding utility
+  // Works in both Edge runtime (btoa) and Node.js runtime (Buffer)
+  const token = toBase64Url(buffer);
 
   return token;
 }
@@ -59,12 +56,9 @@ async function signToken(token: string): Promise<string> {
   const signature = await crypto.subtle.sign('HMAC', key, data);
   const signatureArray = new Uint8Array(signature);
 
-  // FIX 2: Use Buffer instead of btoa for Node.js runtime compatibility
-  const signatureBase64 = Buffer.from(signatureArray)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
+  // Use cross-runtime base64url encoding utility
+  // Works in both Edge runtime (btoa) and Node.js runtime (Buffer)
+  const signatureBase64 = toBase64Url(signatureArray);
 
   return `${token}.${signatureBase64}`;
 }

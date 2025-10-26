@@ -241,7 +241,7 @@ function parseArgs(): CleanupOptions {
 
   const retentionArg = args.find((arg) => arg.startsWith('--retention-days='));
   if (retentionArg) {
-    const days = parseInt(retentionArg.split('=')[1], 10);
+    const days = parseInt(retentionArg.split('=')[1] ?? '', 10);
     if (isNaN(days) || days < 1 || days > 3650) {
       console.error(
         'Invalid retention days value. Must be between 1 and 3650 (10 years).'

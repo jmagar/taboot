@@ -62,10 +62,17 @@ export function NavUser() {
       {
         label: 'Log out',
         onClick: async () => {
-          await signOut();
-          await revalidateSessionCache();
-          refetch();
-          router.push('/');
+          try {
+            await signOut();
+            // Fire-and-forget; UI shouldn't block on cache invalidation
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            revalidateSessionCache();
+            refetch();
+          } catch (error) {
+            console.error('Logout error:', error);
+          } finally {
+            router.replace('/');
+          }
         },
         icon: LogOut,
       },

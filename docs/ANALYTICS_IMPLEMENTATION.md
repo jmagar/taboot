@@ -67,7 +67,7 @@ All events use snake_case convention:
 
 - `apps/web/ANALYTICS.md` - Comprehensive implementation documentation
 - `apps/web/ANALYTICS_EXAMPLES.md` - Code examples for common use cases
-- `/home/jmagar/code/taboot/ANALYTICS_IMPLEMENTATION.md` - This summary
+- `docs/ANALYTICS_IMPLEMENTATION.md` - This summary
 
 **Coverage:**
 
@@ -307,8 +307,8 @@ Before deploying to production:
 5. `apps/web/__tests__/analytics.test.ts` - Unit tests
 6. `apps/web/ANALYTICS.md` - Implementation documentation
 7. `apps/web/ANALYTICS_EXAMPLES.md` - Usage examples
-8. `/home/jmagar/code/taboot/ANALYTICS_IMPLEMENTATION.md` - This summary
-9. `/home/jmagar/code/taboot/instrumentation.ts` - Removed (Edge Runtime incompatibility)
+8. `docs/ANALYTICS_IMPLEMENTATION.md` - This summary
+9. `instrumentation.ts` - Removed (Edge Runtime incompatibility)
 
 ### Modified (4 files)
 

@@ -63,8 +63,9 @@ async function hasValidSession(request: NextRequest): Promise<boolean> {
  * Apply security headers to the response including CSP with nonce.
  */
 function applySecurityHeaders(response: NextResponse): void {
-  // Generate nonce for CSP script tags
-  const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64');
+  // Generate nonce for CSP script tags (Edge runtime compatible)
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const nonce = btoa(String.fromCharCode(...bytes));
 
   // Content Security Policy configuration
   const cspConfig = {
@@ -90,7 +91,6 @@ function applySecurityHeaders(response: NextResponse): void {
     'Content-Security-Policy': csp,
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
-    'X-XSS-Protection': '1; mode=block',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     'x-nonce': nonce, // Pass nonce for script tags in layout

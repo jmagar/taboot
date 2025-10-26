@@ -2,20 +2,9 @@
 
 import { Button } from '@taboot/ui/components/button';
 import { logger } from '@/lib/logger';
+import { sanitizeErrorMessage } from '@/lib/sanitize';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-
-/**
- * Sanitize error messages to remove PII and sensitive data before logging
- */
-function sanitizeErrorMessage(message: string): string {
-  return message
-    .replace(/[\w.-]+@[\w.-]+\.\w+/g, '[EMAIL]') // Email addresses
-    .replace(/token=[\w-]+/gi, 'token=[REDACTED]') // URL tokens
-    .replace(/bearer\s+[\w-]+/gi, 'bearer [REDACTED]') // Bearer tokens
-    .replace(/[0-9a-f]{32,}/gi, '[SESSION_ID]') // Hex strings (session IDs, hashes)
-    .replace(/\b[A-Za-z0-9+/]{40,}={0,2}\b/g, '[TOKEN]'); // Base64 tokens
-}
 
 export default function AuthError({
   error,
@@ -61,7 +50,7 @@ export default function AuthError({
           <details className="mt-8 rounded-lg border bg-card p-4 text-left">
             <summary className="cursor-pointer font-semibold">Technical Details</summary>
             <pre className="mt-4 overflow-auto text-xs">
-              <code>{error.stack || error.message}</code>
+              <code>{error.stack ? sanitizeErrorMessage(error.stack) : sanitizeErrorMessage(error.message)}</code>
             </pre>
           </details>
         )}

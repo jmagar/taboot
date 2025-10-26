@@ -36,7 +36,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader className={cn('flex', isSidebarExpanded ? 'flex-row' : 'flex-col')}>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1">
+            <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:p-1!">
               <Link
                 href="/"
                 className="flex items-center gap-2 self-center font-medium"
@@ -82,7 +82,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 href="/sign-up"
                 className={cn('flex flex-row items-center justify-center', isSidebarExpanded && 'space-x-2')}
               >
-                <UserPlus className="h-4 w-4" aria-hidden={isSidebarExpanded ? 'true' : undefined} />
+                <UserPlus className="h-4 w-4" aria-hidden="true" />
                 <span>{isSidebarExpanded ? 'Sign up' : ''}</span>
               </Link>
             </Button>
@@ -96,7 +96,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 href="/sign-in"
                 className={cn('flex flex-row items-center justify-center', isSidebarExpanded && 'space-x-2')}
               >
-                <LogIn className="h-4 w-4" aria-hidden={isSidebarExpanded ? 'true' : undefined} />
+                <LogIn className="h-4 w-4" aria-hidden="true" />
                 <span>{isSidebarExpanded ? 'Sign in' : ''}</span>
               </Link>
             </Button>

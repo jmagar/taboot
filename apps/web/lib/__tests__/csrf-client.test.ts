@@ -4,13 +4,16 @@
  * Tests for client-side CSRF token handling.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { withCsrfToken, csrfFetch } from '../csrf-client';
 
 // Mock document for browser environment
 const mockDocument = {
   cookie: '',
 };
+
+// Save original document for restoration after tests
+const originalDocument = (global as any).document;
 
 Object.defineProperty(global, 'document', {
   value: mockDocument,
@@ -22,6 +25,18 @@ describe('CSRF Client', () => {
   beforeEach(() => {
     // Clear cookies before each test
     mockDocument.cookie = '';
+  });
+
+  afterAll(() => {
+    // Restore original document to avoid polluting other test suites
+    if (originalDocument !== undefined) {
+      (global as any).document = originalDocument;
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete (global as any).document;
+    }
+    // Restore all global stubs
+    vi.unstubAllGlobals();
   });
 
   describe('withCsrfToken', () => {
@@ -155,14 +170,14 @@ describe('CSRF Client', () => {
 
   describe('csrfFetch', () => {
     it('should use withCsrfToken when making requests', async () => {
-      // Mock global fetch
+      // Mock global fetch using vi.stubGlobal for proper test isolation
       const mockFetch = vi.fn().mockResolvedValue(
         new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
       );
-      global.fetch = mockFetch;
+      vi.stubGlobal('fetch', mockFetch);
 
       mockDocument.cookie = 'taboot.csrf=test-token; path=/';
 

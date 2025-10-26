@@ -4,27 +4,33 @@
  * Tests for CSRF middleware, token generation, and validation.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest';
 import { NextRequest } from 'next/server';
 import { getCsrfToken, csrfMiddleware, withCsrf } from '../csrf';
 
-// Mock crypto API for Node.js environment
-// Note: In Node 18+, crypto.subtle exists but we need to ensure it works
-vi.stubGlobal('crypto', {
-  getRandomValues: (array: Uint8Array) => {
-    for (let i = 0; i < array.length; i++) {
-      array[i] = Math.floor(Math.random() * 256);
-    }
-    return array;
-  },
-  subtle: {
-    importKey: vi.fn().mockResolvedValue('mock-key'),
-    sign: vi.fn().mockResolvedValue(new ArrayBuffer(32)),
-    verify: vi.fn().mockResolvedValue(false), // Default to invalid signature
-  },
-});
-
 describe('CSRF Protection', () => {
+  beforeAll(() => {
+    // Mock crypto API for Node.js environment
+    // Note: In Node 18+, crypto.subtle exists but we need to ensure it works
+    vi.stubGlobal('crypto', {
+      getRandomValues: (array: Uint8Array) => {
+        for (let i = 0; i < array.length; i++) {
+          array[i] = Math.floor(Math.random() * 256);
+        }
+        return array;
+      },
+      subtle: {
+        importKey: vi.fn().mockResolvedValue('mock-key'),
+        sign: vi.fn().mockResolvedValue(new ArrayBuffer(32)),
+        verify: vi.fn().mockResolvedValue(false), // Default to invalid signature
+      },
+    });
+  });
+
+  afterAll(() => {
+    // Restore all global stubs to prevent leakage to other test suites
+    vi.unstubAllGlobals();
+  });
   describe('getCsrfToken', () => {
     it('should generate a new CSRF token', async () => {
       const request = new NextRequest('http://localhost:3000/api/test', {
@@ -39,6 +45,8 @@ describe('CSRF Protection', () => {
     });
 
     it('should return existing valid token from cookie', async () => {
+      // Mock verify to return true so the existing token is accepted
+      (crypto.subtle.verify as unknown as vi.Mock).mockResolvedValueOnce(true);
       const existingToken = 'test-token.test-signature';
       const request = new NextRequest('http://localhost:3000/api/test', {
         method: 'GET',
@@ -49,9 +57,7 @@ describe('CSRF Protection', () => {
 
       const token = await getCsrfToken(request);
 
-      // Due to signature verification, this will likely generate a new token
-      // unless we mock the verification properly
-      expect(token).toBeTruthy();
+      expect(token).toBe(existingToken);
     });
   });
 
@@ -142,6 +148,8 @@ describe('CSRF Protection', () => {
     });
 
     it('should accept POST request with valid origin and CSRF token', async () => {
+      // Mock verify to return true so token validation passes
+      (crypto.subtle.verify as unknown as vi.Mock).mockResolvedValueOnce(true);
       const token = 'test-token.test-signature';
       const request = new NextRequest('http://localhost:3000/api/test', {
         method: 'POST',
@@ -155,12 +163,12 @@ describe('CSRF Protection', () => {
 
       const response = await csrfMiddleware(request);
 
-      // This will likely fail due to signature verification
-      // In a real test, we'd need to generate a valid signed token
-      expect([200, 403]).toContain(response.status);
+      expect(response.status).toBe(200);
     });
 
     it('should validate referer header when origin is missing', async () => {
+      // Mock verify to return true so token validation passes
+      (crypto.subtle.verify as unknown as vi.Mock).mockResolvedValueOnce(true);
       const token = 'test-token.test-signature';
       const request = new NextRequest('http://localhost:3000/api/test', {
         method: 'POST',
@@ -174,8 +182,7 @@ describe('CSRF Protection', () => {
 
       const response = await csrfMiddleware(request);
 
-      // This will likely fail due to signature verification
-      expect([200, 403]).toContain(response.status);
+      expect(response.status).toBe(200);
     });
   });
 

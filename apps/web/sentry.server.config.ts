@@ -28,7 +28,6 @@ if (SENTRY_DSN) {
         'authorization',
         'auth',
         'apikey',
-        'apikey',
         'key',
         'secret',
         'sessionid',

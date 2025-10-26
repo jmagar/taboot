@@ -59,11 +59,18 @@ export class AuthService {
 
       logger.info('Password set successfully', { userId });
     } catch (error) {
-      if (error instanceof Error && /already exists/i.test(error.message)) {
-        logger.warn('Attempted to set password for user who already has one', { userId });
+      // Check for upstream error code/status first (most reliable)
+      const apiError = error as any;
+      const isAlreadyExists =
+        apiError?.code === 'ALREADY_EXISTS' ||
+        apiError?.status === 409 ||
+        (error instanceof Error && /already exists/i.test(error.message));
+
+      if (isAlreadyExists) {
+        logger.warn('Attempted to set password for user who already has one', { userId, code: apiError?.code });
         throw new Error('Password already exists. Please use change password instead.');
       }
-      logger.error('Error setting password', { userId, error });
+      logger.error('Error setting password', { userId, code: apiError?.code, error });
       throw new Error('Failed to set password');
     }
   }
@@ -93,11 +100,18 @@ export class AuthService {
 
       logger.info('Password changed successfully', { userId });
     } catch (error) {
-      if (error instanceof Error && /no password/i.test(error.message)) {
-        logger.warn('Attempted to change password for user without one', { userId });
+      // Check for upstream error code/status first (most reliable)
+      const apiError = error as any;
+      const hasNoPassword =
+        apiError?.code === 'NO_PASSWORD' ||
+        apiError?.status === 404 ||
+        (error instanceof Error && /no password/i.test(error.message));
+
+      if (hasNoPassword) {
+        logger.warn('Attempted to change password for user without one', { userId, code: apiError?.code });
         throw new Error('No password set. Please set a password first.');
       }
-      logger.error('Error changing password', { userId, error });
+      logger.error('Error changing password', { userId, code: apiError?.code, error });
       throw new Error('Failed to change password');
     }
   }

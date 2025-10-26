@@ -11,7 +11,8 @@ import { revalidateTag } from 'next/cache';
  * and unstable_cache (60s) cache session data.
  */
 export async function revalidateSessionCache(): Promise<void> {
-  // Next.js 16 requires a second parameter for revalidateTag
-  // Using 'default' profile which expires immediately
+  // Revalidate session cache using Next.js 16's default profile
+  // The 'default' profile has: stale=5min, revalidate=15min, expire=1year
+  // See: https://nextjs.org/docs/app/api-reference/functions/unstable_cache#revalidate
   revalidateTag('session', 'default');
 }

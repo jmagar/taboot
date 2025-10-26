@@ -9,14 +9,17 @@ export const userProfileSchema = z.object({
   email: z.string().email(),
   name: z.string().nullable(),
   image: z.string().nullable(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 export const updateUserProfileRequestSchema = z
   .object({
-    name: z.string().min(1).max(100).optional(),
-    image: z.string().url().optional(),
+    name: z.string().trim().min(1).max(100).optional(),
+    image: z.string().url().refine(
+      (url) => url.startsWith('http://') || url.startsWith('https://'),
+      { message: 'Image URL must use http:// or https:// scheme' }
+    ).optional(),
   })
   .refine(
     (data) => data.name !== undefined || data.image !== undefined,

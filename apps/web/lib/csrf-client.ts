@@ -6,7 +6,9 @@
  */
 
 const CSRF_TOKEN_HEADER_NAME = 'x-csrf-token';
-const CSRF_TOKEN_COOKIE_NAME = '__Host-taboot.csrf';
+// FIX 1: Match server-side cookie name logic (dev vs prod)
+const CSRF_TOKEN_COOKIE_NAME =
+  process.env.NODE_ENV === 'production' ? '__Host-taboot.csrf' : 'taboot.csrf';
 
 /**
  * Get CSRF token from cookies
@@ -18,7 +20,10 @@ function getCsrfTokenFromCookie(): string | null {
 
   const cookies = document.cookie.split(';');
   for (const cookie of cookies) {
-    const [name, value] = cookie.trim().split('=');
+    const idx = cookie.indexOf('=');
+    if (idx === -1) continue;
+    const name = cookie.slice(0, idx).trim();
+    const value = cookie.slice(idx + 1).trim();
     if (name === CSRF_TOKEN_COOKIE_NAME && value) {
       return decodeURIComponent(value);
     }
@@ -44,10 +49,14 @@ export function withCsrfToken(options: RequestInit = {}): RequestInit {
     return options;
   }
 
+  const normalized =
+    options.headers instanceof Headers
+      ? Object.fromEntries(options.headers.entries())
+      : (options.headers ?? {});
   return {
     ...options,
     headers: {
-      ...options.headers,
+      ...normalized,
       [CSRF_TOKEN_HEADER_NAME]: token,
     },
   };

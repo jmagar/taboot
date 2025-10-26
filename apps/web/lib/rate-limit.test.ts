@@ -77,9 +77,9 @@ describe('rate-limit', () => {
       process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token';
 
       // Import should throw
-      await expect(async () => {
-        await import('./rate-limit');
-      }).rejects.toThrow(/Rate limiting requires Redis configuration/);
+      await expect(import('./rate-limit')).rejects.toThrow(
+        /Rate limiting requires Redis configuration/,
+      );
     });
 
     it('should throw error when Redis token is missing at runtime', async () => {
@@ -91,9 +91,9 @@ describe('rate-limit', () => {
       delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
       // Import should throw
-      await expect(async () => {
-        await import('./rate-limit');
-      }).rejects.toThrow(/Rate limiting requires Redis configuration/);
+      await expect(import('./rate-limit')).rejects.toThrow(
+        /Rate limiting requires Redis configuration/,
+      );
     });
 
     it('should throw error when both Redis URL and token are missing at runtime', async () => {
@@ -105,9 +105,9 @@ describe('rate-limit', () => {
       delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
       // Import should throw
-      await expect(async () => {
-        await import('./rate-limit');
-      }).rejects.toThrow(/Rate limiting requires Redis configuration/);
+      await expect(import('./rate-limit')).rejects.toThrow(
+        /Rate limiting requires Redis configuration/,
+      );
     });
 
     it('should create real Redis instance when credentials are provided at runtime', async () => {
@@ -387,9 +387,9 @@ describe('rate-limit', () => {
       delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
       // Should throw, not return stub
-      await expect(async () => {
-        await import('./rate-limit');
-      }).rejects.toThrow(/Rate limiting requires Redis configuration/);
+      await expect(import('./rate-limit')).rejects.toThrow(
+        /Rate limiting requires Redis configuration/,
+      );
     });
 
     it('should only allow stub when NEXT_PHASE is exactly "phase-production-build"', async () => {
@@ -418,9 +418,9 @@ describe('rate-limit', () => {
         delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
         // Should throw, not return stub
-        await expect(async () => {
-          await import('./rate-limit');
-        }).rejects.toThrow(/Rate limiting requires Redis configuration/);
+        await expect(import('./rate-limit')).rejects.toThrow(
+          /Rate limiting requires Redis configuration/,
+        );
       }
     });
   });

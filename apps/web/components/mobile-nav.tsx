@@ -53,20 +53,20 @@ export function MobileNav() {
             <>
               <div className="my-2 border-t" />
               <SheetClose asChild>
-                <Link href="/sign-up">
-                  <Button className="w-full justify-start" size="lg">
-                    <UserPlus className="h-5 w-5" />
+                <Button className="w-full justify-start" size="lg" asChild>
+                  <Link href="/sign-up">
+                    <UserPlus className="h-5 w-5" aria-hidden="true" />
                     Sign up
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </SheetClose>
               <SheetClose asChild>
-                <Link href="/sign-in">
-                  <Button variant="secondary" className="w-full justify-start" size="lg">
-                    <LogIn className="h-5 w-5" />
+                <Button variant="secondary" className="w-full justify-start" size="lg" asChild>
+                  <Link href="/sign-in">
+                    <LogIn className="h-5 w-5" aria-hidden="true" />
                     Sign in
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </SheetClose>
             </>
           )}

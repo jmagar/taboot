@@ -203,7 +203,7 @@ cache_dir = ".cache/pytest"
 
 [tool.uv.workspace]
 members = [
-  "apps/api", "apps/cli", "apps/mcp",
+  "apps/api", "apps/cli", "apps/mcp", "apps/worker",
   "packages/core", "packages/extraction", "packages/ingest",
   "packages/graph", "packages/vector", "packages/retrieval",
   "packages/schemas", "packages/clients", "packages/common"

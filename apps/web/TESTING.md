@@ -24,7 +24,7 @@ pnpm --filter=web test:ci
 
 ## Project Structure
 
-```
+```text
 apps/web/
 ├── vitest.config.ts        # Vitest configuration
 ├── vitest.setup.ts         # Global test setup

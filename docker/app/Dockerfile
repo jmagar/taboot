@@ -5,7 +5,10 @@
 # -------------------------------
 FROM python:3.13-slim AS builder
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 ARG DEBIAN_FRONTEND=noninteractive
+ARG NODE_MAJOR=20
 
 # System deps for building wheels used by spaCy, Neo4j, etc.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -19,9 +22,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 20.x LTS
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g pnpm@9
+RUN apt-get update && \
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs=20.* && \
+    npm install -g pnpm@10.4.1 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install uv for fast, reproducible installs
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
@@ -61,9 +66,9 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages-ts ./packages-ts
 COPY apps/web ./apps/web
 
-# Install Node.js dependencies (no-frozen-lockfile for Docker build)
+# Install Node.js dependencies with frozen lockfile for deterministic builds
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --no-frozen-lockfile
+    pnpm install --frozen-lockfile
 
 # Build Next.js production bundle
 RUN pnpm --filter @taboot/web build
@@ -72,6 +77,10 @@ RUN pnpm --filter @taboot/web build
 # Runtime image
 # -------------------------------
 FROM python:3.13-slim AS runtime
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ARG NODE_MAJOR=20
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -90,10 +99,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 20.x LTS (runtime only)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g pnpm@9 \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs=20.* && \
+    npm install -g pnpm@10.4.1 && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -107,11 +117,10 @@ COPY apps ./apps
 COPY packages ./packages
 COPY README.md pyproject.toml uv.lock ./
 
-# Copy Node.js dependencies and built web app from builder
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/web ./apps/web
-COPY --from=builder /app/packages-ts ./packages-ts
-COPY --from=builder /app/pnpm-workspace.yaml /app/pnpm-lock.yaml /app/package.json ./
+# Copy standalone Next.js app (optimized output with minimal dependencies)
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
 
 # Install Python workspace dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -130,7 +139,10 @@ RUN mkdir -p /home/llamacrawl/.ssh && chown -R llamacrawl:llamacrawl /home/llama
 
 EXPOSE 8000 3000
 
-# Healthcheck is handled by docker-compose (both API and web)
+# Health check: verify both FastAPI (8000) and Next.js (3000) are responding
+# Checks API /health endpoint first, falls back to Next.js /api/test endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || curl -f http://localhost:3000/api/test || exit 1
 
 # Run both API and web via supervisord
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

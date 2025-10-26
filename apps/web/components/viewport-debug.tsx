@@ -7,7 +7,11 @@ export function ViewportDebug() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 bg-black/80 px-2 py-1 text-xs text-white font-mono rounded">
+    <div
+      className="fixed bottom-4 right-4 z-50 bg-black/80 px-2 py-1 text-xs text-white font-mono rounded"
+      aria-hidden="true"
+      role="presentation"
+    >
       <span className="sm:hidden">xs</span>
       <span className="hidden sm:inline md:hidden">sm</span>
       <span className="hidden md:inline lg:hidden">md</span>

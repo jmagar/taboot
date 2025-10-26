@@ -5,6 +5,18 @@ import { logger } from '@/lib/logger';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
+/**
+ * Sanitize error messages to remove PII and sensitive data before logging
+ */
+function sanitizeErrorMessage(message: string): string {
+  return message
+    .replace(/[\w.-]+@[\w.-]+\.\w+/g, '[EMAIL]') // Email addresses
+    .replace(/token=[\w-]+/gi, 'token=[REDACTED]') // URL tokens
+    .replace(/bearer\s+[\w-]+/gi, 'bearer [REDACTED]') // Bearer tokens
+    .replace(/[0-9a-f]{32,}/gi, '[SESSION_ID]') // Hex strings (session IDs, hashes)
+    .replace(/\b[A-Za-z0-9+/]{40,}={0,2}\b/g, '[TOKEN]'); // Base64 tokens
+}
+
 export default function AuthError({
   error,
   reset,
@@ -16,9 +28,9 @@ export default function AuthError({
 
   useEffect(() => {
     logger.error('Auth error boundary caught error', {
-      message: error.message,
-      digest: error.digest,
-      stack: error.stack,
+      message: sanitizeErrorMessage(error.message),
+      digest: error.digest, // Digest is safe - it's a Next.js error ID
+      stack: error.stack ? sanitizeErrorMessage(error.stack) : undefined,
     });
   }, [error]);
 

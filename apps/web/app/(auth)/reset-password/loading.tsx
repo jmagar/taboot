@@ -2,7 +2,8 @@ import { Skeleton } from '@taboot/ui/components/skeleton';
 
 export default function ResetPasswordLoading() {
   return (
-    <div className="from-background to-muted/20 flex min-h-screen items-center justify-center bg-linear-to-b px-4" aria-busy="true" aria-label="Loading reset password">
+    <div className="from-background to-muted/20 flex min-h-screen items-center justify-center bg-gradient-to-b px-4" role="status" aria-live="polite" aria-busy="true" aria-labelledby="loading-rp-status">
+      <span id="loading-rp-status" className="sr-only">Loading reset password</span>
       <div className="w-full max-w-md rounded-lg border p-6 shadow-sm">
         <div className="mb-6 space-y-2 text-center" aria-hidden="true">
           <Skeleton className="mx-auto h-7 w-48" />

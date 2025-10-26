@@ -4,7 +4,7 @@ This directory contains maintenance scripts for the Taboot platform.
 
 ## cleanup-deleted-users.ts
 
-Permanently deletes users that have been soft-deleted beyond the retention period (default: 90 days).
+Permanently deletes users who have been soft-deleted beyond the retention period (default: 90 days).
 
 ### Usage
 
@@ -27,14 +27,15 @@ pnpm tsx apps/web/scripts/cleanup-deleted-users.ts --retention-days=30
 # Edit crontab
 crontab -e
 
-# Add this line
-0 2 * * * cd /path/to/taboot && pnpm tsx apps/web/scripts/cleanup-deleted-users.ts >> /var/log/taboot-cleanup.log 2>&1
+# Add this line (replace /opt/taboot with your installation path)
+0 2 * * * cd /opt/taboot && pnpm tsx apps/web/scripts/cleanup-deleted-users.ts >> /var/log/taboot-cleanup.log 2>&1
 ```
 
 **Weekly cleanup (Sundays at 3 AM):**
 
 ```bash
-0 3 * * 0 cd /path/to/taboot && pnpm tsx apps/web/scripts/cleanup-deleted-users.ts >> /var/log/taboot-cleanup.log 2>&1
+# Replace /opt/taboot with your installation path
+0 3 * * 0 cd /opt/taboot && pnpm tsx apps/web/scripts/cleanup-deleted-users.ts >> /var/log/taboot-cleanup.log 2>&1
 ```
 
 ### Docker/Production Setup
@@ -95,7 +96,7 @@ services:
       - .:/app
     environment:
       - DATABASE_URL=${DATABASE_URL}
-    command: sh -c "apk add --no-cache pnpm && pnpm tsx apps/web/scripts/cleanup-deleted-users.ts"
+    command: sh -c "if ! command -v pnpm &> /dev/null; then npm install -g pnpm; fi && pnpm tsx apps/web/scripts/cleanup-deleted-users.ts"
     depends_on:
       - taboot-db
     restart: "no"  # Run via external cron or K8s CronJob
@@ -156,7 +157,8 @@ journalctl -u taboot-cleanup.service -n 50
 Modify the cron command:
 
 ```bash
-0 2 * * * cd /path/to/taboot && pnpm tsx apps/web/scripts/cleanup-deleted-users.ts && curl -fsS -m 10 --retry 5 https://hc-ping.com/your-uuid-here > /dev/null
+# Replace /opt/taboot with your installation path
+0 2 * * * cd /opt/taboot && pnpm tsx apps/web/scripts/cleanup-deleted-users.ts && curl -fsS -m 10 --retry 5 https://hc-ping.com/your-uuid-here > /dev/null
 ```
 
 ### Safety Features
@@ -178,21 +180,21 @@ This script is designed to support GDPR Article 17 (Right to Erasure) requiremen
 
 ### Troubleshooting
 
-**Error: "Cannot find module '@taboot/db'"**
+### Error: "Cannot find module '@taboot/db'"
 
 ```bash
 # Install dependencies first
 pnpm install
 ```
 
-**Error: "Permission denied"**
+### Error: "Permission denied"
 
 ```bash
 # Make script executable
 chmod +x apps/web/scripts/cleanup-deleted-users.ts
 ```
 
-**Script runs but deletes nothing:**
+### Script runs but deletes nothing
 
 Check if there are users beyond retention period:
 
@@ -203,7 +205,7 @@ WHERE deleted_at IS NOT NULL
   AND deleted_at < NOW() - INTERVAL '90 days';
 ```
 
-**Database connection timeout:**
+### Database connection timeout
 
 Increase timeout in `DATABASE_URL`:
 
@@ -213,6 +215,6 @@ DATABASE_URL="postgresql://user:pass@host:5432/db?connect_timeout=30"
 
 ### Related Documentation
 
-- Soft Delete Implementation: `/home/jmagar/code/taboot/CLAUDE.md` (Data Integrity section)
-- Prisma Middleware: `/home/jmagar/code/taboot/packages-ts/db/src/middleware/soft-delete.ts`
+- Soft Delete Implementation: `CLAUDE.md` (Data Integrity section)
+- Prisma Middleware: `packages-ts/db/src/middleware/soft-delete.ts`
 - Audit Trail: See `AuditLog` model in Prisma schema

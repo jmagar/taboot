@@ -3,7 +3,7 @@
  *
  * Security Features:
  * - CSRF Protection: All state-changing requests protected by middleware (origin/referer + double-submit token)
- * - Rate Limiting: 5 requests per 15 minutes per IP
+ * - Rate Limiting: 5 requests per 10 minutes per IP
  * - Authentication: Requires valid session
  * - Input Validation: Zod schemas with strict password requirements
  */
@@ -12,6 +12,7 @@ import { auth } from '@taboot/auth';
 import { logger } from '@/lib/logger';
 import { passwordRateLimit } from '@/lib/rate-limit';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { revalidateSessionCache } from '@/lib/cache-utils';
 import {
   hasPasswordResponseSchema,
   setPasswordRequestSchema,
@@ -98,6 +99,9 @@ async function handlePOST(req: Request) {
       }
       throw serviceError;
     }
+
+    // Invalidate session cache after password change
+    await revalidateSessionCache();
 
     // Validate response with schema
     const response: SetPasswordResponse = setPasswordResponseSchema.parse({

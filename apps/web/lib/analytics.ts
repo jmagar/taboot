@@ -1,3 +1,5 @@
+'use client';
+
 import posthog from 'posthog-js';
 
 /**
@@ -24,9 +26,7 @@ export const analytics = {
     if (typeof window === 'undefined') return;
 
     try {
-      if (posthog.__loaded) {
-        posthog.capture(event, properties);
-      }
+      posthog.capture(event, properties);
     } catch (error) {
       console.warn('[Analytics] Failed to track event:', event, error);
     }
@@ -41,9 +41,7 @@ export const analytics = {
     if (typeof window === 'undefined') return;
 
     try {
-      if (posthog.__loaded) {
-        posthog.identify(userId, traits);
-      }
+      posthog.identify(userId, traits);
     } catch (error) {
       console.warn('[Analytics] Failed to identify user:', userId, error);
     }
@@ -56,9 +54,7 @@ export const analytics = {
     if (typeof window === 'undefined') return;
 
     try {
-      if (posthog.__loaded) {
-        posthog.capture('$pageview');
-      }
+      posthog.capture('$pageview');
     } catch (error) {
       console.warn('[Analytics] Failed to track page view:', error);
     }
@@ -71,9 +67,7 @@ export const analytics = {
     if (typeof window === 'undefined') return;
 
     try {
-      if (posthog.__loaded) {
-        posthog.reset();
-      }
+      posthog.reset();
     } catch (error) {
       console.warn('[Analytics] Failed to reset user:', error);
     }
@@ -87,9 +81,7 @@ export const analytics = {
     if (typeof window === 'undefined') return;
 
     try {
-      if (posthog.__loaded) {
-        posthog.people.set(properties);
-      }
+      posthog.setPersonProperties(properties);
     } catch (error) {
       console.warn('[Analytics] Failed to set user properties:', error);
     }
@@ -99,8 +91,7 @@ export const analytics = {
    * Check if analytics is enabled and loaded
    */
   isEnabled(): boolean {
-    if (typeof window === 'undefined') return false;
-    return posthog.__loaded || false;
+    return typeof window !== 'undefined';
   },
 };
 
@@ -131,6 +122,9 @@ export const ANALYTICS_EVENTS = {
   // Settings
   SETTINGS_UPDATED: 'settings_updated',
   THEME_CHANGED: 'theme_changed',
+
+  // Features
+  FEATURE_USED: 'feature_used',
 
   // Errors
   ERROR_OCCURRED: 'error_occurred',

@@ -73,6 +73,7 @@ export function SignOutButton() {
 'use client';
 
 import { analytics, ANALYTICS_EVENTS } from '@/lib/analytics';
+import { api } from '@/lib/api';
 import { useState } from 'react';
 
 export function SearchBar() {
@@ -82,15 +83,20 @@ export function SearchBar() {
     const startTime = Date.now();
 
     try {
-      const results = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
-      const data = await results.json();
+      const response = await api.get<Array<unknown>>(`/api/search?q=${encodeURIComponent(searchQuery)}`);
       const duration = Date.now() - startTime;
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      const results = response.data;
 
       // Track successful search
       analytics.track(ANALYTICS_EVENTS.SEARCH_PERFORMED, {
-        results_count: data.length,
+        results_count: results.length,
         duration_ms: duration,
-        has_results: data.length > 0,
+        has_results: results.length > 0,
         // DO NOT send actual query content (privacy)
       });
     } catch (error) {
@@ -328,17 +334,36 @@ export function App({ children }: { children: React.ReactNode }) {
 'use client';
 
 import { analytics, ANALYTICS_EVENTS } from '@/lib/analytics';
+import { api } from '@/lib/api';
 
-export async function apiClient(endpoint: string, options?: RequestInit) {
+export async function apiClient<T>(endpoint: string, options?: RequestInit) {
   try {
-    const response = await fetch(endpoint, options);
+    const method = options?.method?.toUpperCase() || 'GET';
+    let response;
 
-    if (!response.ok) {
+    switch (method) {
+      case 'POST':
+        response = await api.post<T>(endpoint, options?.body ? JSON.parse(options.body as string) : undefined);
+        break;
+      case 'PUT':
+        response = await api.put<T>(endpoint, options?.body ? JSON.parse(options.body as string) : undefined);
+        break;
+      case 'PATCH':
+        response = await api.patch<T>(endpoint, options?.body ? JSON.parse(options.body as string) : undefined);
+        break;
+      case 'DELETE':
+        response = await api.delete<T>(endpoint);
+        break;
+      default:
+        response = await api.get<T>(endpoint);
+    }
+
+    if (response.error) {
       // Track API errors
       analytics.track(ANALYTICS_EVENTS.API_ERROR, {
         endpoint: endpoint.split('?')[0], // Remove query params
-        status_code: response.status,
-        method: options?.method || 'GET',
+        error_message: response.error,
+        method,
       });
     }
 
@@ -371,7 +396,7 @@ export function useAnalytics() {
   }, []);
 
   const trackFeatureUsage = useCallback((feature: string, data?: Record<string, unknown>) => {
-    analytics.track('feature_used', {
+    analytics.track(ANALYTICS_EVENTS.FEATURE_USED, {
       feature,
       ...data,
     });

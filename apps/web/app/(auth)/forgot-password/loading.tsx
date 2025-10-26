@@ -2,7 +2,8 @@ import { Skeleton } from '@taboot/ui/components/skeleton';
 
 export default function ForgotPasswordLoading() {
   return (
-    <div className="from-background to-muted/20 flex min-h-screen items-center justify-center bg-linear-to-b px-4" aria-busy="true" aria-label="Loading forgot password">
+    <div className="from-background to-muted/20 flex min-h-screen items-center justify-center bg-gradient-to-b px-4" role="status" aria-live="polite" aria-busy="true" aria-labelledby="loading-fp-status">
+      <span id="loading-fp-status" className="sr-only">Loading forgot password</span>
       <div className="w-full max-w-md rounded-lg border p-6 shadow-sm">
         <div className="mb-6 space-y-2 text-center" aria-hidden="true">
           <Skeleton className="mx-auto h-7 w-48" />

@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 from pydantic import Field, HttpUrl, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 _ENV_LOADED = False
 _ENV_LOCK = Lock()
 

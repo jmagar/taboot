@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from packages.common.config import get_config
-from packages.common.db_schema import CURRENT_SCHEMA_VERSION, _get_connection, get_current_version
+from packages.common.db_schema import CURRENT_SCHEMA_VERSION, get_connection, get_current_version
 from packages.common.logging import get_logger
 
 console = Console()
@@ -41,7 +41,7 @@ def version_command() -> None:
     """
     try:
         config = get_config()
-        conn = _get_connection(config)
+        conn = get_connection(config)
 
         try:
             with conn.cursor() as cursor:
@@ -122,10 +122,12 @@ def history_command(limit: int = 10) -> None:
     """
     try:
         config = get_config()
-        conn = _get_connection(config)
+        conn = get_connection(config)
 
         try:
             with conn.cursor() as cursor:
+                # Guardrail: clamp the limit to [1, 100]
+                clamped_limit = max(1, min(int(limit), 100))
                 cursor.execute(
                     """
                     SELECT version, applied_at, applied_by, execution_time_ms, status, checksum
@@ -133,7 +135,7 @@ def history_command(limit: int = 10) -> None:
                     ORDER BY applied_at DESC
                     LIMIT %s
                     """,
-                    (limit,),
+                    (clamped_limit,),
                 )
                 results = cursor.fetchall()
 

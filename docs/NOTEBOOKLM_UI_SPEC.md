@@ -10,7 +10,7 @@
 
 ### Three-Panel System
 
-```
+```text
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ Header: Logo + Notebook Title + Share + User                               │
 ├──────────────────┬──────────────────────────────────┬──────────────────────┤
@@ -178,7 +178,7 @@
 
 ### Header
 
-```
+```text
 ┌─────────────────────────────┐
 │ Sources              [+]    │ ← 16px padding, semibold, + button
 └─────────────────────────────┘
@@ -669,7 +669,7 @@ Settings
 
 ### Studio Types
 
-**1. Audio Overview**
+### 1. Audio Overview
 
 ```text
 ┌─────────────────────────────────────┐
@@ -678,8 +678,8 @@ Settings
 │ Generate a podcast-style discussion │
 │ of your sources                     │
 │                                     │
-│ ○ Standard (5-10 min)               │ ← Radio options
-│ ○ Deep Dive (10-20 min)             │
+│ ○ Standard (5-10 minute)            │ ← Radio options
+│ ○ Deep Dive (10-20 minute)          │
 │                                     │
 │ □ Focus on: ________________        │ ← Optional input
 │                                     │
@@ -703,12 +703,13 @@ Settings
 └─────────────────────────────────────┘
 ```
 
-**2. Video Overview**
+### 2. Video Overview
+
 - Similar to audio but with video thumbnail
 - Slide preview
 - Visual indicators
 
-**3. Mind Map**
+### 3. Mind Map
 
 ```text
 ┌─────────────────────────────────────┐
@@ -721,7 +722,7 @@ Settings
 └─────────────────────────────────────┘
 ```
 
-**4. Reports (Expandable)**
+### 4. Reports (Expandable)
 
 **Collapsed:**
 

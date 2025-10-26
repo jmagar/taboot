@@ -47,8 +47,8 @@ describe('CSRF Client', () => {
     });
 
     it('should add CSRF token to POST requests when cookie exists', () => {
-      // Set CSRF cookie
-      mockDocument.cookie = '__Host-taboot.csrf=test-token-value; path=/';
+      // Set CSRF cookie (use development cookie name since NODE_ENV !== 'production')
+      mockDocument.cookie = 'taboot.csrf=test-token-value; path=/';
 
       const options: RequestInit = { method: 'POST' };
       const enhanced = withCsrfToken(options);
@@ -58,7 +58,7 @@ describe('CSRF Client', () => {
     });
 
     it('should add CSRF token to PUT requests', () => {
-      mockDocument.cookie = '__Host-taboot.csrf=test-token-value; path=/';
+      mockDocument.cookie = 'taboot.csrf=test-token-value; path=/';
 
       const options: RequestInit = { method: 'PUT' };
       const enhanced = withCsrfToken(options);
@@ -67,7 +67,7 @@ describe('CSRF Client', () => {
     });
 
     it('should add CSRF token to PATCH requests', () => {
-      mockDocument.cookie = '__Host-taboot.csrf=test-token-value; path=/';
+      mockDocument.cookie = 'taboot.csrf=test-token-value; path=/';
 
       const options: RequestInit = { method: 'PATCH' };
       const enhanced = withCsrfToken(options);
@@ -76,7 +76,7 @@ describe('CSRF Client', () => {
     });
 
     it('should add CSRF token to DELETE requests', () => {
-      mockDocument.cookie = '__Host-taboot.csrf=test-token-value; path=/';
+      mockDocument.cookie = 'taboot.csrf=test-token-value; path=/';
 
       const options: RequestInit = { method: 'DELETE' };
       const enhanced = withCsrfToken(options);
@@ -85,7 +85,7 @@ describe('CSRF Client', () => {
     });
 
     it('should preserve existing headers when adding CSRF token', () => {
-      mockDocument.cookie = '__Host-taboot.csrf=test-token-value; path=/';
+      mockDocument.cookie = 'taboot.csrf=test-token-value; path=/';
 
       const options: RequestInit = {
         method: 'POST',
@@ -113,6 +113,44 @@ describe('CSRF Client', () => {
 
       consoleWarnSpy.mockRestore();
     });
+
+    it('should handle Headers instance correctly when adding CSRF token', () => {
+      mockDocument.cookie = 'taboot.csrf=test-token-value; path=/';
+
+      const headers = new Headers();
+      headers.set('Content-Type', 'application/json');
+      headers.set('Authorization', 'Bearer token123');
+
+      const options: RequestInit = {
+        method: 'POST',
+        headers,
+      };
+      const enhanced = withCsrfToken(options);
+
+      // Headers.entries() returns lowercase keys
+      expect((enhanced.headers as any)['content-type']).toBe('application/json');
+      expect((enhanced.headers as any)['authorization']).toBe('Bearer token123');
+      expect((enhanced.headers as any)['x-csrf-token']).toBe('test-token-value');
+    });
+
+    it('should parse cookie values containing equals signs correctly', () => {
+      // Base64-encoded tokens often contain '=' padding
+      mockDocument.cookie = 'taboot.csrf=dGVzdC10b2tlbg==; path=/';
+
+      const options: RequestInit = { method: 'POST' };
+      const enhanced = withCsrfToken(options);
+
+      expect((enhanced.headers as any)['x-csrf-token']).toBe('dGVzdC10b2tlbg==');
+    });
+
+    it('should handle multiple cookies and find the CSRF cookie correctly', () => {
+      mockDocument.cookie = 'session=abc123; taboot.csrf=csrf-token-456; other=value';
+
+      const options: RequestInit = { method: 'POST' };
+      const enhanced = withCsrfToken(options);
+
+      expect((enhanced.headers as any)['x-csrf-token']).toBe('csrf-token-456');
+    });
   });
 
   describe('csrfFetch', () => {
@@ -126,7 +164,7 @@ describe('CSRF Client', () => {
       );
       global.fetch = mockFetch;
 
-      mockDocument.cookie = '__Host-taboot.csrf=test-token; path=/';
+      mockDocument.cookie = 'taboot.csrf=test-token; path=/';
 
       await csrfFetch('http://localhost:3000/api/test', { method: 'POST' });
 

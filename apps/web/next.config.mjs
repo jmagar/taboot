@@ -7,7 +7,18 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // Default cache control for API routes
+        // Stricter cache control for auth endpoints - no-store prevents any caching
+        source: '/api/auth/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            // Private (user-specific), no-store (never cache), no-cache (must revalidate), must-revalidate
+            value: 'private, no-store, no-cache, must-revalidate',
+          },
+        ],
+      },
+      {
+        // Default cache control for other API routes
         source: '/api/:path*',
         headers: [
           {
@@ -24,6 +35,9 @@ const nextConfig = {
 
 // Only enable Sentry if both SENTRY_ORG and SENTRY_PROJECT are configured
 const sentryEnabled = process.env.SENTRY_ORG && process.env.SENTRY_PROJECT;
+
+// Use variable assignment pattern to avoid illegal export inside if/else blocks
+let config = nextConfig;
 
 if (sentryEnabled) {
   // Sentry configuration options
@@ -54,9 +68,9 @@ if (sentryEnabled) {
     automaticVercelMonitors: true,
   };
 
-  // Export with Sentry configuration
-  export default withSentryConfig(nextConfig, sentryWebpackPluginOptions, sentryOptions);
-} else {
-  // Export plain config when Sentry is disabled
-  export default nextConfig;
+  // Apply Sentry configuration when enabled
+  config = withSentryConfig(nextConfig, sentryWebpackPluginOptions, sentryOptions);
 }
+
+// Export the final config (with or without Sentry)
+export default config;

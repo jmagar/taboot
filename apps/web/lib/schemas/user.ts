@@ -13,10 +13,15 @@ export const userProfileSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 
-export const updateUserProfileRequestSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  image: z.string().url().optional(),
-});
+export const updateUserProfileRequestSchema = z
+  .object({
+    name: z.string().min(1).max(100).optional(),
+    image: z.string().url().optional(),
+  })
+  .refine(
+    (data) => data.name !== undefined || data.image !== undefined,
+    { message: 'At least one of name or image must be provided' }
+  );
 
 export const updateUserProfileResponseSchema = userProfileSchema;
 

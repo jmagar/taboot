@@ -32,7 +32,7 @@ export function withRateLimit(handler: Handler, ratelimit: Ratelimit): Handler {
       const rateLimitHeaders = {
         'X-RateLimit-Limit': limit.toString(),
         'X-RateLimit-Remaining': remaining.toString(),
-        'X-RateLimit-Reset': new Date(reset).toISOString(),
+        'X-RateLimit-Reset': new Date(reset * 1000).toISOString(),
       };
 
       if (!success) {
@@ -40,18 +40,22 @@ export function withRateLimit(handler: Handler, ratelimit: Ratelimit): Handler {
           identifier,
           limit,
           remaining,
-          reset: new Date(reset).toISOString(),
+          reset: new Date(reset * 1000).toISOString(),
           path: new URL(req.url).pathname,
         });
 
+        const retryAfterSeconds = Math.max(1, Math.round(reset - Math.floor(Date.now() / 1000)));
         return NextResponse.json(
           {
             error: 'Too many requests. Please try again later.',
-            retryAfter: new Date(reset).toISOString(),
+            retryAfter: new Date(reset * 1000).toISOString(),
           },
           {
             status: 429,
-            headers: rateLimitHeaders,
+            headers: {
+              ...rateLimitHeaders,
+              'Retry-After': String(retryAfterSeconds),
+            },
           },
         );
       }

@@ -20,6 +20,7 @@ vi.stubGlobal('crypto', {
   subtle: {
     importKey: vi.fn().mockResolvedValue('mock-key'),
     sign: vi.fn().mockResolvedValue(new ArrayBuffer(32)),
+    verify: vi.fn().mockResolvedValue(false), // Default to invalid signature
   },
 });
 
@@ -64,12 +65,12 @@ describe('CSRF Protection', () => {
 
       expect(response.status).toBe(200);
 
-      // Check if CSRF cookie was set
+      // Check if CSRF cookie was set (use development cookie name)
       const cookies = response.cookies.getAll();
-      const csrfCookie = cookies.find((c) => c.name === '__Host-taboot.csrf');
+      const csrfCookie = cookies.find((c) => c.name === 'taboot.csrf');
 
       expect(csrfCookie).toBeTruthy();
-      expect(csrfCookie?.httpOnly).toBe(true);
+      expect(csrfCookie?.httpOnly).toBe(false); // Must be false for double-submit pattern
       expect(csrfCookie?.sameSite).toBe('lax');
     });
 

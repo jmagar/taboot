@@ -6,7 +6,7 @@ describe('TabootAPIClient', () => {
   const mockFetch = vi.fn();
 
   beforeEach(() => {
-    global.fetch = mockFetch;
+    vi.stubGlobal('fetch', mockFetch);
     client = new TabootAPIClient({
       baseUrl: 'http://localhost:8000',
       credentials: 'include',
@@ -14,6 +14,7 @@ describe('TabootAPIClient', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.resetAllMocks();
   });
 

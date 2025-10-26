@@ -10,24 +10,26 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+// Set NEXT_PHASE before any module imports to bypass runtime env checks
+vi.hoisted(() => {
+  process.env.NEXT_PHASE = 'phase-production-build';
+});
+
 import { NextResponse } from 'next/server';
 import { withRateLimit } from '../with-rate-limit';
 import type { Ratelimit } from '@upstash/ratelimit';
 
 describe('withRateLimit', () => {
   let originalTrustProxy: string | undefined;
-  let originalConsoleWarn: typeof console.warn;
-  let originalConsoleError: typeof console.error;
 
   beforeEach(() => {
     originalTrustProxy = process.env.TRUST_PROXY;
     process.env.TRUST_PROXY = 'true'; // Enable for testing
 
     // Mock console to avoid noise in test output
-    originalConsoleWarn = console.warn;
-    originalConsoleError = console.error;
-    console.warn = vi.fn();
-    console.error = vi.fn();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -37,8 +39,8 @@ describe('withRateLimit', () => {
       process.env.TRUST_PROXY = originalTrustProxy;
     }
 
-    console.warn = originalConsoleWarn;
-    console.error = originalConsoleError;
+    // Restore all mocks including console
+    vi.restoreAllMocks();
   });
 
   describe('successful rate limit check', () => {
@@ -205,8 +207,7 @@ describe('withRateLimit', () => {
     });
 
     it('should log rate limit violations', async () => {
-      const mockWarn = vi.fn();
-      console.warn = mockWarn;
+      const mockWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       const resetTime = Date.now() + 60000;
       const mockRatelimit: Ratelimit = {
@@ -295,8 +296,7 @@ describe('withRateLimit', () => {
     });
 
     it('should log rate limit check failures', async () => {
-      const mockError = vi.fn();
-      console.error = mockError;
+      const mockError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const error = new Error('Redis connection failed');
       const mockRatelimit: Ratelimit = {

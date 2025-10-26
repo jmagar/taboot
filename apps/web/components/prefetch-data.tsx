@@ -1,5 +1,6 @@
 import { HydrationBoundary, QueryClient, dehydrate } from '@tanstack/react-query';
 import { auth } from '@taboot/auth';
+import { headers } from 'next/headers';
 
 import { queryClientConfig } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
@@ -14,8 +15,9 @@ export async function PrefetchData({ children }: { children: React.ReactNode }) 
     defaultOptions: queryClientConfig,
   });
 
-  // Get session to check if we should prefetch user-specific data
-  const session = await auth.api.getSession({ headers: new Headers() });
+  // Get session using real incoming request headers (includes cookies)
+  const h = await headers();
+  const session = await auth.api.getSession({ headers: h });
 
   if (session?.user) {
     // Prefetch hasPassword query for authenticated users

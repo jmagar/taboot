@@ -27,6 +27,7 @@ Rate limiting has been implemented for authentication endpoints using Upstash Re
 ## Rate Limits
 
 ### Password Endpoints
+
 - **Limit**: 5 requests per 10 minutes
 - **Prefix**: `ratelimit:password`
 - **Algorithm**: Sliding window
@@ -35,6 +36,7 @@ Rate limiting has been implemented for authentication endpoints using Upstash Re
   - `POST /api/auth/password` (set new password)
 
 ### General Auth Endpoints
+
 - **Limit**: 10 requests per 1 minute
 - **Prefix**: `ratelimit:auth`
 - **Algorithm**: Sliding window

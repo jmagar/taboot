@@ -1,6 +1,7 @@
 import { useRequiredAuthUser } from '@/hooks/use-auth-user';
 import type { ComponentType, SVGProps } from 'react';
 import { signOut } from '@taboot/auth/client';
+import { revalidateSessionCache } from '@/lib/cache-utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@taboot/ui/components/avatar';
 import {
   DropdownMenu,
@@ -61,7 +62,8 @@ export function NavUser() {
         onClick: async () => {
           await signOut({
             fetchOptions: {
-              onSuccess: () => {
+              onSuccess: async () => {
+                await revalidateSessionCache();
                 refetch();
                 router.push('/');
               },

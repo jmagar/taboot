@@ -8,10 +8,10 @@ import hashlib
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import cast
 
 import psycopg2
-from psycopg2.extensions import connection, cursor as Cursor
+from psycopg2.extensions import connection
+from psycopg2.extensions import cursor as Cursor  # noqa: N812
 from psycopg2.extras import RealDictCursor
 
 from packages.common.config import TabootConfig, _is_running_in_container, get_config
@@ -118,7 +118,7 @@ def get_current_version(cursor: Cursor) -> str | None:
 
 
 def _get_connection(config: TabootConfig) -> connection:
-    """Create PostgreSQL connection using config.
+    """Create PostgreSQL connection using config (private implementation).
 
     Args:
         config: Taboot configuration containing postgres_connection_string.
@@ -140,6 +140,27 @@ def _get_connection(config: TabootConfig) -> connection:
         return conn
     except psycopg2.Error as e:
         raise ConnectionError(f"Failed to connect to PostgreSQL: {e}") from e
+
+
+def get_connection(config: TabootConfig) -> connection:
+    """Create PostgreSQL connection using config (public API).
+
+    Args:
+        config: Taboot configuration containing postgres_connection_string.
+
+    Returns:
+        PgConnection: PostgreSQL connection object.
+
+    Raises:
+        ConnectionError: On connection failure.
+
+    Example:
+        >>> from packages.common.config import get_config
+        >>> config = get_config()
+        >>> conn = get_connection(config)
+        >>> conn.close()
+    """
+    return _get_connection(config)
 
 
 def create_schema(config: TabootConfig, schema_path: str | None = None) -> None:
@@ -354,7 +375,8 @@ def verify_schema(config: TabootConfig) -> dict[str, list[str]]:
     """Verify schema by querying information_schema for existing tables.
 
     Queries information_schema.tables to get list of table names in rag and auth schemas.
-    Expected rag tables: documents, document_content, extraction_windows, ingestion_jobs, extraction_jobs.
+    Expected rag tables: documents, document_content, extraction_windows,
+    ingestion_jobs, extraction_jobs.
     Expected auth tables: user, session, account, verification, twoFactor.
 
     Args:
@@ -488,6 +510,7 @@ __all__ = [
     "create_postgresql_schema",
     "create_schema",
     "extract_schema_version",
+    "get_connection",
     "get_current_version",
     "get_postgres_client",
     "get_schema_checksum",

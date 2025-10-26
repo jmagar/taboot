@@ -47,6 +47,9 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>() {
       const firstElement = focusableArray[0];
       const lastElement = focusableArray[focusableArray.length - 1];
 
+      // Guard against undefined array access (defensive type safety)
+      if (!firstElement || !lastElement) return;
+
       // Shift + Tab (backwards)
       if (event.shiftKey) {
         if (document.activeElement === firstElement) {

@@ -68,20 +68,41 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
       const nameChanged = values.name !== user.name;
       const emailChanged = values.email !== user.email;
 
+      let nameUpdateSuccess = false;
+      let emailUpdateSuccess = false;
+
+      // Try to update name first
       if (nameChanged) {
-        await updateUser({
-          name: values.name,
-        });
+        try {
+          await updateUser({
+            name: values.name,
+          });
+          nameUpdateSuccess = true;
+        } catch (error) {
+          console.error('Name update failed:', error);
+          throw new Error('Failed to update name');
+        }
       }
 
+      // Try to update email second
       if (emailChanged) {
-        await changeEmail({
-          newEmail: values.email,
-          callbackURL: '/settings/general',
-        });
+        try {
+          await changeEmail({
+            newEmail: values.email,
+            callbackURL: '/settings/general',
+          });
+          emailUpdateSuccess = true;
+        } catch (error) {
+          console.error('Email update failed:', error);
+          // If name succeeded but email failed, inform user about partial success
+          if (nameUpdateSuccess) {
+            throw new Error('Name updated, but failed to change email');
+          }
+          throw new Error('Failed to change email');
+        }
       }
 
-      return { nameChanged, emailChanged };
+      return { nameChanged: nameUpdateSuccess, emailChanged: emailUpdateSuccess };
     },
     onSuccess: (result) => {
       // Invalidate auth-related queries when profile is updated
@@ -89,12 +110,15 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
       void queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.user.all });
 
-      if (result.emailChanged) {
+      // Show specific message based on what changed
+      if (result.emailChanged && result.nameChanged) {
+        toast.success('Profile updated successfully!', { duration: 5000 });
+      } else if (result.emailChanged) {
         toast.success(
           'Verification email sent! Please check your current email to approve the change.',
           { duration: 5000 },
         );
-      } else {
+      } else if (result.nameChanged) {
         toast.success('Profile updated successfully!');
       }
       onSuccess?.();

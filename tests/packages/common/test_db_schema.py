@@ -4,9 +4,9 @@ Tests the db_schema module for loading and executing SQL schema files.
 Following TDD methodology - these tests should fail until T024 implements db_schema.py.
 """
 
+import logging
 from pathlib import Path
 from typing import Any
-import logging
 
 import pytest
 
@@ -402,7 +402,7 @@ def test_create_schema_version_mismatch_warning(
     test_config: TabootConfig, mocker: Any, caplog: Any
 ) -> None:
     """Test warning when file version differs from constant."""
-    from packages.common.db_schema import CURRENT_SCHEMA_VERSION, create_schema
+    from packages.common.db_schema import create_schema
 
     # Mock connection and cursor
     mock_conn = mocker.MagicMock()
@@ -584,7 +584,11 @@ def test_version_recorded_after_schema_creation() -> None:
     """Test that version is recorded after successful schema creation."""
     import asyncio
 
-    from packages.common.db_schema import CURRENT_SCHEMA_VERSION, create_postgresql_schema, get_postgres_client
+    from packages.common.db_schema import (
+        CURRENT_SCHEMA_VERSION,
+        create_postgresql_schema,
+        get_postgres_client,
+    )
 
     asyncio.run(create_postgresql_schema())
 

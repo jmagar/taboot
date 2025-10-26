@@ -9,16 +9,19 @@
 ### 1. Sentry Error Tracking
 
 **Files Created:**
+
 - `apps/web/sentry.client.config.ts` - Client-side error tracking configuration
 - `apps/web/sentry.server.config.ts` - Server-side error tracking configuration (Node.js only)
 
 **Configuration:**
+
 - Error capture with PII filtering
 - Performance tracing (10% sample rate)
 - Session replay on errors only (privacy-focused)
 - Source map upload support via Next.js config
 
 **Limitations:**
+
 - **Client-side only** - Sentry runs in browser, not in Edge Runtime middleware
 - Server-side Sentry works only in Node.js runtime (not Edge)
 - This is a Next.js/Prisma architectural constraint, not an analytics issue
@@ -26,10 +29,12 @@
 ### 2. PostHog Product Analytics
 
 **Files Created:**
+
 - `apps/web/lib/posthog.ts` - PostHog initialization
 - `apps/web/lib/analytics.ts` - Type-safe analytics wrapper with event constants
 
 **Features:**
+
 - Automatic page view tracking
 - Custom event tracking with type safety
 - User identification and properties
@@ -39,6 +44,7 @@
 
 **Event Constants:**
 All events use snake_case convention:
+
 - Authentication: `user_signed_in`, `user_signed_out`, `user_signed_up`
 - Search: `search_performed`, `query_executed`, `query_failed`
 - Documents: `document_viewed`, `document_ingested`, `document_deleted`
@@ -49,6 +55,7 @@ All events use snake_case convention:
 ### 3. Vercel Analytics
 
 **Implementation:**
+
 - Added `<Analytics />` component to root layout
 - Automatic page view tracking
 - Web Vitals monitoring
@@ -57,11 +64,13 @@ All events use snake_case convention:
 ### 4. Documentation
 
 **Files Created:**
+
 - `apps/web/ANALYTICS.md` - Comprehensive implementation documentation
 - `apps/web/ANALYTICS_EXAMPLES.md` - Code examples for common use cases
 - `/home/jmagar/code/taboot/ANALYTICS_IMPLEMENTATION.md` - This summary
 
 **Coverage:**
+
 - Setup and configuration instructions
 - Usage examples for all analytics functions
 - Privacy and security best practices
@@ -72,9 +81,11 @@ All events use snake_case convention:
 ### 5. Testing
 
 **Files Created:**
+
 - `apps/web/__tests__/analytics.test.ts` - Unit tests for analytics wrapper
 
 **Test Coverage:**
+
 - ✅ Graceful handling when PostHog not loaded
 - ✅ Event tracking with and without properties
 - ✅ User identification and traits
@@ -87,7 +98,8 @@ All events use snake_case convention:
 - ✅ Naming convention validation
 
 **Test Results:**
-```
+
+```bash
 Test Files  1 passed (1)
 Tests       11 passed (11)
 Duration    1.19s
@@ -96,9 +108,11 @@ Duration    1.19s
 ### 6. Environment Configuration
 
 **Updated Files:**
+
 - `.env.example` - Added analytics environment variables
 
 **New Variables:**
+
 ```bash
 # Sentry
 NEXT_PUBLIC_SENTRY_DSN=""
@@ -158,17 +172,19 @@ NEXT_PUBLIC_POSTHOG_HOST="https://app.posthog.com"
 
 **Issue:** Prisma middleware causes Edge Runtime compatibility error during production build
 
-```
+```bash
 Error: A Node.js API is used (setImmediate) which is not supported in the Edge Runtime.
 Import trace: apps/web/middleware.ts → @taboot/auth → Prisma
 ```
 
 **Impact:**
+
 - **None on analytics** - This is a separate codebase issue
 - Development mode works fine (`pnpm dev`)
 - Production builds fail (middleware incompatibility)
 
 **Status:**
+
 - Documented in `apps/web/ANALYTICS.md`
 - This is an existing architectural issue with `apps/web/middleware.ts` using Prisma in Edge Runtime
 - Resolution requires refactoring middleware to avoid Prisma (separate from analytics work)
@@ -178,11 +194,13 @@ Import trace: apps/web/middleware.ts → @taboot/auth → Prisma
 **Issue:** Sentry cannot run in Edge Runtime (Next.js limitation)
 
 **Resolution:**
+
 - Client-side Sentry works perfectly (browser errors, performance)
 - Server-side Sentry works in Node.js runtime only
 - Edge middleware errors not captured by Sentry (Next.js architectural constraint)
 
 **Documentation:**
+
 - Clearly documented in `apps/web/ANALYTICS.md`
 - No workaround exists (Next.js limitation)
 
@@ -281,6 +299,7 @@ Before deploying to production:
 ## Files Summary
 
 ### Created (9 files)
+
 1. `apps/web/sentry.client.config.ts` - Sentry client configuration
 2. `apps/web/sentry.server.config.ts` - Sentry server configuration
 3. `apps/web/lib/posthog.ts` - PostHog initialization
@@ -292,6 +311,7 @@ Before deploying to production:
 9. `/home/jmagar/code/taboot/instrumentation.ts` - Removed (Edge Runtime incompatibility)
 
 ### Modified (4 files)
+
 1. `apps/web/app/layout.tsx` - Added Vercel Analytics
 2. `apps/web/components/providers.tsx` - Added PostHog initialization
 3. `apps/web/next.config.mjs` - Wrapped with Sentry config
@@ -308,6 +328,7 @@ Before deploying to production:
 ```
 
 All dependencies installed via:
+
 ```bash
 pnpm add @sentry/nextjs @vercel/analytics posthog-js --filter @taboot/web
 ```
@@ -315,12 +336,14 @@ pnpm add @sentry/nextjs @vercel/analytics posthog-js --filter @taboot/web
 ## Testing Verification
 
 **Unit Tests:**
+
 ```bash
 pnpm --filter @taboot/web test __tests__/analytics.test.ts
 # ✅ 11 tests passed
 ```
 
 **Dev Mode:**
+
 ```bash
 pnpm --filter @taboot/web dev
 # ✅ Server starts without errors
@@ -329,6 +352,7 @@ pnpm --filter @taboot/web dev
 ```
 
 **Build Mode:**
+
 ```bash
 pnpm --filter @taboot/web build
 # ❌ Pre-existing Prisma/Edge Runtime issue (not analytics-related)
@@ -347,6 +371,7 @@ pnpm --filter @taboot/web build
 Analytics implementation is **complete and functional** with the following characteristics:
 
 ✅ **Working:**
+
 - Sentry client-side error tracking
 - PostHog product analytics
 - Vercel Analytics page views
@@ -357,11 +382,13 @@ Analytics implementation is **complete and functional** with the following chara
 - Full test coverage
 
 ⚠️ **Limitations:**
+
 - Production build fails due to **pre-existing** Prisma/Edge Runtime middleware issue (unrelated to analytics)
 - Development mode works perfectly
 - Sentry Edge Runtime not supported (Next.js architectural constraint)
 
 **Next Steps:**
+
 1. Add analytics credentials to `.env.local` (optional for development)
 2. Use analytics in components (see `ANALYTICS_EXAMPLES.md`)
 3. Fix pre-existing middleware/Prisma Edge Runtime issue (separate task)

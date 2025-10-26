@@ -13,7 +13,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 
-const CSRF_TOKEN_COOKIE_NAME = '__Host-taboot.csrf';
+// FIX 1: Use __Host- prefix only in production (requires Secure flag)
+// In development, use plain cookie name to avoid HTTPS requirement
+const CSRF_TOKEN_COOKIE_NAME =
+  process.env.NODE_ENV === 'production' ? '__Host-taboot.csrf' : 'taboot.csrf';
 const CSRF_TOKEN_HEADER_NAME = 'x-csrf-token';
 const CSRF_SECRET = process.env.CSRF_SECRET || process.env.AUTH_SECRET || 'development-csrf-secret';
 
@@ -28,8 +31,10 @@ async function generateCsrfToken(): Promise<string> {
   const buffer = new Uint8Array(32);
   crypto.getRandomValues(buffer);
 
-  // Convert to base64url (URL-safe)
-  const token = btoa(String.fromCharCode(...buffer))
+  // FIX 2: Use Buffer instead of btoa for Node.js runtime compatibility
+  // btoa is undefined in Next.js middleware (Node runtime)
+  const token = Buffer.from(buffer)
+    .toString('base64')
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=/g, '');
@@ -53,7 +58,10 @@ async function signToken(token: string): Promise<string> {
 
   const signature = await crypto.subtle.sign('HMAC', key, data);
   const signatureArray = new Uint8Array(signature);
-  const signatureBase64 = btoa(String.fromCharCode(...signatureArray))
+
+  // FIX 2: Use Buffer instead of btoa for Node.js runtime compatibility
+  const signatureBase64 = Buffer.from(signatureArray)
+    .toString('base64')
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=/g, '');
@@ -93,16 +101,25 @@ async function verifyToken(signedToken: string): Promise<boolean> {
 /**
  * Validate Origin/Referer headers match the request host
  * Provides additional protection against cross-origin attacks
+ *
+ * FIX 3: Proxy-aware host detection
+ * When behind reverse proxies (Cloudflare, nginx, ALB), use x-forwarded-host
  */
 function validateOrigin(request: NextRequest): boolean {
   const origin = request.headers.get('origin');
   const referer = request.headers.get('referer');
-  const host = request.headers.get('host');
+
+  // FIX 3: Check TRUST_PROXY env var to determine host source
+  const trustProxy = process.env.TRUST_PROXY === 'true';
+  const host = trustProxy
+    ? (request.headers.get('x-forwarded-host') ?? request.headers.get('host'))
+    : request.headers.get('host');
 
   if (!host) {
     logger.warn('CSRF: Missing host header', {
       url: request.url,
       method: request.method,
+      trustProxy,
     });
     return false;
   }
@@ -115,6 +132,7 @@ function validateOrigin(request: NextRequest): boolean {
         origin: originUrl.host,
         host,
         url: request.url,
+        trustProxy,
       });
       return false;
     }
@@ -128,6 +146,7 @@ function validateOrigin(request: NextRequest): boolean {
         referer: refererUrl.host,
         host,
         url: request.url,
+        trustProxy,
       });
       return false;
     }
@@ -213,16 +232,21 @@ export async function csrfMiddleware(request: NextRequest): Promise<NextResponse
   if (!PROTECTED_METHODS.includes(request.method)) {
     // Set CSRF token cookie for GET requests (so it's available for subsequent mutations)
     const token = await getCsrfToken(request);
+
+    // FIX 4: httpOnly must be false for double-submit pattern
+    // Client needs to read cookie to include in x-csrf-token header
     response.cookies.set(CSRF_TOKEN_COOKIE_NAME, token, {
-      httpOnly: true,
+      httpOnly: false, // Must be false so client can read for double-submit
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24, // 24 hours
     });
 
-    // Also expose token in header for client-side access
-    response.headers.set(CSRF_TOKEN_HEADER_NAME, token);
+    // FIX 5: Remove automatic token header emission to reduce exposure
+    // Client reads token from cookie only, reducing cache/log propagation
+    // If needed, expose via dedicated endpoint or initial HTML meta tag
+    // response.headers.set(CSRF_TOKEN_HEADER_NAME, token);
 
     return response;
   }

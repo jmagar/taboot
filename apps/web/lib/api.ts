@@ -20,12 +20,21 @@ import { csrfFetch } from "./csrf-client";
  * using csrfFetch instead of the default fetch.
  */
 class CsrfAwareAPIClient extends TabootAPIClient {
+  private readonly _baseUrl: string;
+  private readonly _credentials: RequestCredentials;
+
+  constructor(config?: Parameters<typeof TabootAPIClient.prototype.constructor>[0]) {
+    super(config);
+    this._baseUrl = config?.baseUrl || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    this._credentials = config?.credentials || "include";
+  }
+
   private getBaseUrl(): string {
-    return (this as any).baseUrl;
+    return this._baseUrl;
   }
 
   private getCredentials(): RequestCredentials {
-    return (this as any).credentials;
+    return this._credentials;
   }
 
   async get<T>(path: string, options?: RequestInit): Promise<import("@taboot/api-client").APIResponse<T>> {
@@ -84,32 +93,52 @@ class CsrfAwareAPIClient extends TabootAPIClient {
   ): Promise<import("@taboot/api-client").APIResponse<T>> {
     const url = `${this.getBaseUrl()}${path}`;
 
-    try {
-      // Use csrfFetch which automatically adds CSRF token header
-      const response = await csrfFetch(url, {
-        ...options,
-        credentials: this.getCredentials(),
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          ...options?.headers,
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        const error = data && "error" in data && data.error
-          ? data.error
-          : response.statusText || "Request failed";
-
-        throw new Error(error);
+    // Only set Content-Type for string/JSON bodies, not FormData/Blob
+    const headers = new Headers(options?.headers);
+    if (!headers.has("Content-Type") && options?.body) {
+      const isFormDataOrBlob = options.body instanceof FormData || options.body instanceof Blob;
+      if (!isFormDataOrBlob) {
+        headers.set("Content-Type", "application/json");
       }
-
-      return data;
-    } catch (error) {
-      throw error;
     }
+    if (!headers.has("Accept")) {
+      headers.set("Accept", "application/json");
+    }
+
+    // Use csrfFetch which automatically adds CSRF token header
+    const response = await csrfFetch(url, {
+      ...options,
+      credentials: this.getCredentials(),
+      headers,
+    });
+
+    // Handle 204 No Content responses
+    if (response.status === 204) {
+      return {} as import("@taboot/api-client").APIResponse<T>;
+    }
+
+    // Check response content-type before calling response.json()
+    const contentType = response.headers.get("content-type");
+    const isJson = contentType?.includes("application/json");
+
+    let data: import("@taboot/api-client").APIResponse<T> | { data?: string };
+    if (isJson) {
+      data = await response.json();
+    } else {
+      // For non-JSON responses, return text or empty object
+      const text = await response.text();
+      data = text ? { data: text } : {};
+    }
+
+    if (!response.ok) {
+      const error = data && "error" in data && data.error
+        ? data.error
+        : response.statusText || "Request failed";
+
+      throw new Error(error);
+    }
+
+    return data;
   }
 }
 

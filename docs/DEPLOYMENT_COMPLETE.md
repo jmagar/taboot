@@ -70,8 +70,10 @@ docker exec taboot-db psql -U taboot -d taboot -c "\d auth.AuditLog"
 ### Cleanup Job Installed
 - **Schedule:** Daily at 2:00 AM
 - **Command:** `pnpm tsx apps/web/scripts/cleanup-deleted-users.ts`
-- **Log File:** `/home/jmagar/code/taboot/logs/cleanup.log`
+- **Log File:** `${PROJECT_ROOT}/logs/cleanup.log`
 - **Retention Period:** 90 days (default)
+
+**Note:** Replace `${PROJECT_ROOT}` with your Taboot installation path (e.g., `/opt/taboot` or `$HOME/code/taboot`).
 
 **View Cron:**
 ```bash
@@ -80,13 +82,13 @@ crontab -l
 
 **Test Dry Run:**
 ```bash
-cd /home/jmagar/code/taboot
+cd ${PROJECT_ROOT}
 pnpm tsx apps/web/scripts/cleanup-deleted-users.ts --dry-run
 ```
 
 **Monitor Logs:**
 ```bash
-tail -f /home/jmagar/code/taboot/logs/cleanup.log
+tail -f ${PROJECT_ROOT}/logs/cleanup.log
 ```
 
 ---
@@ -136,7 +138,7 @@ tail -f /home/jmagar/code/taboot/logs/cleanup.log
 
 ### Cron Jobs
 - [x] Cleanup job installed in crontab
-- [x] Log directory created (`/home/jmagar/code/taboot/logs/`)
+- [x] Log directory created (`${PROJECT_ROOT}/logs/`)
 - [x] Log file exists (`cleanup.log`)
 
 ### Code Quality
@@ -203,7 +205,7 @@ docker compose logs taboot-app | grep "AUTH_SECRET"
 pnpm tsx apps/web/scripts/cleanup-deleted-users.ts --dry-run
 
 # Check logs after first run
-tail -f /home/jmagar/code/taboot/logs/cleanup.log
+tail -f ${PROJECT_ROOT}/logs/cleanup.log
 ```
 
 ### 4. Update Production Checklist

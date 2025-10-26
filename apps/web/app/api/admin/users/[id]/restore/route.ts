@@ -1,6 +1,62 @@
 import { NextResponse } from 'next/server';
 import { prisma, restoreUser } from '@taboot/db';
-import { auth } from '@/lib/auth';
+import { auth } from '@taboot/auth';
+
+/**
+ * Validate IP address format (IPv4 or IPv6).
+ * @param ip - IP address string to validate
+ * @returns true if valid IPv4 or IPv6 address
+ */
+function isValidIp(ip: string): boolean {
+  // IPv4 regex pattern
+  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+  // IPv6 regex pattern (simplified - matches most common formats)
+  const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+  // IPv6 compressed format (with ::)
+  const ipv6CompressedRegex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+
+  if (ipv4Regex.test(ip)) {
+    // Validate octets are 0-255
+    const octets = ip.split('.').map(Number);
+    return octets.every((octet) => octet >= 0 && octet <= 255);
+  }
+
+  return ipv6Regex.test(ip) || ipv6CompressedRegex.test(ip);
+}
+
+/**
+ * Get client IP address from request headers with proxy support.
+ *
+ * SECURITY: Only trust X-Forwarded-For if behind verified reverse proxy.
+ * Set TRUST_PROXY=true in production ONLY if using Cloudflare, nginx, etc.
+ *
+ * @param request - The incoming request
+ * @returns Client IP address or undefined
+ */
+function getClientIp(request: Request): string | undefined {
+  const trustProxy = process.env.TRUST_PROXY === 'true';
+
+  // Only trust X-Forwarded-For if behind verified proxy
+  if (trustProxy) {
+    const xff = request.headers.get('x-forwarded-for') ?? '';
+    const leftmost = xff.split(',')[0]?.trim();
+
+    // Validate IP format before using
+    if (leftmost && isValidIp(leftmost)) {
+      return leftmost;
+    }
+  }
+
+  // Fallback to X-Real-IP (also requires proxy trust)
+  if (trustProxy) {
+    const realIp = request.headers.get('x-real-ip');
+    if (realIp && isValidIp(realIp)) {
+      return realIp;
+    }
+  }
+
+  return undefined;
+}
 
 /**
  * POST /api/admin/users/[id]/restore
@@ -21,14 +77,16 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // TODO: Add admin role check
-    // For now, require authenticated user
-    // In production, add: if (!session.user.role?.includes('admin'))
+    // Admin authorization check (single-user system: allow first user or env-configured admin)
+    const adminUserId = process.env.ADMIN_USER_ID;
+    if (adminUserId && session.user.id !== adminUserId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const userId = params.id;
 
-    // Find the soft-deleted user
-    const user = await prisma.user.findUnique({
+    // Find the soft-deleted user (using findFirst since deletedAt is not unique)
+    const user = await prisma.user.findFirst({
       where: {
         id: userId,
         deletedAt: { not: null },
@@ -49,11 +107,8 @@ export async function POST(
       );
     }
 
-    // Get request metadata for audit trail
-    const ipAddress =
-      request.headers.get('x-forwarded-for') ||
-      request.headers.get('x-real-ip') ||
-      undefined;
+    // Get request metadata for audit trail with safe proxy header handling
+    const ipAddress = getClientIp(request);
     const userAgent = request.headers.get('user-agent') || undefined;
 
     // Restore the user
@@ -101,13 +156,16 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // TODO: Add admin role check
-    // For now, require authenticated user
+    // Admin authorization check (single-user system: allow first user or env-configured admin)
+    const adminUserId = process.env.ADMIN_USER_ID;
+    if (adminUserId && session.user.id !== adminUserId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const userId = params.id;
 
-    // Find the soft-deleted user
-    const user = await prisma.user.findUnique({
+    // Find the soft-deleted user (using findFirst since deletedAt is not unique)
+    const user = await prisma.user.findFirst({
       where: {
         id: userId,
         deletedAt: { not: null },

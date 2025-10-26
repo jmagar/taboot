@@ -21,20 +21,35 @@ export async function middleware(request: NextRequest) {
 
   // Apply CSRF protection to API routes (unless excluded)
   if (pathname.startsWith('/api')) {
-    const isExcluded = csrfExcludedRoutes.some((route) => pathname.startsWith(route));
+    // Fix #2: Boundary-aware route exclusion check
+    const isExcluded = csrfExcludedRoutes.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`)
+    );
+
     if (!isExcluded) {
+      // Fix #4: Call CSRF middleware only once
       const csrfResponse = await csrfMiddleware(request);
-      // If CSRF check failed (403), return the error response
+
+      // For safe methods (GET/HEAD/OPTIONS), merge CSRF cookies/headers and continue
+      if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
+        const response = NextResponse.next();
+
+        // Copy CSRF cookies and headers to the response
+        csrfResponse.cookies.getAll().forEach((cookie) => {
+          response.cookies.set(cookie);
+        });
+        csrfResponse.headers.forEach((value, key) => {
+          if (key.toLowerCase().startsWith('x-csrf')) {
+            response.headers.set(key, value);
+          }
+        });
+
+        return response;
+      }
+
+      // For unsafe methods (POST/PUT/PATCH/DELETE), return 403 if CSRF check failed
       if (csrfResponse.status === 403) {
         return csrfResponse;
-      }
-      // If CSRF check passed for GET requests, it may have set cookies/headers
-      if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
-        // Continue with auth checks but preserve CSRF cookies/headers
-        request = new NextRequest(request.url, {
-          headers: request.headers,
-        });
-        // Note: We'll apply CSRF response headers after auth checks
       }
     }
   }
@@ -68,24 +83,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // For API routes, apply CSRF token to response headers
-  if (pathname.startsWith('/api') && (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS')) {
-    const response = NextResponse.next();
-    const csrfResponse = await csrfMiddleware(request);
-
-    // Copy CSRF cookies and headers to the response
-    csrfResponse.cookies.getAll().forEach((cookie) => {
-      response.cookies.set(cookie);
-    });
-    csrfResponse.headers.forEach((value, key) => {
-      if (key.toLowerCase().startsWith('x-csrf')) {
-        response.headers.set(key, value);
-      }
-    });
-
-    return response;
-  }
-
   return NextResponse.next();
 }
 
@@ -93,11 +90,13 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     *
+     * Fix #1: Explicitly include /api routes so CSRF/auth branches run
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/api/:path*',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

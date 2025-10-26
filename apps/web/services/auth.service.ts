@@ -1,6 +1,7 @@
 import { prisma } from '@taboot/db';
 import { auth } from '@taboot/auth';
 import { logger } from '@/lib/logger';
+import { revalidateSessionCache } from '@/lib/cache-utils';
 
 /**
  * AuthService - Handles authentication and password management operations
@@ -25,13 +26,14 @@ export class AuthService {
         where: {
           userId,
           providerId: 'credential',
+          password: { not: null },
         },
         select: {
-          password: true,
+          id: true,
         },
       });
 
-      return !!account?.password;
+      return !!account;
     } catch (error) {
       logger.error('Failed to check if user has password', { userId, error });
       throw new Error('Failed to verify password status');
@@ -46,32 +48,20 @@ export class AuthService {
    */
   async setPassword(userId: string, newPassword: string, headers: Headers): Promise<void> {
     try {
-      // Check if user already has a password
-      const existingAccount = await prisma.account.findFirst({
-        where: {
-          userId,
-          providerId: 'credential',
-        },
-        select: {
-          password: true,
-        },
-      });
-
-      if (existingAccount?.password) {
-        logger.warn('Attempted to set password for user who already has one', { userId });
-        throw new Error('Password already exists. Please use change password instead.');
-      }
-
-      // Use better-auth API to set password
+      // Call API directly - let upstream enforce uniqueness constraints
       await auth.api.setPassword({
         body: { newPassword },
         headers,
       });
 
+      // Invalidate session cache after password change
+      await revalidateSessionCache();
+
       logger.info('Password set successfully', { userId });
     } catch (error) {
-      if (error instanceof Error && error.message.includes('already exists')) {
-        throw error;
+      if (error instanceof Error && /already exists/i.test(error.message)) {
+        logger.warn('Attempted to set password for user who already has one', { userId });
+        throw new Error('Password already exists. Please use change password instead.');
       }
       logger.error('Error setting password', { userId, error });
       throw new Error('Failed to set password');
@@ -92,26 +82,20 @@ export class AuthService {
     headers: Headers,
   ): Promise<void> {
     try {
-      // Verify user has a password first
-      const hasExistingPassword = await this.hasPassword(userId);
-      if (!hasExistingPassword) {
-        logger.warn('Attempted to change password for user without one', { userId });
-        throw new Error('No password set. Please set a password first.');
-      }
-
-      // Use better-auth API to change password
+      // Call API directly - let upstream enforce password existence
       await auth.api.changePassword({
         body: { currentPassword, newPassword },
         headers,
       });
 
+      // Invalidate session cache after password change
+      await revalidateSessionCache();
+
       logger.info('Password changed successfully', { userId });
     } catch (error) {
-      if (error instanceof Error && error.message.includes('No password set')) {
-        throw error;
-      }
-      if (error instanceof Error && error.message.includes('Failed to verify password status')) {
-        throw error;
+      if (error instanceof Error && /no password/i.test(error.message)) {
+        logger.warn('Attempted to change password for user without one', { userId });
+        throw new Error('No password set. Please set a password first.');
       }
       logger.error('Error changing password', { userId, error });
       throw new Error('Failed to change password');

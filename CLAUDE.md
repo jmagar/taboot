@@ -115,6 +115,7 @@ uv run apps/cli extract reprocess --since 7d
 ```
 
 ### Data Management
+
 ```bash
 # Soft delete cleanup (production)
 pnpm tsx apps/web/scripts/cleanup-deleted-users.ts
@@ -325,6 +326,7 @@ Per-source credentials (GitHub, Reddit, Gmail, Elasticsearch, Unifi, Tailscale) 
 - Breaking changes OK: wipe and rebuild with `docker volume rm taboot-db`
 
 **Schema Workflow:**
+
 ```bash
 # 1. Check current version
 uv run apps/cli schema version
@@ -404,6 +406,7 @@ The Next.js web application (`apps/web/`) implements **fail-closed rate limiting
 - **Runtime** (production/development): Requires Upstash Redis; throws error if not configured
 
 **Configuration:**
+
 ```bash
 # Required for production deployments with rate limiting
 UPSTASH_REDIS_REST_URL="https://your-database.upstash.io"
@@ -433,6 +436,7 @@ TRUST_PROXY="false"
 If deploying behind Cloudflare, nginx, or other reverse proxy:
 
 1. **Set TRUST_PROXY=true** in production `.env`:
+
    ```bash
    TRUST_PROXY="true"
    ```
@@ -440,6 +444,7 @@ If deploying behind Cloudflare, nginx, or other reverse proxy:
 2. **Configure proxy to set X-Forwarded-For correctly:**
 
    **nginx:**
+
    ```nginx
    location / {
      proxy_pass http://localhost:3000;
@@ -458,6 +463,7 @@ If deploying behind Cloudflare, nginx, or other reverse proxy:
    - No additional configuration needed
 
 3. **Verify configuration:**
+
    ```bash
    # Test that rate limiting uses real client IP, not proxy IP
    curl -v https://yourdomain.com/api/auth/sign-in \
@@ -465,7 +471,7 @@ If deploying behind Cloudflare, nginx, or other reverse proxy:
      -d '{"email":"test@example.com","password":"wrong"}'
 
    # Make 6 requests rapidly to trigger rate limit (5 req/10min limit)
-   # Should see 429 Too Many Requests after 5th attempt
+   # Should see 503 Service Unavailable after 5th attempt (fail-closed)
    ```
 
 **SECURITY WARNING:**
@@ -476,6 +482,7 @@ If deploying behind Cloudflare, nginx, or other reverse proxy:
 - `apps/web/lib/with-rate-limit.ts` - Higher-order function wrapper for route handlers
 
 **Testing:**
+
 ```bash
 # Run rate limiting tests
 pnpm --filter @taboot/web test lib/rate-limit.test.ts

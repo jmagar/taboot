@@ -6,18 +6,28 @@
  * This script should be run periodically via cron job.
  *
  * Usage:
- *   pnpm tsx apps/web/scripts/cleanup-deleted-users.ts [--dry-run] [--retention-days=90]
+ *   pnpm tsx apps/web/scripts/cleanup-deleted-users.ts [--dry-run] [--retention-days=90] [--force]
+ *
+ * Flags:
+ *   --dry-run: Preview deletions without making changes
+ *   --retention-days=N: Custom retention period (default: 90, max: 3650)
+ *   --force: Skip interactive confirmation (required for automation)
  *
  * Cron schedule (daily at 2 AM):
- *   0 2 * * * cd /path/to/taboot && pnpm tsx apps/web/scripts/cleanup-deleted-users.ts
+ *   0 2 * * * cd /path/to/taboot && pnpm tsx apps/web/scripts/cleanup-deleted-users.ts --force
  */
 
 import { prisma } from '@taboot/db';
+import * as readline from 'readline';
 
 interface CleanupOptions {
   dryRun: boolean;
   retentionDays: number;
+  force: boolean;
 }
+
+// Batch size for processing large datasets
+const BATCH_SIZE = 100;
 
 /**
  * Log audit entry for hard deletion
@@ -51,7 +61,7 @@ async function logHardDeletion(
  * Permanently delete users that have been soft-deleted beyond retention period
  */
 async function cleanupDeletedUsers(options: CleanupOptions): Promise<void> {
-  const { dryRun, retentionDays } = options;
+  const { dryRun, retentionDays, force } = options;
 
   console.log(`Starting cleanup of users deleted ${retentionDays}+ days ago...`);
   console.log(`Mode: ${dryRun ? 'DRY RUN (no changes will be made)' : 'PRODUCTION'}`);
@@ -62,34 +72,64 @@ async function cleanupDeletedUsers(options: CleanupOptions): Promise<void> {
 
   console.log(`Cutoff date: ${cutoffDate.toISOString()}`);
 
-  // Find users to delete (bypass soft delete filter)
-  const usersToDelete = await prisma.user.findMany({
+  // Count total users to delete
+  const totalCount = await prisma.user.count({
     where: {
       deletedAt: {
         not: null,
         lte: cutoffDate,
       },
     },
-    select: {
-      id: true,
-      email: true,
-      deletedAt: true,
-      deletedBy: true,
-      _count: {
-        select: {
-          sessions: true,
-          accounts: true,
-          twofactors: true,
-        },
-      },
-    },
   });
 
-  console.log(`Found ${usersToDelete.length} users to permanently delete`);
+  console.log(`Found ${totalCount} users to permanently delete`);
 
-  if (usersToDelete.length === 0) {
+  if (totalCount === 0) {
     console.log('No users to delete. Exiting.');
     return;
+  }
+
+  // Collect users for summary (paginated to avoid memory issues)
+  const usersToDelete: Array<{
+    id: string;
+    email: string | null;
+    deletedAt: Date | null;
+    deletedBy: string | null;
+    _count: { sessions: number; accounts: number; twofactors: number };
+  }> = [];
+
+  let skip = 0;
+  while (true) {
+    const batch = await prisma.user.findMany({
+      where: {
+        deletedAt: {
+          not: null,
+          lte: cutoffDate,
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        deletedAt: true,
+        deletedBy: true,
+        _count: {
+          select: {
+            sessions: true,
+            accounts: true,
+            twofactors: true,
+          },
+        },
+      },
+      take: BATCH_SIZE,
+      skip,
+    });
+
+    if (batch.length === 0) {
+      break;
+    }
+
+    usersToDelete.push(...batch);
+    skip += batch.length;
   }
 
   // Display summary
@@ -109,17 +149,29 @@ async function cleanupDeletedUsers(options: CleanupOptions): Promise<void> {
   }
 
   // Confirm in interactive mode
-  if (process.stdin.isTTY && !process.env.CI) {
-    const readline = require('readline').createInterface({
+  const needsConfirmation = !force && process.stdin.isTTY && !process.env.CI;
+
+  if (!force && !process.stdin.isTTY && !process.env.CI) {
+    console.error(
+      '\nERROR: Running in non-interactive mode without --force flag.'
+    );
+    console.error(
+      'For automation (Docker/Kubernetes/CI), use: --force to skip confirmation prompt.'
+    );
+    process.exit(1);
+  }
+
+  if (needsConfirmation) {
+    const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
     });
 
     const answer = await new Promise<string>((resolve) => {
-      readline.question(
+      rl.question(
         '\nProceed with permanent deletion? (yes/no): ',
         (ans: string) => {
-          readline.close();
+          rl.close();
           resolve(ans);
         }
       );
@@ -129,28 +181,39 @@ async function cleanupDeletedUsers(options: CleanupOptions): Promise<void> {
       console.log('Deletion cancelled.');
       return;
     }
+  } else if (force) {
+    console.log('\nSkipping confirmation (--force flag set)');
   }
 
-  // Perform deletions
-  console.log('\nDeleting users...');
+  // Perform deletions in batches
+  console.log('\nDeleting users in batches...');
   let deletedCount = 0;
   let failedCount = 0;
+  let batchNumber = 0;
 
-  for (const user of usersToDelete) {
-    try {
-      // Log deletion before removing
-      await logHardDeletion(user.id, user.deletedAt!, retentionDays);
+  for (let i = 0; i < usersToDelete.length; i += BATCH_SIZE) {
+    const batch = usersToDelete.slice(i, i + BATCH_SIZE);
+    batchNumber++;
+    console.log(
+      `\nProcessing batch ${batchNumber} (${i + 1}-${i + batch.length} of ${usersToDelete.length})...`
+    );
 
-      // Hard delete (cascade will remove related records)
-      await prisma.$executeRaw`
-        DELETE FROM "user" WHERE id = ${user.id}
-      `;
+    for (const user of batch) {
+      try {
+        // Hard delete (cascade will remove related records)
+        await prisma.user.delete({
+          where: { id: user.id },
+        });
 
-      deletedCount++;
-      console.log(`  ✓ Deleted ${user.email}`);
-    } catch (error) {
-      failedCount++;
-      console.error(`  ✗ Failed to delete ${user.email}:`, error);
+        // Log deletion AFTER successful removal
+        await logHardDeletion(user.id, user.deletedAt!, retentionDays);
+
+        deletedCount++;
+        console.log(`  ✓ Deleted ${user.email}`);
+      } catch (error) {
+        failedCount++;
+        console.error(`  ✗ Failed to delete ${user.email}:`, error);
+      }
     }
   }
 
@@ -168,13 +231,16 @@ function parseArgs(): CleanupOptions {
   const options: CleanupOptions = {
     dryRun: args.includes('--dry-run'),
     retentionDays: 90,
+    force: args.includes('--force'),
   };
 
   const retentionArg = args.find((arg) => arg.startsWith('--retention-days='));
   if (retentionArg) {
     const days = parseInt(retentionArg.split('=')[1], 10);
-    if (isNaN(days) || days < 1) {
-      console.error('Invalid retention days value. Must be a positive integer.');
+    if (isNaN(days) || days < 1 || days > 3650) {
+      console.error(
+        'Invalid retention days value. Must be between 1 and 3650 (10 years).'
+      );
       process.exit(1);
     }
     options.retentionDays = days;
@@ -199,8 +265,12 @@ async function main(): Promise<void> {
   }
 }
 
-// Run if executed directly
-if (require.main === module) {
+// Run if executed directly (ESM module check)
+const isMainModule =
+  import.meta.url === `file://${process.argv[1]}` ||
+  import.meta.url.endsWith(process.argv[1]);
+
+if (isMainModule) {
   main().catch((error) => {
     console.error('Unhandled error:', error);
     process.exit(1);

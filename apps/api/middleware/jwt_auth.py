@@ -78,10 +78,11 @@ def _get_auth_secret() -> str:
 
     if not auth_secret:
         logger.error("AUTH_SECRET or BETTER_AUTH_SECRET required for JWT authentication")
-        raise RuntimeError(
-            "AUTH_SECRET (or BETTER_AUTH_SECRET) environment variable must be set. "
-            "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        logger.info(
+            "Generate AUTH_SECRET with: "
+            "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
         )
+        raise RuntimeError("AUTH_SECRET (or BETTER_AUTH_SECRET) environment variable must be set")
 
     # Validate minimum length (256 bits for HS256)
     if len(auth_secret) < MIN_SECRET_LENGTH:
@@ -89,20 +90,24 @@ def _get_auth_secret() -> str:
             "AUTH_SECRET too short",
             extra={"length": len(auth_secret), "minimum": MIN_SECRET_LENGTH},
         )
-        raise RuntimeError(
-            f"AUTH_SECRET must be at least {MIN_SECRET_LENGTH} characters (256 bits). "
-            f"Current length: {len(auth_secret)}. "
+        logger.info(
             "Generate strong secret with: "
             "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
+        raise RuntimeError(
+            f"AUTH_SECRET must be at least {MIN_SECRET_LENGTH} characters (256 bits). "
+            f"Current length: {len(auth_secret)}"
         )
 
     # Basic entropy check (not repeated characters)
     if len(set(auth_secret)) < MIN_SECRET_LENGTH // 2:
         logger.error("AUTH_SECRET has low entropy")
-        raise RuntimeError(
-            "AUTH_SECRET has insufficient entropy (too many repeated characters). "
+        logger.info(
             "Generate cryptographically random secret with: "
             "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
+        raise RuntimeError(
+            "AUTH_SECRET has insufficient entropy (too many repeated characters)"
         )
 
     logger.info("AUTH_SECRET validated", extra={"length": len(auth_secret)})

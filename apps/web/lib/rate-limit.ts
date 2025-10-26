@@ -21,7 +21,7 @@ function createBuildTimeStub(limit: number, windowMs: number): Ratelimit {
   } as unknown as Ratelimit;
 }
 
-let redis: Redis;
+let redis: Redis | undefined;
 if (isBuildTime) {
   // Create stub Redis for build time only
   redis = {
@@ -29,21 +29,6 @@ if (isBuildTime) {
     set: async () => 'OK',
     del: async () => 1,
   } as unknown as Redis;
-} else {
-  // Runtime: fail-closed if Redis not configured
-  if (!redisUrl || !redisToken) {
-    throw new Error(
-      '[RATE_LIMIT] Rate limiting requires Redis configuration. ' +
-        'Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables. ' +
-        'See .env.example for details.',
-    );
-  }
-
-  // Create real Redis instance
-  redis = new Redis({
-    url: redisUrl,
-    token: redisToken,
-  });
 }
 
 /**
@@ -62,10 +47,27 @@ function createRateLimit(prefix: string, limit: number, windowMs: number): Ratel
     return createBuildTimeStub(limit, windowMs);
   }
 
+  // Runtime: fail-closed if Redis not configured
+  if (!redisUrl || !redisToken) {
+    throw new Error(
+      '[RATE_LIMIT] Rate limiting requires Redis configuration. ' +
+        'Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables. ' +
+        'See .env.example for details.',
+    );
+  }
+
+  // Lazy initialization of Redis client
+  if (!redis) {
+    redis = new Redis({
+      url: redisUrl,
+      token: redisToken,
+    });
+  }
+
   // Runtime: Redis must be configured (already validated above)
   return new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(limit, `${windowMs} ms`),
+    limiter: Ratelimit.slidingWindow(limit, `${windowMs / 1000} s`),
     prefix,
     analytics: true,
   });

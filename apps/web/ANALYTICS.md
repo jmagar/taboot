@@ -271,7 +271,7 @@ Without credentials, analytics will:
 
 The application currently has a **pre-existing build issue** with Prisma and Edge Runtime middleware (unrelated to analytics):
 
-```
+```text
 Error: A Node.js API is used (setImmediate) which is not supported in the Edge Runtime.
 ```
 
@@ -330,7 +330,7 @@ After deployment:
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │          apps/web/app/layout.tsx        │
 │  ┌────────────────────────────────┐     │

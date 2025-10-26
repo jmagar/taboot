@@ -57,7 +57,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               {config.nav.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton tooltip={item.title} asChild>
-                    <Link href={item.href} aria-label={`Navigate to ${item.title}`}>
+                    <Link href={item.href}>
                       <item.icon aria-hidden="true" />
                       <span>{item.title}</span>
                     </Link>

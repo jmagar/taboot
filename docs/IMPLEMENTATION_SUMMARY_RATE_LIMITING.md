@@ -8,42 +8,42 @@ Implemented rate limiting for authentication endpoints (#3 from WEB_APP_IMPROVEM
 
 ### 1. Core Rate Limiting Infrastructure
 
-**`/home/jmagar/code/taboot/apps/web/lib/rate-limit.ts`** (53 lines)
+**`apps/web/lib/rate-limit.ts`** (53 lines)
 - Redis client initialization with Upstash
 - Password rate limiter: 5 requests per 10 minutes (sliding window)
 - Auth rate limiter: 10 requests per 1 minute (sliding window)
 - Client identifier extraction from `x-forwarded-for` / `x-real-ip` headers
 
-**`/home/jmagar/code/taboot/apps/web/lib/with-rate-limit.ts`** (77 lines)
+**`apps/web/lib/with-rate-limit.ts`** (77 lines)
 - Higher-order function wrapper for route handlers
 - Rate limit enforcement with 429 responses
 - Rate limit headers injection (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)
-- Fail-open error handling (allows requests on Redis failures)
+- Fail-closed error handling (rejects requests with 503 on Redis failures)
 - Comprehensive logging for violations and errors
 
 ### 2. Updated Endpoints
 
-**`/home/jmagar/code/taboot/apps/web/app/api/auth/password/route.ts`** (92 lines)
+**`apps/web/app/api/auth/password/route.ts`** (92 lines)
 - Refactored GET and POST handlers into `handleGET` and `handlePOST`
 - Wrapped both handlers with `withRateLimit(handler, passwordRateLimit)`
 - Maintains all original functionality while adding rate limiting
 
 ### 3. Testing & Documentation
 
-**`/home/jmagar/code/taboot/apps/web/lib/__tests__/rate-limit.test.ts`** (84 lines)
+**`apps/web/lib/__tests__/rate-limit.test.ts`** (84 lines)
 - Unit tests for client identifier extraction
 - Rate limit header verification
 - Threshold validation
 - Error response structure tests
 
-**`/home/jmagar/code/taboot/apps/web/docs/RATE_LIMITING.md`** (comprehensive documentation)
+**`apps/web/docs/RATE_LIMITING.md`** (comprehensive documentation)
 - Architecture overview
 - Configuration guide
 - Usage examples
 - Monitoring and troubleshooting
 - Security considerations
 
-**`/home/jmagar/code/taboot/apps/web/docs/RATE_LIMITING_TESTING.md`** (testing guide)
+**`apps/web/docs/RATE_LIMITING_TESTING.md`** (testing guide)
 - 8 detailed test scenarios with commands
 - Performance testing
 - Troubleshooting guide
@@ -58,7 +58,8 @@ Implemented rate limiting for authentication endpoints (#3 from WEB_APP_IMPROVEM
 ### 5. Environment Configuration
 
 **`.env.example`** already contained:
-```env
+
+```bash
 UPSTASH_REDIS_REST_URL=your-upstash-redis-rest-url
 UPSTASH_REDIS_REST_TOKEN=your-upstash-redis-rest-token
 ```
@@ -85,15 +86,17 @@ IP extraction priority:
 
 ### Error Handling
 
-**Fail-Open Strategy**: If Redis is unavailable or rate limit check fails:
-- Request is **allowed** (doesn't block legitimate users)
+**Fail-Closed Strategy**: If Redis is unavailable or rate limit check fails:
+- Request is **rejected** with 503 Service Unavailable (protects against abuse during outages)
 - Error is **logged** with full context
-- Prevents single point of failure
+- Service refuses to start if Redis credentials not configured at runtime
+- Build-time uses stub to allow static analysis, runtime strictly requires Redis
 
 ### Response Headers
 
 All responses include:
-```
+
+```http
 X-RateLimit-Limit: 5
 X-RateLimit-Remaining: 4
 X-RateLimit-Reset: 2025-10-25T12:34:56.789Z
@@ -102,6 +105,7 @@ X-RateLimit-Reset: 2025-10-25T12:34:56.789Z
 ### 429 Response
 
 When rate limit exceeded:
+
 ```json
 {
   "error": "Too many requests. Please try again later.",
@@ -112,6 +116,7 @@ When rate limit exceeded:
 ### Logging
 
 **Rate limit violation**:
+
 ```json
 {
   "level": "warn",
@@ -127,11 +132,12 @@ When rate limit exceeded:
 }
 ```
 
-**Fail-open error**:
+**Fail-closed error**:
+
 ```json
 {
   "level": "error",
-  "message": "Rate limit check failed, failing open",
+  "message": "Rate limit check failed, failing closed (rejecting request)",
   "timestamp": "2025-10-25T12:34:56.789Z",
   "meta": {
     "error": { ... },
@@ -144,7 +150,7 @@ When rate limit exceeded:
 ## Code Quality
 
 ✅ **TypeScript strict types**: All functions fully typed, no `any` types
-✅ **Error handling**: Throws errors early, fail-open strategy for resilience
+✅ **Error handling**: Throws errors early, fail-closed strategy for security
 ✅ **Logging**: Structured JSON logs with context
 ✅ **Testing**: Unit tests with vitest
 ✅ **Documentation**: Comprehensive guides for implementation and testing
@@ -194,7 +200,8 @@ pnpm test lib/__tests__/rate-limit.test.ts
 1. **Brute-force protection**: Limits password enumeration and guessing attacks
 2. **DoS mitigation**: Prevents single IP from overwhelming endpoints
 3. **Resource protection**: Reduces load from malicious or misconfigured clients
-4. **Graceful degradation**: Fail-open prevents auth lockouts during outages
+4. **Fail-closed posture**: Rejects requests during Redis outages to prevent bypass attacks
+5. **Build-time safety**: Stub allows Next.js static analysis without compromising runtime security
 
 ## Performance Impact
 
@@ -218,7 +225,7 @@ pnpm test lib/__tests__/rate-limit.test.ts
 - ✅ Rate limit headers present in all responses
 - ✅ Per-IP tracking implemented
 - ✅ Clear error messages on rate limit exceeded
-- ✅ Fail-open strategy for resilience
+- ✅ Fail-closed strategy for security (503 on Redis failures)
 - ✅ Comprehensive logging of violations
 - ✅ TypeScript strict types throughout
 - ✅ Reusable architecture for other endpoints
@@ -246,9 +253,9 @@ UPSTASH_REDIS_REST_TOKEN=your-token-here
 Rate limiting has been successfully implemented for authentication endpoints using Upstash Redis with a sliding window algorithm. The implementation follows best practices:
 
 - **Type-safe** TypeScript code with no `any` types
-- **Resilient** fail-open strategy prevents outages
+- **Secure** fail-closed strategy prevents bypass attacks during outages
 - **Observable** with structured logging
 - **Extensible** higher-order function pattern for easy application to other endpoints
 - **Well-documented** with comprehensive guides for implementation, testing, and troubleshooting
 
-The password endpoints are now protected against brute-force attacks and abuse while maintaining excellent user experience through clear error messages, informative headers, and graceful degradation.
+The password endpoints are now protected against brute-force attacks and abuse while maintaining excellent user experience through clear error messages, informative headers, and proper security posture.

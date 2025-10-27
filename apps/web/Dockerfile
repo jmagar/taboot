@@ -51,14 +51,13 @@ FROM base AS installer
 
 WORKDIR /app
 
-# Copy pruned workspace from builder
+# Copy pruned workspace from builder (only the pruned package.json files)
 COPY --from=builder /app/out/json ./
-COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
-COPY --from=builder /app/out/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
 # Install all dependencies (needed for build)
+# Note: pnpm install will create proper lockfile with all transitive dependencies
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+    pnpm install --ignore-scripts
 
 # Copy source files and build configuration
 COPY --from=builder /app/out/full ./

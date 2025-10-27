@@ -16,25 +16,17 @@ import asyncio
 import logging
 from contextlib import ExitStack
 from datetime import UTC, datetime
-from typing import Annotated
-
 from types import ModuleType
+from typing import Annotated
 
 import typer
 from rich.console import Console
 
+from apps.cli.taboot_cli.commands import ingest_app as app
 from packages.clients.postgres_document_store import PostgresDocumentStore
 from packages.common.config import get_config
 from packages.common.db_schema import get_postgres_client
 from packages.core.use_cases.ingest_web import IngestWebUseCase
-
-redis_async: ModuleType | None
-try:
-    from redis import asyncio as redis_async
-except ModuleNotFoundError:  # pragma: no cover - redis optional in some test suites
-    redis_async = None
-
-from apps.cli.taboot_cli.commands import ingest_app as app
 from packages.ingest.adapters.redis_streams_publisher import RedisDocumentEventPublisher
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
@@ -44,6 +36,12 @@ from packages.ingest.services.document_events import DocumentEventDispatcher
 from packages.schemas.models import Document as DocumentModel
 from packages.schemas.models import JobState
 from packages.vector.writer import QdrantWriter
+
+redis_async: ModuleType | None
+try:
+    from redis import asyncio as redis_async
+except ModuleNotFoundError:  # pragma: no cover - redis optional in some test suites
+    redis_async = None
 
 console = Console()
 logger = logging.getLogger(__name__)

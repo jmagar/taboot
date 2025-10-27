@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from redis.asyncio import Redis
@@ -69,7 +69,7 @@ class ExtractionOrchestrator:
         tier_a_patterns: EntityPatternMatcher,
         window_selector: WindowSelector,
         llm_client: TierCLLMClient,
-        redis_client: Redis,
+        redis_client: Redis[Any],
     ) -> None:
         """Initialize ExtractionOrchestrator.
 

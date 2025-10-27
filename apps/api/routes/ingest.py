@@ -13,6 +13,8 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
+from types import ModuleType
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
@@ -38,6 +40,7 @@ from packages.schemas.models import (
 )
 from packages.vector.writer import QdrantWriter
 
+redis_async: ModuleType | None
 try:
     from redis import asyncio as redis_async
 except ModuleNotFoundError:  # pragma: no cover - redis optional in some test suites

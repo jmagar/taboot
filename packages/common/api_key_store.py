@@ -87,7 +87,7 @@ class ApiKeyStore:
         if not value:
             return None
 
-        return cast(ApiKey, ApiKey.model_validate_json(value.decode("utf-8")))
+        return ApiKey.model_validate_json(value.decode("utf-8"))
 
 
 __all__ = ["ApiKeyStore"]

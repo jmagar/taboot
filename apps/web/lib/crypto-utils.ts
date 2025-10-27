@@ -20,16 +20,28 @@
  * @returns A base64url-encoded string
  */
 export function toBase64Url(bytes: Uint8Array): string {
+  if (!(bytes instanceof Uint8Array)) {
+    throw new TypeError("Expected bytes to be a Uint8Array");
+  }
+
   let base64: string;
 
   if (typeof btoa === 'function') {
     // Edge/browser runtime
     // btoa expects a binary string where each character represents a byte
-    const binary = String.fromCharCode(...bytes);
-    base64 = btoa(binary);
+    const chunkSize = 8192;
+    const chunks: string[] = [];
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      chunks.push(String.fromCharCode(...chunk));
+    }
+    base64 = btoa(chunks.join(''));
   } else {
     // Node.js runtime
     // @ts-ignore Buffer is not available in Edge runtime type definitions
+    if (typeof Buffer === 'undefined') {
+      throw new Error('Buffer is not available in this runtime');
+    }
     base64 = Buffer.from(bytes).toString('base64');
   }
 

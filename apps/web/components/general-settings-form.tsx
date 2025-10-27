@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
-import { updateProfile } from '@/lib/services/profile-service';
+import { updateProfile } from '@/lib/services';
 import { Button } from '@taboot/ui/components/button';
 import {
   Card,
@@ -59,20 +59,18 @@ export function GeneralSettingsForm({ user, onSuccess }: GeneralSettingsFormProp
         email: user.email,
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, form.reset]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (values: UpdateProfileFormValues) => {
-      if (!user) throw new Error('User not authenticated');
-
       return updateProfile(user.id, user, values);
     },
     onSuccess: (result) => {
       // Invalidate auth-related queries when profile is updated
       // This ensures any cached user data is refreshed
       void queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.user.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.user.profile(user.id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.user.settings() });
 
       // Show specific message based on what changed
       if (result.emailChanged && result.nameChanged) {

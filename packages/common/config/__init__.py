@@ -260,10 +260,12 @@ class TabootConfig(BaseSettings):
     def tei_config(self) -> TeiConfig:
         """Return validated TEI configuration block."""
 
-        return TeiConfig(
-            url=self.tei_embedding_url,
-            batch_size=self.embedding_batch_size,
-            timeout=self.tei_timeout,
+        return TeiConfig.model_validate(
+            {
+                "url": self.tei_embedding_url,
+                "batch_size": self.embedding_batch_size,
+                "timeout": self.tei_timeout,
+            }
         )
 
     @property

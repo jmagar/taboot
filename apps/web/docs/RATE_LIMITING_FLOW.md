@@ -98,11 +98,14 @@ All responses (both successful and rate-limited) include rate limit information 
 **Implementation Detail**: The rate limiter internally uses UNIX epoch seconds (seconds since January 1, 1970 UTC), but the `X-RateLimit-Reset` header is converted to ISO 8601 format for client convenience. Clients should parse this as a standard ISO timestamp.
 
 Example response headers:
+
 ```text
 X-RateLimit-Limit: 5
 X-RateLimit-Remaining: 4
 X-RateLimit-Reset: 2025-10-25T12:34:56.789Z
 ```
+
+
 
 ## Error Handling Flow
 

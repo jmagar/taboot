@@ -20,241 +20,76 @@ This audit examines the code changes in the recent commits for **silent failures
 
 | Severity | Count | Category |
 |----------|-------|----------|
-| **CRITICAL** 🔴 | 3 | Silent failures that could cause production outages |
+| **CRITICAL** 🔴 | 1 | Silent failure risk that could cause production outages |
 | **HIGH** 🟠 | 2 | Missing error handling with security implications |
 | **MEDIUM** 🟡 | 2 | Inadequate error messages |
 | **LOW** 🟢 | 1 | Minor improvements |
+| **RESOLVED** ✅ | 2 | Previously critical middleware gaps now addressed |
 
-**Overall Assessment:** ⚠️ **CRITICAL ISSUES FOUND** - Production deployment is **NOT RECOMMENDED** until critical issues are resolved.
+**Overall Assessment:** ⚠️ **CRITICAL ISSUE REMAINS** - Production deployment is **NOT RECOMMENDED** until Docker build hardening (C-3) is completed. Middleware items C-1 and C-2 are now resolved; see Resolved Findings.
+
+---
+
+## Resolved Findings
+
+### C-1: Silent Auth Session Failure in Middleware (Resolved)
+
+**Location:** `apps/web/middleware.ts:43-125`
+**Resolution:** Session checks now execute inside a `try/catch` (`hasValidSession`). On errors, the middleware logs structured context and treats the request as unauthenticated, ensuring protected routes redirect to sign-in while auth routes remain accessible. Example:
+
+```typescript
+// apps/web/middleware.ts:54-87
+async function hasValidSession(request: NextRequest): Promise<boolean> {
+  try {
+    const session = await verifySession({
+      sessionToken: token,
+      secret: process.env.AUTH_SECRET!,
+    });
+    return !!session?.user;
+  } catch (error) {
+    console.error('Auth session check failed - denying access (fail-closed)', {
+      pathname: request.nextUrl.pathname,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+```
+
+### C-2: CSRF Middleware Error Swallowing (Resolved)
+
+**Location:** `apps/web/middleware.ts:25-80`
+**Resolution:** The CSRF guard is now wrapped in `try/catch`, logs errors with method/path metadata, and fails closed (403 JSON) for unsafe methods while transferring headers/cookies for safe ones. Example:
+
+```typescript
+// apps/web/middleware.ts:25-79
+if (!isExcluded) {
+  try {
+    const csrfResponse = await csrfMiddleware(request);
+    if (safeMethods.includes(request.method)) {
+      const response = NextResponse.next();
+      transferCsrfData(csrfResponse, response);
+      return response;
+    }
+    if (csrfResponse.status === 403) {
+      return csrfResponse;
+    }
+  } catch (error) {
+    console.error('CSRF validation failed - rejecting request (fail-closed)', {
+      pathname: request.nextUrl.pathname,
+      method: request.method,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json({ error: 'Security validation failed' }, { status: 403 });
+  }
+}
+```
+
+No further action required for C-1/C-2; they are kept here for audit traceability.
 
 ---
 
 ## CRITICAL Findings
-
-### C-1: Silent Auth Session Failure in Middleware
-
-**Location:** `/home/jmagar/code/taboot/apps/web/middleware.ts:63-74`
-**Severity:** 🔴 CRITICAL
-**Impact:** Authentication bypass, unauthorized access to protected routes
-
-**Issue Description:**
-
-The authentication check uses `auth.api.getSession()` without any error handling. If the auth service throws an error (network failure, invalid token format, database connection error, etc.), the middleware will crash and the **entire application becomes unavailable**.
-
-**Problematic Code:**
-
-```typescript
-// Line 63-74
-let isAuthenticated = false;
-if (isProtectedRoute || isAuthRoute) {
-  const session = await auth.api.getSession({
-    headers: request.headers,
-  });
-  isAuthenticated = !!session?.user;
-}
-```
-
-**Hidden Errors This Catch Block Could Hide:**
-
-Since there is **NO catch block**, ALL errors will bubble up and crash the middleware:
-
-1. ❌ **Network errors** - Auth service unreachable
-2. ❌ **Database errors** - Session store unavailable
-3. ❌ **Invalid JWT** - Malformed token throws parsing error
-4. ❌ **Expired session** - Could throw instead of returning null
-5. ❌ **Better-auth library bugs** - Any uncaught exception in the library
-6. ❌ **Memory errors** - Out of memory during session deserialization
-7. ❌ **Redis connection failures** - If session cache is down
-8. ❌ **Type validation errors** - If session data is corrupted
-
-**User Impact:**
-
-- **Best case:** User sees a 500 error page and can't access the application
-- **Worst case:** Middleware crashes repeatedly, entire site goes down until restart
-- **Debugging nightmare:** No error context logged, just "middleware failed"
-- **Security risk:** If error handling defaults to allowing access, authentication is bypassed
-
-**Recommendation:**
-
-```typescript
-// REQUIRED: Wrap auth check in try-catch with explicit fail-closed behavior
-let isAuthenticated = false;
-if (isProtectedRoute || isAuthRoute) {
-  try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-    isAuthenticated = !!session?.user;
-  } catch (error) {
-    // CRITICAL: Log error with full context for debugging
-    logger.error('Authentication session check failed - denying access (fail-closed)', {
-      pathname,
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      headers: {
-        authorization: request.headers.get('authorization') ? 'present' : 'missing',
-        cookie: request.headers.get('cookie') ? 'present' : 'missing',
-      },
-    });
-
-    // FAIL CLOSED: Deny access on error (security-first approach)
-    isAuthenticated = false;
-
-    // For protected routes, show user-friendly error instead of crash
-    if (isProtectedRoute) {
-      return NextResponse.json(
-        {
-          error: 'Authentication service temporarily unavailable',
-          message: 'Please try again in a few moments',
-        },
-        { status: 503, headers: { 'Retry-After': '30' } }
-      );
-    }
-
-    // For auth routes, allow through (so users can sign in/up during outage)
-    // Auth will fail at the API level with proper error messages
-  }
-}
-```
-
-**Remediation Effort:** High (1 hour to implement and test all error paths)
-
----
-
-### C-2: CSRF Middleware Error Swallowing
-
-**Location:** `/home/jmagar/code/taboot/apps/web/middleware.ts:30-52`
-**Severity:** 🔴 CRITICAL
-**Impact:** Silent CSRF validation failures, potential security bypass
-
-**Issue Description:**
-
-The CSRF middleware is called but there is **no error handling** for failures. If `csrfMiddleware()` throws an exception (crypto failure, invalid token format, etc.), the middleware crashes.
-
-**Problematic Code:**
-
-```typescript
-// Line 28-52
-if (!isExcluded) {
-  // Fix #4: Call CSRF middleware only once
-  const csrfResponse = await csrfMiddleware(request);
-
-  // For safe methods (GET/HEAD/OPTIONS), merge CSRF cookies/headers and continue
-  if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
-    const response = NextResponse.next();
-
-    // Copy CSRF cookies and headers to the response
-    csrfResponse.cookies.getAll().forEach((cookie) => {
-      response.cookies.set(cookie);
-    });
-    csrfResponse.headers.forEach((value, key) => {
-      if (key.toLowerCase().startsWith('x-csrf')) {
-        response.headers.set(key, value);
-      }
-    });
-
-    return response;
-  }
-
-  // For unsafe methods (POST/PUT/PATCH/DELETE), return 403 if CSRF check failed
-  if (csrfResponse.status === 403) {
-    return csrfResponse;
-  }
-}
-```
-
-**Hidden Errors This Code Could Hide:**
-
-1. ❌ **Crypto API failures** - `crypto.subtle.sign()` throws on invalid key
-2. ❌ **Token parsing errors** - Malformed tokens throw during split/decode
-3. ❌ **Header iteration errors** - `headers.forEach()` could throw if corrupted
-4. ❌ **Cookie setting errors** - `cookies.set()` throws on invalid values
-5. ❌ **Response construction errors** - NextResponse.json() throws on invalid JSON
-6. ❌ **Memory errors** - Out of memory during HMAC computation
-
-**Additional Issue:**
-
-The code **assumes** `csrfMiddleware()` always returns a Response object. What if it throws? What if it returns undefined due to a bug? This is a **silent failure** waiting to happen.
-
-**User Impact:**
-
-- POST/PUT/PATCH/DELETE requests silently bypass CSRF protection on error
-- Users experience application crashes instead of security errors
-- No logging = impossible to debug CSRF-related issues
-- Potential security vulnerability if CSRF checks are bypassed due to errors
-
-**Recommendation:**
-
-```typescript
-// REQUIRED: Wrap CSRF middleware in try-catch
-if (!isExcluded) {
-  try {
-    const csrfResponse = await csrfMiddleware(request);
-
-    // VALIDATE: Ensure we got a valid response
-    if (!csrfResponse || !(csrfResponse instanceof NextResponse)) {
-      throw new Error('CSRF middleware returned invalid response');
-    }
-
-    // For safe methods (GET/HEAD/OPTIONS), merge CSRF cookies/headers and continue
-    if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
-      const response = NextResponse.next();
-
-      // Copy CSRF cookies and headers to the response
-      try {
-        csrfResponse.cookies.getAll().forEach((cookie) => {
-          response.cookies.set(cookie);
-        });
-        csrfResponse.headers.forEach((value, key) => {
-          if (key.toLowerCase().startsWith('x-csrf')) {
-            response.headers.set(key, value);
-          }
-        });
-      } catch (cookieError) {
-        // Log but don't fail - CSRF token setting is not critical for GET requests
-        logger.warn('Failed to set CSRF cookies/headers on GET request', {
-          pathname,
-          error: cookieError instanceof Error ? cookieError.message : String(cookieError),
-        });
-      }
-
-      return response;
-    }
-
-    // For unsafe methods (POST/PUT/PATCH/DELETE), return 403 if CSRF check failed
-    if (csrfResponse.status === 403) {
-      return csrfResponse;
-    }
-
-  } catch (error) {
-    // CRITICAL: CSRF validation failure - fail closed
-    logger.error('CSRF middleware failed - rejecting request (fail-closed)', {
-      pathname,
-      method: request.method,
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-
-    // FAIL CLOSED: Reject state-changing requests if CSRF check fails
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
-      return NextResponse.json(
-        {
-          error: 'CSRF validation failed',
-          message: 'Security check could not be completed. Please refresh and try again.',
-        },
-        { status: 503 }
-      );
-    }
-
-    // For GET requests, continue but log the error
-    return NextResponse.next();
-  }
-}
-```
-
-**Remediation Effort:** High (1 hour to implement and test all error paths)
-
----
 
 ### C-3: Docker Build Failures Are Silent
 

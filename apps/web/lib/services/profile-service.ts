@@ -25,6 +25,17 @@ export interface CurrentUser {
   email: string;
 }
 
+const redactEmail = (email: string): string => {
+  const [local = '', domain = ''] = email.split('@');
+  if (!domain) {
+    return '***';
+  }
+  if (local.length <= 2) {
+    return `***@${domain}`;
+  }
+  return `${local[0]}***${local[local.length - 1]}@${domain}`;
+};
+
 /**
  * Update user profile (name and/or email).
  *
@@ -83,8 +94,8 @@ export async function updateProfile(
     } catch (error) {
       logger.error('Email update failed:', {
         userId,
-        currentEmail: currentUser.email,
-        newEmail: values.email,
+        currentEmail: redactEmail(currentUser.email),
+        newEmail: redactEmail(values.email),
         error: error instanceof Error ? error.message : String(error),
       });
 

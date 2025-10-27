@@ -39,6 +39,13 @@ def _style_status(status: str) -> str:
         return f"[yellow]{status}[/yellow]"
 
 
+def _format_checksum(checksum: str | None) -> str:
+    """Format checksum for display (truncate long values, show N/A when missing)."""
+    if checksum and len(checksum) >= 16:
+        return checksum[:16] + "..."
+    return checksum or "N/A"
+
+
 def version_command() -> None:
     """Show current database schema version.
 
@@ -93,11 +100,7 @@ def version_command() -> None:
         if details.execution_time_ms is not None:
             console.print(f"  Execution time: {details.execution_time_ms}ms")
         console.print(f"  Status: {status_text}")
-        checksum_display = (
-            details.checksum[:16] + "..."
-            if details.checksum and len(details.checksum) >= 16
-            else (details.checksum or "N/A")
-        )
+        checksum_display = _format_checksum(details.checksum)
         console.print(f"  Checksum: {checksum_display}")
 
     except Exception as e:
@@ -157,7 +160,7 @@ def history_command(limit: int = 10) -> None:
                 applied_by,
                 f"{exec_time}ms" if exec_time is not None else "-",
                 status_styled,
-                (checksum[:16] + "..." if checksum and len(checksum) >= 16 else (checksum or "N/A")),
+                _format_checksum(checksum),
             )
 
         console.print(table)

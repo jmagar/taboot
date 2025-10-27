@@ -66,16 +66,19 @@ const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('
 All external scripts include the nonce to bypass CSP restrictions:
 
 #### PostHog Analytics
+
 ```typescript
 <script nonce={nonce} dangerouslySetInnerHTML={{...}} />
 ```
 
 #### Sentry Error Tracking
+
 ```typescript
 <script nonce={nonce} src="https://browser.sentry-cdn.com/..." />
 ```
 
 #### Vercel Analytics
+
 ```typescript
 <script nonce={nonce} src="/_vercel/insights/script.js" />
 ```

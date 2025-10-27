@@ -18,6 +18,8 @@ from contextlib import ExitStack
 from datetime import UTC, datetime
 from typing import Annotated
 
+from types import ModuleType
+
 import typer
 from rich.console import Console
 
@@ -26,6 +28,7 @@ from packages.common.config import get_config
 from packages.common.db_schema import get_postgres_client
 from packages.core.use_cases.ingest_web import IngestWebUseCase
 
+redis_async: ModuleType | None
 try:
     from redis import asyncio as redis_async
 except ModuleNotFoundError:  # pragma: no cover - redis optional in some test suites

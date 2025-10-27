@@ -60,7 +60,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONPATH=/app
 
-# Install minimal runtime packages
+# hadolint ignore=DL3008  # rely on latest security patches, see docs/docker/README.md
+# Install minimal runtime packages (unpinned to receive security updates with base image)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
@@ -86,4 +87,3 @@ HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
     CMD python -c "import sys; sys.exit(0)" || exit 1
 
 CMD ["python", "-m", "apps.worker.main"]
-

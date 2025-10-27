@@ -6,6 +6,9 @@ import hashlib
 import json
 from typing import TYPE_CHECKING, Any
 
+from packages.common.resilience import resilient_async_call
+from packages.extraction.tier_c.schema import ExtractionResult
+
 if TYPE_CHECKING:
     from ollama import AsyncClient as AsyncClientType
 else:
@@ -19,9 +22,6 @@ except ImportError:
     AsyncClientFactory = None
 else:
     AsyncClientFactory = _AsyncClientImported
-
-from packages.common.resilience import resilient_async_call
-from packages.extraction.tier_c.schema import ExtractionResult
 
 
 class TierCLLMClient:

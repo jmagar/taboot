@@ -34,7 +34,7 @@ def load_model() -> CrossEncoder:
     preferred_device = os.getenv("RERANKER_DEVICE", "auto").lower()
     device = _resolve_device("cuda" if preferred_device == "auto" else preferred_device)
     max_length = int(os.getenv("MAX_LENGTH", "512"))
-    model = CrossEncoder(
+    model: CrossEncoder = CrossEncoder(
         model_id,
         device=device,
         max_length=max_length,

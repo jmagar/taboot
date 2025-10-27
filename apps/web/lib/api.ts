@@ -13,6 +13,57 @@
 import { TabootAPIClient } from "@taboot/api-client";
 import { csrfFetch } from "./csrf-client";
 
+const isArrayBufferView = (value: unknown): value is ArrayBufferView =>
+  typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(value as ArrayBufferView);
+
+const isBinaryBody = (data: unknown): data is Exclude<BodyInit, string> =>
+  data instanceof FormData ||
+  data instanceof Blob ||
+  data instanceof URLSearchParams ||
+  data instanceof ArrayBuffer ||
+  isArrayBufferView(data);
+
+const resolveRequestBody = (data: unknown): BodyInit | undefined => {
+  if (data == null) {
+    return undefined;
+  }
+
+  if (isBinaryBody(data) || typeof data === "string") {
+    return data as BodyInit;
+  }
+
+  return JSON.stringify(data);
+};
+
+const shouldTreatAsJsonPayload = (data: unknown, options?: RequestInit): boolean => {
+  if (options?.body !== undefined) {
+    return false;
+  }
+  if (data == null) {
+    return false;
+  }
+  if (typeof data === "string") {
+    return false;
+  }
+  if (isBinaryBody(data)) {
+    return false;
+  }
+  return true;
+};
+
+const shouldSetJsonContentType = (body: BodyInit | null | undefined): boolean => {
+  if (body == null) {
+    return false;
+  }
+  if (typeof body === "string") {
+    return false;
+  }
+  if (isBinaryBody(body)) {
+    return false;
+  }
+  return true;
+};
+
 /**
  * Type-safe configuration for TabootAPIClient constructor.
  * Extracted using ConstructorParameters to ensure type safety.
@@ -55,17 +106,12 @@ class CsrfAwareAPIClient extends TabootAPIClient {
     data?: unknown,
     options?: RequestInit,
   ): Promise<import("@taboot/api-client").APIResponse<T>> {
+    const resolvedBody = options?.body ?? resolveRequestBody(data);
     return this.requestWithCsrf<T>(path, {
       ...options,
       method: "POST",
-      body: options?.body ?? (
-        data == null
-          ? undefined
-          : (data instanceof FormData || data instanceof Blob || data instanceof ArrayBuffer
-              ? (data as BodyInit)
-              : JSON.stringify(data))
-      ),
-    });
+      body: resolvedBody,
+    }, shouldTreatAsJsonPayload(data, options));
   }
 
   async put<T>(
@@ -73,17 +119,12 @@ class CsrfAwareAPIClient extends TabootAPIClient {
     data?: unknown,
     options?: RequestInit,
   ): Promise<import("@taboot/api-client").APIResponse<T>> {
+    const resolvedBody = options?.body ?? resolveRequestBody(data);
     return this.requestWithCsrf<T>(path, {
       ...options,
       method: "PUT",
-      body: options?.body ?? (
-        data == null
-          ? undefined
-          : (data instanceof FormData || data instanceof Blob || data instanceof ArrayBuffer
-              ? (data as BodyInit)
-              : JSON.stringify(data))
-      ),
-    });
+      body: resolvedBody,
+    }, shouldTreatAsJsonPayload(data, options));
   }
 
   async patch<T>(
@@ -91,17 +132,12 @@ class CsrfAwareAPIClient extends TabootAPIClient {
     data?: unknown,
     options?: RequestInit,
   ): Promise<import("@taboot/api-client").APIResponse<T>> {
+    const resolvedBody = options?.body ?? resolveRequestBody(data);
     return this.requestWithCsrf<T>(path, {
       ...options,
       method: "PATCH",
-      body: options?.body ?? (
-        data == null
-          ? undefined
-          : (data instanceof FormData || data instanceof Blob || data instanceof ArrayBuffer
-              ? (data as BodyInit)
-              : JSON.stringify(data))
-      ),
-    });
+      body: resolvedBody,
+    }, shouldTreatAsJsonPayload(data, options));
   }
 
   async delete<T>(path: string, options?: RequestInit): Promise<import("@taboot/api-client").APIResponse<T>> {
@@ -114,16 +150,16 @@ class CsrfAwareAPIClient extends TabootAPIClient {
   private async requestWithCsrf<T>(
     path: string,
     options?: RequestInit,
+    forceJsonContentType = false,
   ): Promise<import("@taboot/api-client").APIResponse<T>> {
-    const url = `${this.getBaseUrl()}${path}`;
+    const base = this.getBaseUrl().replace(/\/+$/, "");
+    const rel = path.startsWith("/") ? path : `/${path}`;
+    const url = `${base}${rel}`;
 
     // Only set Content-Type for string/JSON bodies, not FormData/Blob
     const headers = new Headers(options?.headers);
-    if (!headers.has("Content-Type") && options?.body) {
-      const isFormDataOrBlob = options.body instanceof FormData || options.body instanceof Blob;
-      if (!isFormDataOrBlob) {
-        headers.set("Content-Type", "application/json");
-      }
+    if (!headers.has("Content-Type") && (forceJsonContentType || shouldSetJsonContentType(options?.body ?? null))) {
+      headers.set("Content-Type", "application/json");
     }
     if (!headers.has("Accept")) {
       headers.set("Accept", "application/json");
@@ -138,7 +174,7 @@ class CsrfAwareAPIClient extends TabootAPIClient {
 
     // Handle 204 No Content responses
     if (response.status === 204) {
-      return {} as import("@taboot/api-client").APIResponse<T>;
+      return { data: null, error: null } as import("@taboot/api-client").APIResponse<T>;
     }
 
     // Check response content-type before calling response.json()

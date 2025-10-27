@@ -533,9 +533,16 @@ class SchemaVersionDetails:
         self.status = status
         self.checksum = checksum
 
-    def to_tuple(self) -> tuple:
+    def to_tuple(self) -> tuple[str, datetime, str, int | None, str, str | None]:
         """Convert to tuple for unpacking."""
-        return (self.version, self.applied_at, self.applied_by, self.execution_time_ms, self.status, self.checksum)
+        return (
+            self.version,
+            self.applied_at,
+            self.applied_by,
+            self.execution_time_ms,
+            self.status,
+            self.checksum,
+        )
 
 
 def get_schema_version_details() -> SchemaVersionDetails | None:
@@ -585,7 +592,9 @@ def get_schema_version_details() -> SchemaVersionDetails | None:
         conn.close()
 
 
-def get_schema_version_history(limit: int = 10) -> list[tuple]:
+def get_schema_version_history(
+    limit: int = 10,
+) -> list[tuple[str, datetime, str, int | None, str, str | None]]:
     """Get schema version history from database with limit clamping.
 
     Retrieves a historical record of schema versions applied to the database,

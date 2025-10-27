@@ -227,8 +227,12 @@ def test_verify_schema_query_structure(test_config: TabootConfig, mocker: Any) -
 
     # Check that execute was called with information_schema query
     execute_call = mock_cursor.execute.call_args[0][0]
-    assert "information_schema.tables" in execute_call.lower()
-    assert "table_schema in ('rag', 'auth')" in execute_call.lower() or "table_schema = 'rag'" in execute_call.lower()
+    lower_execute_call = execute_call.lower()
+    assert "information_schema.tables" in lower_execute_call
+    assert (
+        "table_schema in ('rag', 'auth')" in lower_execute_call
+        or "table_schema = 'rag'" in lower_execute_call
+    )
 
 
 @pytest.mark.integration
@@ -518,7 +522,10 @@ def test_create_schema_records_failure_on_error(test_config: TabootConfig, mocke
     # Mock connection and cursor
     mock_conn = mocker.MagicMock()
     mock_cursor = mocker.MagicMock()
-    mock_cursor.execute.side_effect = [None, Exception("SQL error")]  # First call for check, second for execution
+    mock_cursor.execute.side_effect = [
+        None,
+        Exception("SQL error"),
+    ]  # First call for check, second for execution
     mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
 
     mocker.patch("packages.common.db_schema._get_connection", return_value=mock_conn)

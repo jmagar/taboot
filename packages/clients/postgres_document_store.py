@@ -167,7 +167,10 @@ class PostgresDocumentStore:
             KeyError: If document not found.
         """
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT content FROM rag.document_content WHERE doc_id = %s", (str(doc_id),))
+            cur.execute(
+                "SELECT content FROM rag.document_content WHERE doc_id = %s",
+                (str(doc_id),),
+            )
             row = cur.fetchone()
 
         if row is None:

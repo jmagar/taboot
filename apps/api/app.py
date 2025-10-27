@@ -6,10 +6,10 @@ import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Callable, cast
 
 import redis.asyncio as redis
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialize Redis with connection pooling
     try:
-        redis_pool: redis.ConnectionPool = redis.ConnectionPool.from_url(
+        redis_pool: redis.ConnectionPool[Any] = redis.ConnectionPool.from_url(
             config.redis_url,
             max_connections=config.redis_max_connections,
             socket_timeout=config.redis_socket_timeout,
@@ -205,7 +205,8 @@ app = FastAPI(
 config = get_config()
 limiter = Limiter(key_func=get_remote_address, storage_uri=config.redis_url)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+rate_limit_handler = cast(Callable[[Request, Exception], Response], _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
 # Add CORS middleware
 config = get_config()

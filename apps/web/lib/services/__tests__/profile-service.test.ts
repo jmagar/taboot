@@ -84,6 +84,22 @@ describe('updateProfile', () => {
         userId: mockUserId,
         error: 'API error',
       });
+      expect(changeEmail).not.toHaveBeenCalled();
+    });
+
+    it('should not attempt email change if name update fails when both fields change', async () => {
+      const values: UpdateProfileFormValues = {
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+      };
+
+      vi.mocked(updateUser).mockRejectedValueOnce(new Error('API error'));
+
+      await expect(updateProfile(mockUserId, mockCurrentUser, values)).rejects.toThrow(
+        'Failed to update name',
+      );
+
+      expect(changeEmail).not.toHaveBeenCalled();
     });
   });
 
@@ -137,8 +153,8 @@ describe('updateProfile', () => {
 
       expect(logger.error).toHaveBeenCalledWith('Email update failed:', {
         userId: mockUserId,
-        currentEmail: 'john@example.com',
-        newEmail: 'jane@example.com',
+        currentEmail: 'j***n@example.com',
+        newEmail: 'j***e@example.com',
         error: 'Email service error',
       });
     });
@@ -183,8 +199,8 @@ describe('updateProfile', () => {
       });
       expect(logger.error).toHaveBeenCalledWith('Email update failed:', {
         userId: mockUserId,
-        currentEmail: 'john@example.com',
-        newEmail: 'jane@example.com',
+        currentEmail: 'j***n@example.com',
+        newEmail: 'j***e@example.com',
         error: 'Email service error',
       });
     });
@@ -230,7 +246,7 @@ describe('updateProfile', () => {
       });
     });
 
-    it('should handle whitespace trimming in name', async () => {
+    it('should treat trailing whitespace in name as a change', async () => {
       const values: UpdateProfileFormValues = {
         name: 'John Doe ',
         email: 'john@example.com',

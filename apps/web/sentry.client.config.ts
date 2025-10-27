@@ -1,14 +1,8 @@
 import * as Sentry from '@sentry/nextjs';
+import { parseSampleRate, resolveSentryEnvironment, scrubData } from '@/lib/sentry-utils';
 
 const SENTRY_DSN = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-
-// Validate and clamp sample rate to [0, 1] range
-const parseSampleRate = (value: string | undefined, fallback: number): number => {
-  const parsed = Number(value ?? fallback);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(0, Math.min(1, parsed));
-};
 
 if (SENTRY_DSN) {
   Sentry.init({
@@ -44,53 +38,10 @@ if (SENTRY_DSN) {
     ],
 
     // Deployment-aware environment detection (Vercel-compatible)
-    environment:
-      process.env.SENTRY_ENVIRONMENT ??
-      process.env.NEXT_PUBLIC_VERCEL_ENV ??
-      process.env.VERCEL_ENV ??
-      process.env.NEXT_PUBLIC_RUNTIME_ENV ??
-      process.env.NODE_ENV,
+    environment: resolveSentryEnvironment(),
 
     // Configure beforeSend to filter sensitive data
     beforeSend(event, hint) {
-      // Fix #3: Comprehensive PII scrubbing with case-insensitive matching
-      const scrubKeys = new Set([
-        'email',
-        'password',
-        'pass',
-        'token',
-        'access_token',
-        'refresh_token',
-        'authorization',
-        'auth',
-        'apikey',
-        'key',
-        'secret',
-        'sessionid',
-        'phone',
-        'address',
-        'ssn',
-      ]);
-
-      // Helper function to scrub sensitive data from any object (recursive with array support)
-      const scrubData = (data: unknown): unknown => {
-        if (data === null || data === undefined) return data;
-        if (Array.isArray(data)) return data.map((v) => scrubData(v));
-        if (typeof data === 'object') {
-          const input = data as Record<string, unknown>;
-          const out: Record<string, unknown> = {};
-          for (const [key, value] of Object.entries(input)) {
-            if (scrubKeys.has(key.toLowerCase())) {
-              out[key] = '[Filtered]';
-            } else {
-              out[key] = scrubData(value);
-            }
-          }
-          return out;
-        }
-        return data;
-      };
-
       // Filter out PII from breadcrumbs
       if (event.breadcrumbs) {
         event.breadcrumbs = event.breadcrumbs.map((breadcrumb) => {

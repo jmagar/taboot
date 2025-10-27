@@ -208,7 +208,7 @@ async function cleanupDeletedUsers(options: CleanupOptions): Promise<void> {
       try {
         // Hard delete using raw SQL to bypass soft-delete middleware
         // Cascade deletes are handled by database foreign key constraints
-        await prisma.$executeRaw`DELETE FROM "User" WHERE id = ${user.id}`;
+        await prisma.$executeRaw`DELETE FROM "user" WHERE id = ${user.id}`;
 
         // Log deletion AFTER successful removal
         await logHardDeletion(user.id, user.deletedAt!, retentionDays);

@@ -2,7 +2,7 @@
  * Tests for FormData/Blob handling in CsrfAwareAPIClient
  */
 
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock the csrf-client module
 vi.mock("../csrf-client", () => ({
@@ -22,7 +22,16 @@ import { api } from "../api";
 import { csrfFetch } from "../csrf-client";
 
 describe("CsrfAwareAPIClient FormData/Blob handling", () => {
-  const mockCsrfFetch = csrfFetch as Mock;
+  const mockCsrfFetch = vi.mocked(csrfFetch);
+
+  const getCallByPath = (path: string): [RequestInfo, RequestInit] => {
+    const call = mockCsrfFetch.mock.calls.find(([url]) => String(url).includes(path));
+    if (!call) {
+      throw new Error(`No csrfFetch call found for path: ${path}`);
+    }
+    const [url, init] = call;
+    return [url, (init ?? {}) as RequestInit];
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -50,9 +59,8 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
         }),
       );
 
-      // Verify body is the exact FormData instance
-      const callArgs = mockCsrfFetch.mock.calls[0];
-      expect(callArgs[1].body).toBeInstanceOf(FormData);
+      const [, opts] = getCallByPath("/upload");
+      expect(opts.body).toBeInstanceOf(FormData);
     });
 
     it("should pass Blob directly without JSON.stringify", async () => {
@@ -68,8 +76,8 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
         }),
       );
 
-      const callArgs = mockCsrfFetch.mock.calls[0];
-      expect(callArgs[1].body).toBeInstanceOf(Blob);
+      const [, opts] = getCallByPath("/upload-blob");
+      expect(opts.body).toBeInstanceOf(Blob);
     });
 
     it("should pass ArrayBuffer directly without JSON.stringify", async () => {
@@ -85,8 +93,8 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
         }),
       );
 
-      const callArgs = mockCsrfFetch.mock.calls[0];
-      expect(callArgs[1].body).toBeInstanceOf(ArrayBuffer);
+      const [, opts] = getCallByPath("/upload-buffer");
+      expect(opts.body).toBeInstanceOf(ArrayBuffer);
     });
 
     it("should JSON.stringify plain objects", async () => {
@@ -102,8 +110,8 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
         }),
       );
 
-      const callArgs = mockCsrfFetch.mock.calls[0];
-      expect(typeof callArgs[1].body).toBe("string");
+      const [, opts] = getCallByPath("/data");
+      expect(typeof opts.body).toBe("string");
     });
 
     it("should preserve options.body if provided", async () => {
@@ -151,9 +159,9 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
 
       await api.put("/update", formData);
 
-      const callArgs = mockCsrfFetch.mock.calls[0];
-      expect(callArgs[1].method).toBe("PUT");
-      expect(callArgs[1].body).toBeInstanceOf(FormData);
+      const [, opts] = getCallByPath("/update");
+      expect(opts.method).toBe("PUT");
+      expect(opts.body).toBeInstanceOf(FormData);
     });
 
     it("should JSON.stringify plain objects", async () => {
@@ -161,10 +169,10 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
 
       await api.put("/update", data);
 
-      const callArgs = mockCsrfFetch.mock.calls[0];
-      expect(callArgs[1].method).toBe("PUT");
-      expect(typeof callArgs[1].body).toBe("string");
-      expect(callArgs[1].body).toBe(JSON.stringify(data));
+      const [, opts] = getCallByPath("/update");
+      expect(opts.method).toBe("PUT");
+      expect(typeof opts.body).toBe("string");
+      expect(opts.body).toBe(JSON.stringify(data));
     });
   });
 
@@ -175,9 +183,9 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
 
       await api.patch("/partial-update", formData);
 
-      const callArgs = mockCsrfFetch.mock.calls[0];
-      expect(callArgs[1].method).toBe("PATCH");
-      expect(callArgs[1].body).toBeInstanceOf(FormData);
+      const [, opts] = getCallByPath("/partial-update");
+      expect(opts.method).toBe("PATCH");
+      expect(opts.body).toBeInstanceOf(FormData);
     });
 
     it("should pass Blob directly without JSON.stringify", async () => {
@@ -185,9 +193,9 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
 
       await api.patch("/partial-update-blob", blob);
 
-      const callArgs = mockCsrfFetch.mock.calls[0];
-      expect(callArgs[1].method).toBe("PATCH");
-      expect(callArgs[1].body).toBeInstanceOf(Blob);
+      const [, opts] = getCallByPath("/partial-update-blob");
+      expect(opts.method).toBe("PATCH");
+      expect(opts.body).toBeInstanceOf(Blob);
     });
 
     it("should JSON.stringify plain objects", async () => {
@@ -195,10 +203,10 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
 
       await api.patch("/partial-update", data);
 
-      const callArgs = mockCsrfFetch.mock.calls[0];
-      expect(callArgs[1].method).toBe("PATCH");
-      expect(typeof callArgs[1].body).toBe("string");
-      expect(callArgs[1].body).toBe(JSON.stringify(data));
+      const [, opts] = getCallByPath("/partial-update");
+      expect(opts.method).toBe("PATCH");
+      expect(typeof opts.body).toBe("string");
+      expect(opts.body).toBe(JSON.stringify(data));
     });
   });
 
@@ -209,8 +217,8 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
 
       await api.post("/upload", formData);
 
-      const callArgs = mockCsrfFetch.mock.calls[0];
-      const headers = callArgs[1].headers as Headers;
+      const [, opts] = getCallByPath("/upload");
+      const headers = opts.headers as Headers;
 
       // Content-Type should not be set (browser sets it with boundary)
       expect(headers.get("Content-Type")).toBeNull();
@@ -221,8 +229,8 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
 
       await api.post("/upload", blob);
 
-      const callArgs = mockCsrfFetch.mock.calls[0];
-      const headers = callArgs[1].headers as Headers;
+      const [, opts] = getCallByPath("/upload");
+      const headers = opts.headers as Headers;
 
       // Content-Type should not be set for Blob
       expect(headers.get("Content-Type")).toBeNull();
@@ -233,8 +241,8 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
 
       await api.post("/data", data);
 
-      const callArgs = mockCsrfFetch.mock.calls[0];
-      const headers = callArgs[1].headers as Headers;
+      const [, opts] = getCallByPath("/data");
+      const headers = opts.headers as Headers;
 
       expect(headers.get("Content-Type")).toBe("application/json");
     });

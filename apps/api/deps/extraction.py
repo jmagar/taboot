@@ -52,7 +52,7 @@ def get_window_selector() -> WindowSelector:
 
 def get_tier_c_llm_client(
     request: Request,
-    redis_client: Annotated[Redis, Depends(get_redis_client)],
+    redis_client: Annotated[Redis[bytes], Depends(get_redis_client)],
 ) -> TierCLLMClient:
     """Provide a cached Tier C LLM client bound to the FastAPI application."""
     client: TierCLLMClient | None = getattr(request.app.state, "tier_c_llm_client", None)
@@ -71,7 +71,7 @@ def get_tier_c_llm_client(
 
 def get_extraction_orchestrator(
     request: Request,
-    redis_client: Annotated[Redis, Depends(get_redis_client)],
+    redis_client: Annotated[Redis[bytes], Depends(get_redis_client)],
     llm_client: Annotated[TierCLLMClient, Depends(get_tier_c_llm_client)],
     entity_pattern_matcher: Annotated[EntityPatternMatcher, Depends(get_entity_pattern_matcher)],
     window_selector: Annotated[WindowSelector, Depends(get_window_selector)],
@@ -115,7 +115,7 @@ def get_extract_use_case(
 
 
 def get_status_use_case(
-    redis_client: Annotated[Redis, Depends(get_redis_client)],
+    redis_client: Annotated[Redis[bytes], Depends(get_redis_client)],
 ) -> GetStatusUseCase:
     """Construct the status use case with shared Redis client."""
     return GetStatusUseCase(

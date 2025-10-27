@@ -184,7 +184,9 @@ export async function middleware(request: NextRequest) {
 
   // Create response with security headers
   const response = NextResponse.next();
-  applySecurityHeaders(response);
+  if (!pathname.startsWith('/api')) {
+    applySecurityHeaders(response);
+  }
 
   return response;
 }

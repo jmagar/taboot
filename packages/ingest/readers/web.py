@@ -6,7 +6,6 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 
 import logging
 import time
-from typing import cast
 
 from llama_index.core import Document
 from llama_index.readers.web import FireCrawlWebReader
@@ -96,7 +95,7 @@ class WebReader:
             params=params,
         )
 
-        docs = cast(list[Document], reader.load_data(url=url))
+        docs = reader.load_data(url=url)
 
         # Add source_url to metadata
         for doc in docs:

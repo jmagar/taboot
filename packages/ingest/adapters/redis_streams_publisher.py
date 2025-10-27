@@ -17,7 +17,7 @@ class RedisDocumentEventPublisher(DocumentEventPublisher):
 
     def __init__(
         self,
-        redis_client: Redis,
+        redis_client: Redis[Any],
         stream_name: str = "stream:documents",
         *,
         maxlen: int | None = 1000,
@@ -57,7 +57,7 @@ class RedisDocumentEventPublisher(DocumentEventPublisher):
             raise
 
 
-async def create_redis_client(url: str, *, decode_responses: bool = False) -> Redis:
+async def create_redis_client(url: str, *, decode_responses: bool = False) -> Redis[Any]:
     """Helper to create a Redis client from URL."""
 
     return redis.from_url(url, decode_responses=decode_responses)

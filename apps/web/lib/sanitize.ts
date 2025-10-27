@@ -88,6 +88,8 @@ export function sanitizeErrorMessage(message: string): string {
   // Trade-off: May redact legitimate checksums/UUIDs for security
   // Word boundaries prevent matching hex within larger strings
   // Case-sensitive to avoid false positives with uppercase base64 strings
+  // Note: UUIDs containing dashes (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx) are preserved
+  // intentionally so request/trace identifiers remain usable in logs.
   sanitized = sanitized.replace(/\b[0-9a-f]{32,}\b/g, '[REDACTED]');
 
   // Pattern 5: Long base64 strings (40+ chars)

@@ -16,7 +16,11 @@ import { twoFactor } from 'better-auth/plugins';
 import { prisma } from '@taboot/db';
 import { logger } from '@taboot/logger';
 
-export const auth = betterAuth({
+// The inferred type of 'auth' is too complex to name portably (TS2742).
+// This is safe because 'auth' is only used internally in server code, not exported to clients.
+// The Session type is properly exported via `typeof auth.$Infer.Session` at line 156.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const auth: any = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),

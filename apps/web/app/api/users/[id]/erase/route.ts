@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@taboot/db';
 import { auth } from '@taboot/auth';
 import { logger } from '@/lib/logger';
-import type { prisma as prismaType } from '@taboot/db';
 
 /**
  * Validate IP address format (IPv4 or IPv6).
@@ -128,12 +127,13 @@ export async function POST(
     const ipAddress = getClientIp(request);
 
     // GDPR erasure: atomic transaction to ensure consistency
-    await prisma.$transaction(async (tx: typeof prismaType) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await prisma.$transaction(async (tx: any) => {
       // 1. Anonymize user PII in the user record
       await tx.user.update({
         where: { id: userId },
         data: {
-          email: `anonymized-${userId}@example.local`,
+          email: `anonymized-${userId}@example.invalid`,
           name: 'Anonymized User',
           image: null,
           deletedAt: new Date(),

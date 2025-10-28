@@ -284,13 +284,13 @@ taboot list RESOURCE [--limit N] [--filter EXPR]
 | `taboot-playwright` | Playwright browser microservice                | ❌   |
 | `taboot-crawler`    | Firecrawl v2 API                               | ❌   |
 | `taboot-ollama`     | Ollama LLM server (pull Qwen3-4B on first run) | ✅   |
-| `taboot-app`        | Unified API + MCP + Web container              | ❌   |
+| `taboot-api`        | FastAPI service (Python 3.13)                  | ❌   |
+| `taboot-web`        | Next.js dashboard (standalone build)           | ❌   |
 | `taboot-worker`     | Extraction pipeline worker (spaCy + LLM tiers) | ❌   |
 
 > Port and image settings align with `.env.example` provided below.
 
-`taboot-app` bundles the FastAPI surface, MCP server, and web dashboard into a single container to keep the compose stack compact. Override the start command in
-`docker/app/Dockerfile` if you need a different process supervisor.
+`taboot-api` and `taboot-web` have dedicated Dockerfiles in `docker/api/` and `docker/web/`. Override those Dockerfiles directly if you need custom runtime tweaks or process managers.
 
 Operational runbooks and production responses are documented in [apps/api/docs/RUNBOOK.md](apps/api/docs/RUNBOOK.md), while crawl etiquette and throttling live in [apps/api/docs/BACKPRESSURE_RATELIMITING.md](apps/api/docs/BACKPRESSURE_RATELIMITING.md).
 
@@ -347,7 +347,7 @@ Review [apps/api/docs/SECURITY_MODEL.md](apps/api/docs/SECURITY_MODEL.md) and [a
 
 * **spaCy:** start with `en_core_web_md`; selectively use `en_core_web_trf` for complex prose; emphasize `entity_ruler` and domain patterns.
 * **LLM (Tier C):** Qwen3-4B-Instruct via Ollama; windows ≤512 tokens; temperature 0; strict JSON schema; batch 8–16; Redis prompt cache.
-* **Embeddings (TEI):** BGE/e5/EmbeddingGemma-class models (768–1024 dims); batch aggressively; monitor VRAM.
+* **Embeddings (TEI):** BGE/e5/EmbeddingGemma-class models (1024 dims); batch aggressively; monitor VRAM.
 * **Reranking (SentenceTransformers):** `Qwen/Qwen3-Reranker-0.6B` served via a small
   FastAPI wrapper (GPU if available). TEI does not yet ship Qwen3 rerankers, so we run
   the model through `sentence-transformers` instead of the TEI container.
@@ -407,7 +407,7 @@ LlamaIndex is a framework concern and lives in **`packages/retrieval/`**:
 The compose file at repo root reflects the services below; see inline comments there for ports, healthchecks, and GPU flags.
 
 * **GPU-accelerated:** `taboot-vectors`, `taboot-embed`, `taboot-rerank`, `taboot-ollama`
-* **CPU:** `taboot-graph`, `taboot-cache`, `taboot-db`, `taboot-playwright`, `taboot-crawler`, `taboot-app`, `taboot-worker`
+* **CPU:** `taboot-graph`, `taboot-cache`, `taboot-db`, `taboot-playwright`, `taboot-crawler`, `taboot-api`, `taboot-web`, `taboot-worker`
 
 ---
 

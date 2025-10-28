@@ -15,6 +15,8 @@ from apps.cli.taboot_cli.commands import (
     list_app,
     schema_app,
 )
+# Import ingest commands to trigger registration (web and swag have @app.command decorators)
+from apps.cli.taboot_cli.commands import ingest_swag, ingest_web  # noqa: F401
 from apps.cli.taboot_cli.utils import async_command
 from packages.schemas.models import ExtractionState, SourceType
 
@@ -22,6 +24,7 @@ app = typer.Typer(
     name="taboot",
     help="Taboot CLI - Doc-to-Graph RAG Platform",
     add_completion=False,
+    no_args_is_help=True,
 )
 console = Console()
 logger = logging.getLogger(__name__)

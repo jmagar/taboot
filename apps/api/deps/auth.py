@@ -13,20 +13,20 @@ from packages.common.api_key_store import ApiKeyStore
 logger = logging.getLogger(__name__)
 
 
-async def get_redis_client(request: Request) -> Redis[bytes]:
+async def get_redis_client(request: Request) -> Redis:
     """Get Redis client from app state via Request.
 
     Args:
         request: FastAPI Request object (injected).
 
     Returns:
-        redis.Redis[bytes]: Async Redis client (returns bytes, not decoded strings).
+        redis.Redis: Async Redis client (returns bytes, not decoded strings).
     """
-    return cast(Redis[bytes], request.app.state.redis)
+    return cast(Redis, request.app.state.redis)
 
 
 async def verify_api_key(
-    redis_client: Annotated[Redis[bytes], Depends(get_redis_client)],  # noqa: B008
+    redis_client: Annotated[Redis, Depends(get_redis_client)],
     x_api_key: Annotated[str | None, Header(description="API key for authentication")] = None,
 ) -> bool:
     """Verify API key from X-API-Key header.

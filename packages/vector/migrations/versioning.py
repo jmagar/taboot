@@ -14,8 +14,9 @@ Per MIGRATIONS.md:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import suppress
-from typing import Any, Callable
+from typing import Any
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams

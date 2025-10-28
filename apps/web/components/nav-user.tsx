@@ -65,7 +65,7 @@ export function NavUser() {
           try {
             await signOut();
             // Fire-and-forget; UI shouldn't block on cache invalidation
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+             
             revalidateSessionCache();
             refetch();
           } catch (error) {

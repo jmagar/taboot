@@ -6,7 +6,7 @@ With job state tracking and error handling.
 """
 
 from typing import cast
-from unittest.mock import MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import UUID
 
 import pytest
@@ -65,15 +65,18 @@ class TestIngestWebUseCase:
     def mock_embedder(self) -> Mock:
         """Create mock Embedder."""
         embedder = Mock()
-        # Return 768-dim embeddings
-        embedder.embed_texts.side_effect = lambda texts: [[0.1] * 768 for _ in texts]
+        # Return 1024-dim embeddings for async method
+        async def async_embed(texts):
+            return [[0.1] * 1024 for _ in texts]
+        embedder.embed_texts_async = AsyncMock(side_effect=async_embed)
         return embedder
 
     @pytest.fixture
     def mock_qdrant_writer(self) -> Mock:
         """Create mock QdrantWriter."""
         writer = Mock()
-        writer.upsert_batch.return_value = None
+        # Use AsyncMock for async method
+        writer.upsert_batch_async = AsyncMock(return_value=None)
         return writer
 
     @pytest.fixture
@@ -82,7 +85,7 @@ class TestIngestWebUseCase:
         store = MagicMock(spec=PostgresDocumentStore)
         return cast(PostgresDocumentStore, store)
 
-    def test_execute_orchestrates_full_pipeline(
+    async def test_execute_orchestrates_full_pipeline(
         self,
         mock_web_reader: Mock,
         mock_normalizer: Mock,
@@ -108,14 +111,14 @@ class TestIngestWebUseCase:
         # Execute
         url = "https://example.com"
         limit = 10
-        job = use_case.execute(url=url, limit=limit)
+        job = await use_case.execute(url=url, limit=limit)
 
         # Verify pipeline orchestration
         mock_web_reader.load_data.assert_called_once_with(url, limit)
         assert mock_normalizer.normalize.call_count == 2  # 2 documents
         assert mock_chunker.chunk_document.call_count == 2  # 2 documents
-        mock_embedder.embed_texts.assert_called_once()  # 1 batch call
-        mock_qdrant_writer.upsert_batch.assert_called_once()
+        mock_embedder.embed_texts_async.assert_called_once()  # 1 batch call
+        mock_qdrant_writer.upsert_batch_async.assert_called_once()
 
         # Verify job state
         assert isinstance(job, IngestionJob)
@@ -129,7 +132,7 @@ class TestIngestWebUseCase:
         assert job.completed_at >= job.started_at
         assert job.errors is None
 
-    def test_execute_creates_job_in_pending_state(
+    async def test_execute_creates_job_in_pending_state(
         self,
         mock_web_reader: Mock,
         mock_normalizer: Mock,
@@ -151,13 +154,13 @@ class TestIngestWebUseCase:
             collection_name="test_collection",
         )
 
-        job = use_case.execute(url="https://example.com", limit=5)
+        job = await use_case.execute(url="https://example.com", limit=5)
 
         # Job should start in PENDING, then move to RUNNING, then COMPLETED
         assert job.state == JobState.COMPLETED
         assert job.created_at is not None
 
-    def test_execute_transitions_to_running(
+    async def test_execute_transitions_to_running(
         self,
         mock_web_reader: Mock,
         mock_normalizer: Mock,
@@ -179,12 +182,12 @@ class TestIngestWebUseCase:
             collection_name="test_collection",
         )
 
-        job = use_case.execute(url="https://example.com", limit=5)
+        job = await use_case.execute(url="https://example.com", limit=5)
 
         assert job.started_at is not None
         assert job.started_at >= job.created_at
 
-    def test_execute_updates_pages_processed_incrementally(
+    async def test_execute_updates_pages_processed_incrementally(
         self,
         mock_web_reader: Mock,
         mock_normalizer: Mock,
@@ -213,11 +216,11 @@ class TestIngestWebUseCase:
             collection_name="test_collection",
         )
 
-        job = use_case.execute(url="https://example.com", limit=5)
+        job = await use_case.execute(url="https://example.com", limit=5)
         assert job.state == JobState.COMPLETED
         assert job.pages_processed == 3
 
-    def test_execute_updates_chunks_created_incrementally(
+    async def test_execute_updates_chunks_created_incrementally(
         self,
         mock_web_reader: Mock,
         mock_normalizer: Mock,
@@ -239,12 +242,12 @@ class TestIngestWebUseCase:
             collection_name="test_collection",
         )
 
-        job = use_case.execute(url="https://example.com", limit=5)
+        job = await use_case.execute(url="https://example.com", limit=5)
 
         # 2 docs * 3 chunks each = 6 total
         assert job.chunks_created == 6
 
-    def test_execute_handles_empty_document_list(
+    async def test_execute_handles_empty_document_list(
         self,
         mock_web_reader: Mock,
         mock_normalizer: Mock,
@@ -269,17 +272,17 @@ class TestIngestWebUseCase:
             collection_name="test_collection",
         )
 
-        job = use_case.execute(url="https://example.com", limit=5)
+        job = await use_case.execute(url="https://example.com", limit=5)
 
         assert job.state == JobState.COMPLETED
         assert job.pages_processed == 0
         assert job.chunks_created == 0
         mock_normalizer.normalize.assert_not_called()
         mock_chunker.chunk_document.assert_not_called()
-        mock_embedder.embed_texts.assert_not_called()
-        mock_qdrant_writer.upsert_batch.assert_not_called()
+        mock_embedder.embed_texts_async.assert_not_called()
+        mock_qdrant_writer.upsert_batch_async.assert_not_called()
 
-    def test_execute_handles_web_reader_error(
+    async def test_execute_handles_web_reader_error(
         self,
         mock_web_reader: Mock,
         mock_normalizer: Mock,
@@ -304,7 +307,7 @@ class TestIngestWebUseCase:
             collection_name="test_collection",
         )
 
-        job = use_case.execute(url="https://example.com", limit=5)
+        job = await use_case.execute(url="https://example.com", limit=5)
 
         assert job.state == JobState.FAILED
         assert job.errors is not None
@@ -312,19 +315,20 @@ class TestIngestWebUseCase:
         assert "Connection timeout" in job.errors[0]["error"]
         assert job.completed_at is not None
 
-    def test_execute_handles_embedder_error(
+    async def test_execute_handles_embedder_error(
         self,
         mock_web_reader: Mock,
         mock_normalizer: Mock,
         mock_chunker: Mock,
         mock_embedder: Mock,
         mock_qdrant_writer: Mock,
+        mock_document_store: PostgresDocumentStore,
     ) -> None:
         """Test that execute handles Embedder errors and marks job as FAILED."""
         from packages.core.use_cases.ingest_web import IngestWebUseCase
 
         # Simulate Embedder error
-        mock_embedder.embed_texts.side_effect = Exception("TEI service unavailable")
+        mock_embedder.embed_texts_async.side_effect = Exception("TEI service unavailable")
 
         use_case = IngestWebUseCase(
             web_reader=mock_web_reader,
@@ -332,29 +336,31 @@ class TestIngestWebUseCase:
             chunker=mock_chunker,
             embedder=mock_embedder,
             qdrant_writer=mock_qdrant_writer,
+            document_store=mock_document_store,
             collection_name="test_collection",
         )
 
-        job = use_case.execute(url="https://example.com", limit=5)
+        job = await use_case.execute(url="https://example.com", limit=5)
 
         assert job.state == JobState.FAILED
         assert job.errors is not None
         assert len(job.errors) == 1
         assert "TEI service unavailable" in job.errors[0]["error"]
 
-    def test_execute_handles_qdrant_writer_error(
+    async def test_execute_handles_qdrant_writer_error(
         self,
         mock_web_reader: Mock,
         mock_normalizer: Mock,
         mock_chunker: Mock,
         mock_embedder: Mock,
         mock_qdrant_writer: Mock,
+        mock_document_store: PostgresDocumentStore,
     ) -> None:
         """Test that execute handles QdrantWriter errors and marks job as FAILED."""
         from packages.core.use_cases.ingest_web import IngestWebUseCase
 
         # Simulate QdrantWriter error
-        mock_qdrant_writer.upsert_batch.side_effect = Exception("Qdrant connection refused")
+        mock_qdrant_writer.upsert_batch_async.side_effect = Exception("Qdrant connection refused")
 
         use_case = IngestWebUseCase(
             web_reader=mock_web_reader,
@@ -362,23 +368,25 @@ class TestIngestWebUseCase:
             chunker=mock_chunker,
             embedder=mock_embedder,
             qdrant_writer=mock_qdrant_writer,
+            document_store=mock_document_store,
             collection_name="test_collection",
         )
 
-        job = use_case.execute(url="https://example.com", limit=5)
+        job = await use_case.execute(url="https://example.com", limit=5)
 
         assert job.state == JobState.FAILED
         assert job.errors is not None
         assert len(job.errors) == 1
         assert "Qdrant connection refused" in job.errors[0]["error"]
 
-    def test_execute_creates_valid_chunk_models(
+    async def test_execute_creates_valid_chunk_models(
         self,
         mock_web_reader: Mock,
         mock_normalizer: Mock,
         mock_chunker: Mock,
         mock_embedder: Mock,
         mock_qdrant_writer: Mock,
+        mock_document_store: PostgresDocumentStore,
     ) -> None:
         """Test that execute creates valid Chunk models for Qdrant."""
         from packages.core.use_cases.ingest_web import IngestWebUseCase
@@ -389,16 +397,17 @@ class TestIngestWebUseCase:
             chunker=mock_chunker,
             embedder=mock_embedder,
             qdrant_writer=mock_qdrant_writer,
+            document_store=mock_document_store,
             collection_name="test_collection",
         )
 
-        job = use_case.execute(url="https://example.com", limit=5)
+        job = await use_case.execute(url="https://example.com", limit=5)
         assert job.state == JobState.COMPLETED
 
-        # Verify upsert_batch was called with Chunk models
-        mock_qdrant_writer.upsert_batch.assert_called_once()
-        chunks_arg = mock_qdrant_writer.upsert_batch.call_args[0][0]
-        embeddings_arg = mock_qdrant_writer.upsert_batch.call_args[0][1]
+        # Verify upsert_batch_async was called with Chunk models
+        mock_qdrant_writer.upsert_batch_async.assert_called_once()
+        chunks_arg = mock_qdrant_writer.upsert_batch_async.call_args[0][0]
+        embeddings_arg = mock_qdrant_writer.upsert_batch_async.call_args[0][1]
 
         # Verify chunks are Chunk models
         assert all(isinstance(chunk, Chunk) for chunk in chunks_arg)
@@ -406,7 +415,7 @@ class TestIngestWebUseCase:
 
         # Verify embeddings match chunks
         assert len(embeddings_arg) == len(chunks_arg)
-        assert all(len(emb) == 768 for emb in embeddings_arg)
+        assert all(len(emb) == 1024 for emb in embeddings_arg)
 
         # Verify chunk metadata
         for chunk in chunks_arg:

@@ -51,6 +51,8 @@ def health() -> dict[str, str]:
     try:
         load_model()
     except Exception as exc:  # pragma: no cover - defensive logging
+        # Catches: OSError (model file/device issues), RuntimeError (CUDA/torch errors),
+        # ValueError (invalid config), and other model initialization exceptions
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {"status": "ok"}
 

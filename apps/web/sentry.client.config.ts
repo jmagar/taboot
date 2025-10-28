@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { parseSampleRate, resolveSentryEnvironment, scrubData } from '@/lib/sentry-utils';
 
-const SENTRY_DSN = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN;
+const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 if (SENTRY_DSN) {

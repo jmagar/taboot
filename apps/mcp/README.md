@@ -20,9 +20,8 @@ uv run python -m taboot.mcp.server --help
 uv run python -m taboot.mcp.server --port 8020
 ```
 
-The `taboot-app` container runs the MCP server alongside the API and web
-interfaces. Override its command or provide a supervisor if you need separate
-lifecycles.
+The `taboot-api` container runs the MCP server alongside the FastAPI surface.
+Override its command or provide a supervisor if you need separate lifecycles.
 
 ## Configuration
 

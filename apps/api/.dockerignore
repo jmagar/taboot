@@ -60,14 +60,14 @@ tests/
 .gitattributes
 .github/
 
-# Documentation
+# Documentation (keep README.md - required by hatchling build)
 *.md
+!README.md
 docs/
 specs/
 todos/
 
 # CI/CD
-.github/
 .gitlab-ci.yml
 .travis.yml
 
@@ -75,8 +75,3 @@ todos/
 .env
 .env.*
 !.env.example
-
-# Docker
-Dockerfile*
-docker-compose*.yml
-.dockerignore

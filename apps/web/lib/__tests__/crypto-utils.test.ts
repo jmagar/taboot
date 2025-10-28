@@ -15,7 +15,7 @@ describe("toBase64Url", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (globalThis as any).btoa = undefined;
 
-    const bytes = Uint8Array.from(Buffer.from("hello-world", "utf8"));
+    const bytes = new Uint8Array(Buffer.from("hello-world", "utf8"));
     const encoded = toBase64Url(bytes);
     expect(encoded).toBe("aGVsbG8td29ybGQ");
   });
@@ -41,5 +41,39 @@ describe("toBase64Url", () => {
     expect(() => toBase64Url("not-bytes" as unknown as Uint8Array)).toThrow(
       "Expected bytes to be a Uint8Array",
     );
+  });
+
+  it("handles empty Uint8Array", () => {
+    const bytes = new Uint8Array(0);
+    const encoded = toBase64Url(bytes);
+    expect(encoded).toBe("");
+  });
+
+  it("handles single byte Uint8Array", () => {
+    const bytes = new Uint8Array([65]); // ASCII 'A'
+    const encoded = toBase64Url(bytes);
+    // Base64 of 'A' is 'QQ==', url-safe removes padding -> 'QQ'
+    expect(encoded).toBe("QQ");
+  });
+
+  it("handles error when both btoa and Buffer are unavailable", () => {
+    // Save original Buffer
+    const originalBuffer = globalThis.Buffer;
+
+    try {
+      // Remove both btoa and Buffer
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (globalThis as any).btoa = undefined;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (globalThis as any).Buffer = undefined;
+
+      const bytes = new Uint8Array([65]);
+
+      // Should throw error when both are unavailable
+      expect(() => toBase64Url(bytes)).toThrow();
+    } finally {
+      // Restore Buffer
+      globalThis.Buffer = originalBuffer;
+    }
   });
 });

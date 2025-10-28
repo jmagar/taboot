@@ -129,10 +129,22 @@ class IngestYouTubeUseCase:
         # Step 2a: Normalize text to Markdown
         markdown = self.normalizer.normalize(doc.text)
 
+        # Filter metadata to only essential fields needed for chunking/retrieval
+        # This prevents LlamaIndex SentenceSplitter from failing when metadata
+        # serialization exceeds chunk_size (512 tokens)
+        filtered_metadata = {}
+        if doc.metadata:
+            # Only keep fields that are: (1) needed for retrieval or (2) small
+            allowed_keys = {"video_url", "title", "channel", "duration"}
+            filtered_metadata = {
+                k: v for k, v in doc.metadata.items()
+                if k in allowed_keys and isinstance(v, (str, int, float, bool))
+            }
+
         # Create a new Document with normalized text
         normalized_doc = LlamaDocument(
             text=markdown,
-            metadata=doc.metadata.copy() if doc.metadata else {},
+            metadata=filtered_metadata,
         )
 
         # Step 2b: Chunk the normalized document

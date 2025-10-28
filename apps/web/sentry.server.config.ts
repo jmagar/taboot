@@ -17,6 +17,9 @@ if (SENTRY_DSN) {
     // Setting this option to true will print useful information to the console while you're setting up Sentry.
     debug: false,
 
+    // Disable default PII collection (rely on explicit scrubbing in beforeSend)
+    sendDefaultPii: false,
+
     environment: resolveSentryEnvironment(),
 
     // Configure beforeSend to filter sensitive data
@@ -61,5 +64,5 @@ if (SENTRY_DSN) {
 }
 
 if (!SENTRY_DSN) {
-  console.log('Sentry integration disabled (SENTRY_DSN or NEXT_PUBLIC_SENTRY_DSN not configured)');
+  console.warn('Sentry integration disabled (SENTRY_DSN or NEXT_PUBLIC_SENTRY_DSN not configured)');
 }

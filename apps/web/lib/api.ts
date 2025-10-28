@@ -180,10 +180,18 @@ class CsrfAwareAPIClient extends TabootAPIClient {
     // Check response content-type before calling response.json()
     const contentType = response.headers.get("content-type");
     const isJson = contentType?.includes("application/json");
+    const isBinary = contentType?.includes("application/octet-stream") ||
+      contentType?.includes("application/pdf") ||
+      contentType?.startsWith("image/") ||
+      contentType?.startsWith("video/");
 
     let data: import("@taboot/api-client").APIResponse<T>;
     if (isJson) {
       data = await response.json();
+    } else if (isBinary) {
+      // For binary responses, return blob wrapped in success response
+      const blob = await response.blob();
+      data = { data: blob as T, error: null };
     } else {
       // For non-JSON responses, return text wrapped in success response
       const text = await response.text();

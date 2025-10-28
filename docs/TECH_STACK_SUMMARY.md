@@ -281,12 +281,14 @@ packages/retrieval/
 | `taboot-db` | ./docker/postgres/Dockerfile (16) | 5432 | PostgreSQL (Firecrawl metadata) |
 | `taboot-playwright` | ghcr.io/firecrawl/playwright-service | 3000 | Browser microservice |
 | `taboot-crawler` | ghcr.io/firecrawl/firecrawl | 3002 | Firecrawl orchestrator |
-| `taboot-app` | ./docker/app/Dockerfile (Python 3.13) | 8000 | FastAPI app |
+| `taboot-api` | ./docker/api/Dockerfile (Python 3.13) | 8000 | FastAPI HTTP service |
+| `taboot-web` | ./docker/web/Dockerfile (Node 22) | 3000 | Next.js dashboard |
 | `taboot-worker` | ./docker/worker/Dockerfile (Python 3.13) | — | Extraction worker (optional) |
 
 ### Health Checks
 - All services have structured health checks
-- Dependencies: `taboot-app` waits for healthy cache, vectors, graph, embed, db
+- Dependencies: `taboot-api` waits for healthy cache, vectors, graph, embed, db
+- Dependencies: `taboot-web` waits for healthy API + db
 - Startup delays: 10–60s
 
 ---

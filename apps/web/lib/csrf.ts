@@ -19,7 +19,11 @@ import { toBase64Url } from '@/lib/crypto-utils';
 const CSRF_TOKEN_COOKIE_NAME =
   process.env.NODE_ENV === 'production' ? '__Host-taboot.csrf' : 'taboot.csrf';
 const CSRF_TOKEN_HEADER_NAME = 'x-csrf-token';
-const CSRF_SECRET = process.env.CSRF_SECRET || process.env.AUTH_SECRET || 'development-csrf-secret';
+const CSRF_SECRET =
+  process.env.CSRF_SECRET ||
+  process.env.AUTH_SECRET ||
+  process.env.BETTER_AUTH_SECRET ||
+  'development-csrf-secret';
 
 // State-changing HTTP methods that require CSRF protection
 const PROTECTED_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];

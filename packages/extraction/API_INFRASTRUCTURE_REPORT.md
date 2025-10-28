@@ -31,20 +31,18 @@ app = FastAPI(
 
 ### Entry Point Context: Docker
 
-**Docker Service:** `taboot-app` (line 247 in docker-compose.yaml)
+**Docker Service:** `taboot-api` (line 247 in docker-compose.yaml)
 
 **Container Entry Command:**
 ```bash
 uvicorn apps.api.app:app --host 0.0.0.0 --port 8000
 ```
 
-**Dockerfile:** `/home/jmagar/code/taboot/docker/app/Dockerfile`
+**Dockerfile:** `/home/jmagar/code/taboot/docker/api/Dockerfile`
 - Multi-stage build (builder + runtime)
 - Base image: `python:3.13-slim`
 - Non-root user: `llamacrawl` (UID 10001)
-- Key dependencies installed via `uv pip install --system`:
-  - `llama-index-core`, `llama-index-vector-stores-qdrant`, `llama-index-graph-stores-neo4j`, `llama-index-llms-ollama`
-  - `firecrawl-py`, `qdrant-client`, `neo4j`, `redis`, `fastapi`, `uvicorn`, `pydantic`, `typer`, `spacy`
+- Dependencies installed with `uv sync --frozen --no-dev`, copied into runtime layer
 
 ---
 
@@ -436,11 +434,11 @@ config = get_config()
 
 ### Service Configuration
 
-**Service Name:** `taboot-app`
+**Service Name:** `taboot-api`
 **Build Context:** `.` (root of repository)
-**Dockerfile:** `docker/app/Dockerfile`
+**Dockerfile:** `docker/api/Dockerfile`
 **Image:** Auto-built
-**Container Name:** `taboot-app`
+**Container Name:** `taboot-api`
 
 ### Networking
 
@@ -451,9 +449,8 @@ config = get_config()
 
 ```yaml
 volumes:
-  - .:/app                              # Full source code
-  - ~/.ssh:/home/taboot/.ssh:ro         # SSH keys for auth
-  - ~/.ssh/config:/home/taboot/.ssh/config:ro
+  - taboot-api:/app/.venv
+  - ${HOME}/.ssh:/home/llamacrawl/.ssh:ro
 ```
 
 ### Environment Configuration
@@ -1019,10 +1016,9 @@ logger.info("Message", extra={"key1": value1, "key2": value2})
 | `/apps/api/app.py` | Main FastAPI app, lifespan, middleware, routes |
 | `/apps/api/middleware/logging.py` | Request logging middleware |
 | `/apps/api/routes/*.py` | Endpoint implementations |
-| `/docker/app/Dockerfile` | Multi-stage Docker build |
-| `/docker-compose.yaml` | Service orchestration (taboot-app section) |
+| `/docker/api/Dockerfile` | Multi-stage Docker build |
+| `/docker-compose.yaml` | Service orchestration (`taboot-api` section) |
 | `/packages/common/config/__init__.py` | Configuration singleton |
 | `/packages/common/health.py` | Health check functions |
 | `/tests/apps/api/conftest.py` | Test fixtures |
 | `/.env.example` | Environment template |
-

@@ -10,6 +10,7 @@ import time
 from llama_index.core import Document
 from llama_index.readers.web import FireCrawlWebReader
 
+from packages.common.config import get_config
 from packages.common.resilience import resilient_external_call
 
 logger = logging.getLogger(__name__)
@@ -130,9 +131,23 @@ class WebReader:
         # Enforce rate limiting
         self._enforce_rate_limit()
 
-        # Build Firecrawl params
-        # formats goes inside scrape_options per Firecrawl v2 API
-        params: dict[str, object] = {"scrape_options": {"formats": ["markdown"]}}
+        # Get locale config from environment (defaults to US/en-US)
+        config = get_config()
+
+        # Parse comma-separated languages into list
+        languages = [lang.strip() for lang in config.firecrawl_default_languages.split(",")]
+
+        # Build Firecrawl params with location parameter for language control
+        # Per Firecrawl v2 API: location parameter prevents auto-redirects to non-English locales
+        params: dict[str, object] = {
+            "scrape_options": {
+                "formats": ["markdown"],
+                "location": {
+                    "country": config.firecrawl_default_country,
+                    "languages": languages,
+                },
+            }
+        }
         if limit is not None:
             params["limit"] = limit
 

@@ -62,7 +62,17 @@ class PostgresDocumentStore:
                 ),
             )
 
-            # Store full content in separate table
+            # Check if insert was skipped due to duplicate content_hash
+            if cur.rowcount == 0:
+                logger.debug(
+                    f"Document with content_hash {document.content_hash[:16]}... already exists, "
+                    "skipping content insert (deduplication)"
+                )
+                # Commit the no-op transaction before returning
+                self.conn.commit()
+                return  # Early return - document already exists
+
+            # Only insert content if document was actually inserted
             cur.execute(
                 """
                 INSERT INTO rag.document_content (doc_id, content, created_at)

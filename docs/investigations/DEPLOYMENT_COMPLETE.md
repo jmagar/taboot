@@ -204,10 +204,10 @@ tail -f ${PROJECT_ROOT}/logs/cleanup.log
 docker compose up -d
 
 # Check logs for any errors
-docker compose logs -f taboot-app
+docker compose logs -f taboot-api
 
 # Verify API starts without AUTH_SECRET errors
-docker compose logs taboot-app | grep "AUTH_SECRET"
+docker compose logs taboot-api | grep "AUTH_SECRET"
 ```
 
 ### 2. Test Soft Delete Functionality

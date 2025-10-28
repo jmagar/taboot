@@ -311,10 +311,22 @@ class IngestWebUseCase:
         # Step 4a: Normalize HTML to Markdown
         markdown = self.normalizer.normalize(doc.text)
 
+        # Filter metadata to only essential fields needed for chunking/retrieval
+        # This prevents LlamaIndex SentenceSplitter from failing when metadata
+        # serialization exceeds chunk_size (512 tokens)
+        filtered_metadata = {}
+        if doc.metadata:
+            # Only keep fields that are: (1) needed for retrieval or (2) small
+            allowed_keys = {"source_url", "section", "title"}
+            filtered_metadata = {
+                k: v for k, v in doc.metadata.items()
+                if k in allowed_keys and isinstance(v, (str, int, float, bool))
+            }
+
         # Create a new Document with normalized text
         normalized_doc = LlamaDocument(
             text=markdown,
-            metadata=doc.metadata if doc.metadata else {},
+            metadata=filtered_metadata,
         )
 
         # Step 4b: Chunk the normalized document

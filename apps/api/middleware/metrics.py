@@ -10,7 +10,6 @@ Follows OBSERVABILITY.md requirements for HTTP request metrics.
 from __future__ import annotations
 
 import time
-
 from collections.abc import Awaitable, Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware

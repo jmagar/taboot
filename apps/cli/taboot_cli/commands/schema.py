@@ -40,7 +40,14 @@ def _style_status(status: str) -> str:
 
 
 def _format_checksum(checksum: str | None) -> str:
-    """Format checksum for display (truncate long values, show N/A when missing)."""
+    """Format checksum for display (truncate long values, show N/A when missing).
+
+    Args:
+        checksum: SHA-256 checksum string or None if checksum is unavailable
+
+    Returns:
+        Truncated checksum (first 16 chars with '...') or 'N/A' when missing.
+    """
     if checksum and len(checksum) >= 16:
         return checksum[:16] + "..."
     return checksum or "N/A"

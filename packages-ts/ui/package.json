@@ -15,6 +15,7 @@
   },
   "prettier": "@taboot/prettier-config",
   "dependencies": {
+    "@tailwindcss/postcss": "catalog:web",
     "@radix-ui/react-avatar": "catalog:web",
     "@radix-ui/react-dialog": "catalog:web",
     "@radix-ui/react-dropdown-menu": "catalog:web",
@@ -34,7 +35,6 @@
     "tw-animate-css": "catalog:web"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "catalog:web",
     "@types/node": "catalog:dev",
     "@types/react": "catalog:web",
     "@types/react-dom": "catalog:web",

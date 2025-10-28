@@ -12,9 +12,7 @@ vi.mock("../csrf-client", () => ({
 // Mock the TabootAPIClient
 vi.mock("@taboot/api-client", () => ({
   TabootAPIClient: class MockTabootAPIClient {
-    constructor(_config?: unknown) {
-      // Mock constructor
-    }
+    // Mock constructor - intentionally empty
   },
 }));
 
@@ -245,6 +243,122 @@ describe("CsrfAwareAPIClient FormData/Blob handling", () => {
       const headers = opts.headers as Headers;
 
       expect(headers.get("Content-Type")).toBe("application/json");
+    });
+
+    it("should pass URLSearchParams as-is without Content-Type", async () => {
+      const params = new URLSearchParams();
+      params.append("key1", "value1");
+      params.append("key2", "value2");
+
+      await api.post("/form-urlencoded", params);
+
+      const [, opts] = getCallByPath("/form-urlencoded");
+      const headers = opts.headers as Headers;
+
+      // URLSearchParams should be sent as-is
+      expect(opts.body).toBeInstanceOf(URLSearchParams);
+      // Content-Type should not be auto-set (browser will set application/x-www-form-urlencoded)
+      expect(headers.get("Content-Type")).toBeNull();
+    });
+
+    it("should pass Uint8Array/TypedArray without Content-Type and preserve binary body", async () => {
+      const buffer = new Uint8Array([0x48, 0x65, 0x6c, 0x6c, 0x6f]); // "Hello" in bytes
+
+      await api.post("/binary-data", buffer);
+
+      const [, opts] = getCallByPath("/binary-data");
+      const headers = opts.headers as Headers;
+
+      // Uint8Array should remain binary (ArrayBufferView)
+      expect(opts.body).toBeInstanceOf(Uint8Array);
+      // Content-Type should not be auto-set for binary data
+      expect(headers.get("Content-Type")).toBeNull();
+      // Body should not be stringified
+      expect(typeof opts.body).not.toBe("string");
+    });
+
+    it("should preserve Accept header when provided by caller", async () => {
+      const data = { test: "value" };
+      const customAccept = "application/vnd.api+json";
+
+      await api.post("/data", data, {
+        headers: { Accept: customAccept },
+      });
+
+      const [, opts] = getCallByPath("/data");
+      const headers = opts.headers as Headers;
+
+      // Custom Accept header should be preserved, not overwritten
+      expect(headers.get("Accept")).toBe(customAccept);
+      // Content-Type should still be set for JSON
+      expect(headers.get("Content-Type")).toBe("application/json");
+    });
+  });
+
+  describe("Binary response handling", () => {
+    it("should handle binary responses (application/octet-stream)", async () => {
+      const binaryData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]); // PNG header
+      const blob = new Blob([binaryData], { type: "application/octet-stream" });
+
+      mockCsrfFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/octet-stream" }),
+        blob: async () => blob,
+      });
+
+      const response = await api.get<Blob>("/download/binary");
+
+      expect(response.data).toBeInstanceOf(Blob);
+      expect(response.error).toBeNull();
+    });
+
+    it("should handle PDF responses", async () => {
+      const pdfBlob = new Blob(["%PDF-1.4"], { type: "application/pdf" });
+
+      mockCsrfFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/pdf" }),
+        blob: async () => pdfBlob,
+      });
+
+      const response = await api.get<Blob>("/download/document.pdf");
+
+      expect(response.data).toBeInstanceOf(Blob);
+      expect(response.error).toBeNull();
+    });
+
+    it("should handle image responses", async () => {
+      const imageBlob = new Blob(["fake-image-data"], { type: "image/png" });
+
+      mockCsrfFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "image/png" }),
+        blob: async () => imageBlob,
+      });
+
+      const response = await api.get<Blob>("/download/image.png");
+
+      expect(response.data).toBeInstanceOf(Blob);
+      expect(response.error).toBeNull();
+    });
+
+    it("should handle video responses", async () => {
+      const videoBlob = new Blob(["fake-video-data"], { type: "video/mp4" });
+
+      mockCsrfFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "video/mp4" }),
+        blob: async () => videoBlob,
+      });
+
+      const response = await api.get<Blob>("/download/video.mp4");
+
+      expect(response.data).toBeInstanceOf(Blob);
+      expect(response.error).toBeNull();
     });
   });
 });

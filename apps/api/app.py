@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 import redis.asyncio as redis
 from fastapi import FastAPI, Request, Response
@@ -24,10 +24,11 @@ logger = logging.getLogger(__name__)
 
 # Single source of truth for version
 try:
+    from importlib.metadata import PackageNotFoundError
     from importlib.metadata import version as get_version
 
     VERSION = get_version("taboot")
-except Exception:
+except (PackageNotFoundError, ImportError):
     # Fallback for development or when package not installed
     VERSION = os.getenv("TABOOT_VERSION", "0.4.0")
 
@@ -74,7 +75,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "max_connections": config.redis_max_connections,
             },
         )
-    except Exception as e:
+    except (ConnectionError, TimeoutError, OSError) as e:
         logger.exception("Failed to initialize Redis client", extra={"error": str(e)})
         raise
 
@@ -93,7 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "max_pool_size": config.neo4j_max_pool_size,
             },
         )
-    except Exception as e:
+    except (ConnectionError, TimeoutError, OSError) as e:
         logger.exception("Failed to initialize Neo4j client", extra={"error": str(e)})
         # Close Redis before re-raising
         if hasattr(app.state, "redis"):
@@ -118,7 +119,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "max_connections": config.qdrant_max_connections,
             },
         )
-    except Exception as e:
+    except (ConnectionError, TimeoutError, OSError) as e:
         logger.exception("Failed to initialize Qdrant client", extra={"error": str(e)})
         # Close existing clients before re-raising
         if hasattr(app.state, "neo4j_client"):
@@ -141,7 +142,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "max_pool_size": config.postgres_max_pool_size,
             },
         )
-    except Exception as e:
+    except (ConnectionError, TimeoutError, OSError) as e:
         logger.exception("Failed to initialize PostgreSQL pool", extra={"error": str(e)})
         # Close existing clients before re-raising
         if hasattr(app.state, "qdrant_client"):

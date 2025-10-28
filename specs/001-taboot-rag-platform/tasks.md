@@ -116,7 +116,7 @@ This task list implements the Taboot Doc-to-Graph RAG platform using TDD methodo
 #### Embedder
 
 - [X] T043 [P] [US1] Write test for embedder in tests/packages/ingest/test_embedder.py
-- [X] T044 [P] [US1] Create packages/ingest/embedder.py implementing TEI client for batch embedding (Qwen3-Embedding-0.6B, 768-dim)
+- [X] T044 [P] [US1] Create packages/ingest/embedder.py implementing TEI client for batch embedding (Qwen3-Embedding-0.6B, 1024-dim)
 
 #### Qdrant Writer
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@taboot/db';
+import { prisma, Prisma } from '@taboot/db';
 import { auth } from '@taboot/auth';
 import { logger } from '@/lib/logger';
+import { checkAdminAuthorization } from '@/lib/auth-helpers';
 
 /**
  * Validate IP address format (IPv4 or IPv6).
@@ -67,6 +68,12 @@ function getClientIp(request: Request): string | undefined {
  * User can erase own account, admin can erase any account
  *
  * This is IRREVERSIBLE unlike soft delete
+ *
+ * SOFT DELETE CONTEXT:
+ * Soft delete context (user ID, IP, user-agent) is automatically set by
+ * apps/web/middleware.ts for all authenticated API requests.
+ * No manual context management is needed in this route.
+ * All Prisma delete operations will have proper audit trail metadata.
  */
 export async function POST(
   request: NextRequest,
@@ -79,39 +86,17 @@ export async function POST(
       headers: request.headers,
     });
 
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const userId = id;
-    const currentUserId = session.user.id;
 
     // Authorization: user can erase own account OR admin can erase any account
-    const adminUserId = process.env.ADMIN_USER_ID;
-
-    // SECURITY: Fail closed on admin operations
-    // If attempting to erase another user's account but admin not configured, reject
-    if (currentUserId !== userId && !adminUserId) {
-      logger.error('Admin erasure attempted but ADMIN_USER_ID not configured', {
-        attemptedBy: currentUserId,
-        targetUser: userId,
-      });
-      return NextResponse.json(
-        { error: 'Service not configured for admin operations' },
-        { status: 503 }
-      );
+    const authError = checkAdminAuthorization(session, userId, 'erasure');
+    if (authError) {
+      return authError;
     }
 
-    const isAdmin = adminUserId !== undefined && currentUserId === adminUserId;
-    const canErase = currentUserId === userId || isAdmin;
-
-    if (!canErase) {
-      logger.warn('Unauthorized erasure attempt', {
-        attemptedBy: currentUserId,
-        targetUser: userId,
-      });
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const currentUserId = session!.user.id;
+    const adminUserId = process.env.ADMIN_USER_ID?.trim();
+    const isAdmin = Boolean(adminUserId) && currentUserId === adminUserId;
 
     // Find the user to erase
     const userToErase = await prisma.user.findUnique({
@@ -127,8 +112,7 @@ export async function POST(
     const ipAddress = getClientIp(request);
 
     // GDPR erasure: atomic transaction to ensure consistency
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await prisma.$transaction(async (tx: any) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Anonymize user PII in the user record
       await tx.user.update({
         where: { id: userId },
@@ -151,9 +135,9 @@ export async function POST(
         where: { userId },
       });
 
-      // 4. Delete all verification tokens (use userId FK for efficiency)
+      // 4. Delete all verification tokens (use email identifier)
       await tx.verification.deleteMany({
-        where: { userId },
+        where: { identifier: userToErase.email },
       });
 
       // 5. Delete all two-factor auth entries
@@ -161,15 +145,31 @@ export async function POST(
         where: { userId },
       });
 
-      // 6. Anonymize audit log entries (keep action, remove PII)
-      await tx.auditLog.updateMany({
+      // 6. Anonymize audit log entries - preserve non-PII metadata while removing PII
+      // Read existing audit logs to preserve non-PII context
+      const auditLogsToUpdate = await tx.auditLog.findMany({
         where: { userId },
-        data: {
-          ipAddress: 'anonymized',
-          userAgent: 'anonymized',
-          metadata: { gdpr_erased: true },
-        },
+        select: { id: true, metadata: true },
       });
+
+      // For each log, merge metadata while preserving non-PII fields
+      for (const log of auditLogsToUpdate) {
+        const existingMetadata =
+          (log.metadata as Record<string, unknown>) || {};
+        const mergedMetadata = {
+          ...existingMetadata,
+          gdpr_erased: true,
+        };
+
+        await tx.auditLog.update({
+          where: { id: log.id },
+          data: {
+            ipAddress: 'anonymized',
+            userAgent: 'anonymized',
+            metadata: mergedMetadata,
+          },
+        });
+      }
 
       // 7. Create erasure audit log entry with minimal PII
       await tx.auditLog.create({
@@ -231,6 +231,9 @@ export async function POST(
  *
  * Preview what will be erased (for confirmation UI)
  * User can preview own account erasure, admin can preview any
+ *
+ * SOFT DELETE CONTEXT:
+ * Context is set by middleware but not used in this read-only preview.
  */
 export async function GET(
   request: NextRequest,
@@ -243,38 +246,12 @@ export async function GET(
       headers: request.headers,
     });
 
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const userId = id;
-    const currentUserId = session.user.id;
 
     // Authorization: user can preview own erasure OR admin can preview any
-    const adminUserId = process.env.ADMIN_USER_ID;
-
-    // SECURITY: Fail closed on admin operations
-    // If attempting to preview another user's erasure but admin not configured, reject
-    if (currentUserId !== userId && !adminUserId) {
-      logger.error('Admin preview attempted but ADMIN_USER_ID not configured', {
-        attemptedBy: currentUserId,
-        targetUser: userId,
-      });
-      return NextResponse.json(
-        { error: 'Service not configured for admin operations' },
-        { status: 503 }
-      );
-    }
-
-    const isAdmin = adminUserId !== undefined && currentUserId === adminUserId;
-    const canPreview = currentUserId === userId || isAdmin;
-
-    if (!canPreview) {
-      logger.warn('Unauthorized erasure preview attempt', {
-        attemptedBy: currentUserId,
-        targetUser: userId,
-      });
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const authError = checkAdminAuthorization(session, userId, 'erasure preview');
+    if (authError) {
+      return authError;
     }
 
     // Fetch data that will be erased

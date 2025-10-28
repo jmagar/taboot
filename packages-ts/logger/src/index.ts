@@ -48,3 +48,5 @@ export const logger = {
     log('error', message, meta);
   },
 };
+
+export type Logger = typeof logger;

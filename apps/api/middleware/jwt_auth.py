@@ -73,7 +73,7 @@ def _ensure_env_loaded() -> None:
     """Ensure .env configuration is loaded before reading process environment."""
     try:
         from packages.common.config import ensure_env_loaded
-    except Exception as exc:  # pragma: no cover - defensive logging
+    except ImportError as exc:  # pragma: no cover - defensive logging
         logger.debug("ensure_env_loaded import skipped", extra={"error": str(exc)})
     else:
         ensure_env_loaded()

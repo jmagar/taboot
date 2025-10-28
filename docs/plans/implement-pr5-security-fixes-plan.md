@@ -136,7 +136,7 @@ export const AUTH_BEARER_PREFIX = 'Bearer ';
 
 #### T3: Add Docker SHELL Directive
 **Files:**
-- `docker/app/Dockerfile`
+- `docker/api/Dockerfile`
 - `docker/worker/Dockerfile`
 
 **Objective:** Enable fail-fast builds with `set -e`
@@ -254,7 +254,7 @@ try {
 ---
 
 #### T6: Fix Supervisord Server Path
-**File:** `docker/app/supervisord.conf`
+**File:** `docker/app/supervisord.conf` (legacy; container replaced by `docker/api` + `docker/web`)
 
 **Objective:** Restore correct Next.js server path
 
@@ -270,14 +270,7 @@ stderr_logfile=/var/log/supervisor/web-stderr.log
 stdout_logfile=/var/log/supervisor/web-stdout.log
 ```
 
-**Changes:**
-- Fix path: `server.js` → `apps/web/server.js`
-- Add `startretries=3` (limit restart loops)
-
-**Validation:**
-- Verify supervisord starts successfully
-- Test server.js exists at expected path
-- Test process starts and serves requests
+**Note:** With the unified container deprecated, ensure `docker/web/Dockerfile` launches `node apps/web/server.js` directly.
 - Test restart limit prevents infinite loops
 
 **Reference:** Code Review Report - Issues C-5, I-3

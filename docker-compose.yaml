@@ -105,7 +105,7 @@ services:
       RERANKER_DEVICE: ${RERANKER_DEVICE:-auto}
       HF_TOKEN: ${HF_TOKEN:-}
     volumes:
-      - taboot-rerank:/root/.cache/huggingface
+      - huggingface-cache:/root/.cache/huggingface
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
       interval: 30s
@@ -172,7 +172,7 @@ services:
       OLLAMA_USE_MMAP: "true"
       OLLAMA_MAX_QUEUE: "20000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      test: ["CMD", "ollama", "list"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -248,14 +248,15 @@ services:
     <<: *common-base
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: docker/api/Dockerfile
+      additional_contexts:
+        packages: ./packages
     container_name: taboot-api
     env_file:
       - .env
     environment:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
-      - taboot-api:/app/.venv
       - ${HOME}/.ssh:/home/llamacrawl/.ssh:ro
     ports:
       - "${TABOOT_HTTP_PORT:-8000}:8000"
@@ -267,6 +268,8 @@ services:
       taboot-graph:
         condition: service_healthy
       taboot-embed:
+        condition: service_healthy
+      taboot-ollama:
         condition: service_healthy
       taboot-db:
         condition: service_healthy
@@ -281,7 +284,13 @@ services:
     <<: *common-base
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
+      dockerfile: docker/web/Dockerfile
+      additional_contexts:
+        packages-ts: ./packages-ts
+      cache_from:
+        - type=registry,ref=taboot/web:buildcache
+      cache_to:
+        - type=inline
     container_name: taboot-web
     env_file:
       - .env
@@ -308,9 +317,13 @@ services:
     build:
       context: .
       dockerfile: docker/worker/Dockerfile
+      additional_contexts:
+        packages: ./packages
     container_name: taboot-worker
     env_file:
       - .env
+    volumes:
+      - spacy-models:/root/.spacy/data
     depends_on:
       taboot-cache:
         condition: service_healthy
@@ -321,6 +334,8 @@ services:
       taboot-embed:
         condition: service_healthy
       taboot-rerank:
+        condition: service_healthy
+      taboot-ollama:
         condition: service_healthy
       taboot-db:
         condition: service_healthy
@@ -342,7 +357,8 @@ volumes:
   taboot-cache:
   taboot-ollama:
   taboot-db:
-  taboot-api:
+  huggingface-cache:
+  spacy-models:
 
 networks:
   taboot-net:

@@ -30,6 +30,7 @@ def mock_config() -> TabootConfig:
         qdrant_url="http://localhost:6333",
         redis_url="redis://localhost:6379",
         tei_embedding_url="http://localhost:80",
+        ollama_url="http://localhost:11434",
         ollama_port=11434,
         firecrawl_api_url="http://localhost:3002",
         playwright_microservice_url="http://localhost:3000/scrape",
@@ -186,10 +187,14 @@ class TestOllamaHealth:
 
         with (
             patch("packages.common.health.get_config", return_value=mock_config),
-            patch("packages.common.health.httpx.AsyncClient.get", return_value=mock_response),
+            patch("packages.common.health.httpx.AsyncClient.get", return_value=mock_response) as mock_get,
         ):
             result = await check_ollama_health()
             assert result is True
+            # Verify it uses config.ollama_url instead of hardcoded container name
+            mock_get.assert_called_once()
+            called_url = mock_get.call_args[0][0]
+            assert "localhost" in called_url, "Should use localhost from config, not container name"
 
     @pytest.mark.asyncio
     async def test_ollama_unhealthy(self, mock_config: TabootConfig) -> None:

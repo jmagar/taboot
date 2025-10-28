@@ -3,6 +3,7 @@ import { isIP } from 'node:net';
 import { prisma, restoreUser } from '@taboot/db';
 import { auth } from '@taboot/auth';
 import { logger } from '@/lib/logger';
+import { checkAdminAuthorization } from '@/lib/auth-helpers';
 
 /**
  * Validate IP address format (IPv4 or IPv6).
@@ -67,28 +68,14 @@ export async function POST(
       headers: request.headers,
     });
 
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Check admin authorization (user can restore their own account or admin can restore any)
+    const authResult = checkAdminAuthorization(session, id, 'restore');
+    if (authResult) {
+      return authResult;
     }
 
-    // Admin authorization check (single-user system: allow first user or env-configured admin)
-    const adminUserId = process.env.ADMIN_USER_ID;
-    if (!adminUserId) {
-      logger.error('ADMIN_USER_ID not configured for restore operation');
-      return NextResponse.json(
-        { error: 'Service not configured' },
-        { status: 503 }
-      );
-    }
-
-    if (session.user.id !== adminUserId) {
-      logger.warn('Unauthorized restore attempt', {
-        attemptedBy: session.user.id,
-        targetUser: id,
-      });
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
+    // TypeScript: session.user is guaranteed non-null after authorization check
+    const currentUserId = session!.user!.id;
     const userId = id;
 
     // Find the soft-deleted user (using findFirst since deletedAt is not unique)
@@ -111,7 +98,7 @@ export async function POST(
     const userAgent = request.headers.get('user-agent') || undefined;
 
     // Restore the user
-    await restoreUser(prisma, userId, session.user.id, {
+    await restoreUser(prisma, userId, currentUserId, {
       ipAddress,
       userAgent,
     });
@@ -158,26 +145,10 @@ export async function GET(
       headers: request.headers,
     });
 
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Admin authorization check (single-user system: allow first user or env-configured admin)
-    const adminUserId = process.env.ADMIN_USER_ID;
-    if (!adminUserId) {
-      logger.error('ADMIN_USER_ID not configured for restore operation');
-      return NextResponse.json(
-        { error: 'Service not configured' },
-        { status: 503 }
-      );
-    }
-
-    if (session.user.id !== adminUserId) {
-      logger.warn('Unauthorized restore attempt', {
-        attemptedBy: session.user.id,
-        targetUser: id,
-      });
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Check admin authorization (user can view their own deleted account or admin can view any)
+    const authResult = checkAdminAuthorization(session, id, 'restore');
+    if (authResult) {
+      return authResult;
     }
 
     const userId = id;

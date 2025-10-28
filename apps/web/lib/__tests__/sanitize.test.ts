@@ -72,6 +72,26 @@ describe('sanitizeErrorMessage', () => {
         'The bearer [REDACTED] this message'
       );
     });
+
+    it('should redact email when it appears before Bearer token', () => {
+      // Pattern order: email redacted first, then Bearer token
+      expect(
+        sanitizeErrorMessage('Failed for user@example.com with Bearer abc123')
+      ).toBe('Failed for [REDACTED] with Bearer [REDACTED]');
+    });
+
+    it('should redact email even in unrealistic Bearer email edge case', () => {
+      // Edge case: "Bearer user@example.com" is not a realistic token format
+      // but email pattern still redacts it before Bearer pattern runs
+      expect(sanitizeErrorMessage('Bearer user@example.com')).toBe(
+        'Bearer [REDACTED]'
+      );
+
+      // More realistic: Bearer token followed by email in error message
+      expect(
+        sanitizeErrorMessage('Auth failed: Bearer xyz123 for admin@company.com')
+      ).toBe('Auth failed: Bearer [REDACTED] for [REDACTED]');
+    });
   });
 
   describe('Session ID Pattern', () => {

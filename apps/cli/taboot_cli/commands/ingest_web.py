@@ -16,11 +16,23 @@ import asyncio
 import logging
 from contextlib import ExitStack
 from datetime import UTC, datetime
-from types import ModuleType
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated, Protocol
 
 import typer
 from rich.console import Console
+
+if TYPE_CHECKING:
+    class RedisClient(Protocol):
+        """Protocol for async Redis client."""
+
+        async def close(self) -> None:
+            """Close the Redis connection."""
+
+    class RedisAsyncModule(Protocol):
+        """Protocol for redis.asyncio module."""
+
+        def from_url(self, url: str, *args, **kwargs) -> RedisClient:
+            """Create Redis client from URL."""
 
 from apps.cli.taboot_cli.commands import ingest_app as app
 from packages.clients.postgres_document_store import PostgresDocumentStore
@@ -37,10 +49,10 @@ from packages.schemas.models import Document as DocumentModel
 from packages.schemas.models import JobState
 from packages.vector.writer import QdrantWriter
 
-redis_async: ModuleType | None
+redis_async: RedisAsyncModule | None
 try:
     from redis import asyncio as redis_async
-except ModuleNotFoundError:  # pragma: no cover - redis optional in some test suites
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - optional dependency
     redis_async = None
 
 console = Console()
@@ -98,7 +110,7 @@ def ingest_web_command(
         # Initialize resources with ExitStack to ensure cleanup
         with ExitStack() as stack:
             embedder = Embedder(
-                tei_url=str(tei_settings.url),
+                tei_url=str(tei_settings.url).rstrip("/"),
                 batch_size=tei_settings.batch_size,
                 timeout=float(tei_settings.timeout),
             )
@@ -215,20 +227,43 @@ def _register_subcommands() -> None:
 
     app.command(name="docker-compose")(ingest_docker_compose_command)
 
-    # Register external API subcommands
-    from apps.cli.taboot_cli.commands.ingest_elasticsearch import (
-        ingest_elasticsearch_command,
-    )
-    from apps.cli.taboot_cli.commands.ingest_github import ingest_github_command
-    from apps.cli.taboot_cli.commands.ingest_gmail import ingest_gmail_command
-    from apps.cli.taboot_cli.commands.ingest_reddit import ingest_reddit_command
-    from apps.cli.taboot_cli.commands.ingest_youtube import ingest_youtube_command
+    # Register external API subcommands (skip if dependencies missing)
+    try:
+        from apps.cli.taboot_cli.commands.ingest_elasticsearch import (
+            ingest_elasticsearch_command,
+        )
 
-    app.command(name="github")(ingest_github_command)
-    app.command(name="reddit")(ingest_reddit_command)
-    app.command(name="youtube")(ingest_youtube_command)
-    app.command(name="gmail")(ingest_gmail_command)
-    app.command(name="elasticsearch")(ingest_elasticsearch_command)
+        app.command(name="elasticsearch")(ingest_elasticsearch_command)
+    except (ModuleNotFoundError, ImportError):
+        logger.debug("Elasticsearch reader dependencies not installed, skipping command")
+
+    try:
+        from apps.cli.taboot_cli.commands.ingest_github import ingest_github_command
+
+        app.command(name="github")(ingest_github_command)
+    except (ModuleNotFoundError, ImportError):
+        logger.debug("GitHub reader dependencies not installed, skipping command")
+
+    try:
+        from apps.cli.taboot_cli.commands.ingest_reddit import ingest_reddit_command
+
+        app.command(name="reddit")(ingest_reddit_command)
+    except (ModuleNotFoundError, ImportError):
+        logger.debug("Reddit reader dependencies not installed, skipping command")
+
+    try:
+        from apps.cli.taboot_cli.commands.ingest_youtube import ingest_youtube_command
+
+        app.command(name="youtube")(ingest_youtube_command)
+    except (ModuleNotFoundError, ImportError):
+        logger.debug("YouTube reader dependencies not installed, skipping command")
+
+    try:
+        from apps.cli.taboot_cli.commands.ingest_gmail import ingest_gmail_command
+
+        app.command(name="gmail")(ingest_gmail_command)
+    except (ModuleNotFoundError, ImportError):
+        logger.debug("Gmail reader dependencies not installed, skipping command")
 
 
 # Register subcommands on module load

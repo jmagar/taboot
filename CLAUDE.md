@@ -217,12 +217,30 @@ await restoreUser(prisma, userId, currentUserId, {
 });
 ```
 
-**Setting Context for Audit Trail:**
+**Context Management for Audit Trail:**
+
+Soft delete context tracks who performed the deletion for audit purposes. Currently, this is handled manually in route handlers:
+
+```typescript
+// Current pattern (manual context in route handlers)
+export async function DELETE(request: NextRequest) {
+  const session = await auth.api.getSession({ headers: request.headers });
+
+  // Context is implicitly available through session.user.id
+  // Used by soft delete middleware when delete() is called
+  await prisma.user.delete({ where: { id } });
+  // → deletedBy field automatically set to currentUserId from session
+}
+```
+
+**Context API (for advanced use cases):**
+
+Manual context management is available but typically not needed in route handlers:
 
 ```typescript
 import { setSoftDeleteContext, clearSoftDeleteContext } from '@taboot/db';
 
-// In API middleware
+// Manual context setting (advanced - not needed in typical API routes)
 const requestId = `req-${Date.now()}`;
 setSoftDeleteContext(requestId, {
   userId: session.user.id,
@@ -236,12 +254,88 @@ setSoftDeleteContext(requestId, {
 clearSoftDeleteContext(requestId);
 ```
 
+**Automatic Context Management (Recommended Pattern):**
+
+For production applications, context should be automatically set by middleware for all authenticated API requests. This eliminates manual context management and ensures consistent audit trails:
+
+```typescript
+// apps/web/middleware.ts - Automatic context setup
+import { setSoftDeleteContext, clearSoftDeleteContext } from '@taboot/db';
+
+export async function middleware(request: NextRequest) {
+  // ... existing CSRF and auth checks ...
+
+  // For authenticated API routes, set soft delete context
+  if (pathname.startsWith('/api') && session?.user) {
+    const requestId = `req-${Date.now()}-${Math.random()}`;
+
+    // Set context for this request
+    setSoftDeleteContext(requestId, {
+      userId: session.user.id,
+      ipAddress: getClientIp(request),
+      userAgent: request.headers.get('user-agent') ?? undefined,
+    });
+
+    // Process request
+    const response = NextResponse.next();
+
+    // Clean up context after response (use response middleware)
+    response.headers.set('x-request-id', requestId);
+
+    // Note: Context cleanup happens in response handling
+    // or via AsyncLocalStorage pattern for automatic cleanup
+    return response;
+  }
+
+  return NextResponse.next();
+}
+
+// In route handlers - context automatically available
+export async function DELETE(request: NextRequest) {
+  const session = await auth.api.getSession({ headers: request.headers });
+
+  // No manual context management needed!
+  // Middleware already set context via setSoftDeleteContext()
+  await prisma.user.delete({ where: { id } });
+  // → deletedBy, ipAddress, userAgent automatically logged
+}
+```
+
+**Implementation Files:**
+
+- `apps/web/lib/soft-delete-context.ts` - Context storage and helpers (planned)
+- `apps/web/middleware.ts` - Automatic context injection for authenticated requests (planned)
+- `packages-ts/db/src/middleware/soft-delete.ts` - Soft delete implementation with context support
+
+**Edge Cases:**
+
+1. **Anonymous requests:** Context defaults to `{ userId: 'system' }` if no session
+2. **Non-API routes:** Middleware skips context setup for static/page routes
+3. **Background jobs:** Must manually set context or use system user
+4. **Request cleanup:** Use AsyncLocalStorage pattern for automatic cleanup on request completion
+
+**Best Practices:**
+
+1. **Route handlers:** Get session via `auth.api.getSession()` - soft delete middleware uses session context automatically
+2. **IP addresses:** Use trusted headers only when `TRUST_PROXY=true`; validate IP format before using
+3. **Audit logging:** Critical operations (erasure, restoration) should manually log to `AuditLog` table
+4. **Testing:** Use `prisma.$executeRaw` to bypass middleware for test cleanup
+5. **Middleware pattern:** Set context once in middleware, not in every route handler
+
+**Current Status:**
+
+- Soft delete middleware: ✅ Implemented in `packages-ts/db/src/middleware/soft-delete.ts`
+- Context API: ✅ Available via `setSoftDeleteContext()` / `clearSoftDeleteContext()`
+- Automatic middleware setup: ⚠️ Not yet implemented - currently manual in route handlers
+- AsyncLocalStorage cleanup: ⚠️ Not yet implemented - manual cleanup required
+
 **Important Notes:**
 
 - Only User model has soft delete (Session/Account cascade naturally when User soft-deleted)
 - Hard cascade deletes (`onDelete: Cascade`) still work but won't trigger if User is soft-deleted
-- For testing, use raw SQL to bypass middleware: `prisma.$executeRaw`
 - Audit logs are never deleted (permanent compliance record)
+- Soft delete context is stored in-memory (does not persist across server restarts)
+- Context management is request-scoped (cleared after each request completes)
 
 ## Code Style & Conventions
 

@@ -1,5 +1,7 @@
 """Hybrid retriever combining vector search with graph traversal."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from packages.graph.traversal import GraphTraversal
@@ -20,7 +22,11 @@ class HybridRetriever:
         neo4j_password: str,
         reranker_model: str = "Qwen/Qwen3-Reranker-0.6B",
         reranker_device: str = "auto",
+        reranker_url: str = "http://taboot-rerank:8000",
+        reranker_timeout: float = 30.0,
+        reranker_batch_size: int = 16,
         tei_embedding_url: str | None = None,
+        reranker: Reranker | None = None,
     ):
         """
         Initialize hybrid retriever.
@@ -31,9 +37,13 @@ class HybridRetriever:
             neo4j_uri: Neo4j connection URI
             neo4j_username: Neo4j username
             neo4j_password: Neo4j password
-            reranker_model: Reranker model name
-            reranker_device: Reranker device ('cpu', 'cuda', 'auto')
-            tei_embedding_url: TEI API URL for query embedding
+            reranker_model: Logical reranker model identifier.
+            reranker_device: Desired device hint (forwarded for logging).
+            reranker_url: HTTP URL for reranker microservice.
+            reranker_timeout: Timeout for reranker calls in seconds.
+            reranker_batch_size: Batch size hint for reranker requests.
+            tei_embedding_url: TEI API URL for query embedding.
+            reranker: Optional preconfigured reranker instance (useful for tests).
         """
         self.qdrant_url = qdrant_url
         self.neo4j_uri = neo4j_uri
@@ -41,7 +51,13 @@ class HybridRetriever:
         # Initialize components
         self.vector_search = VectorSearch(qdrant_url=qdrant_url, collection_name=qdrant_collection)
 
-        self.reranker = Reranker(model_name=reranker_model, device=reranker_device, batch_size=16)
+        self.reranker = reranker or Reranker(
+            model_name=reranker_model,
+            device=reranker_device,
+            batch_size=reranker_batch_size,
+            base_url=reranker_url,
+            timeout=reranker_timeout,
+        )
 
         self.graph_traversal = GraphTraversal(
             neo4j_uri=neo4j_uri, username=neo4j_username, password=neo4j_password, max_hops=2
@@ -131,4 +147,6 @@ class HybridRetriever:
 
     def close(self) -> None:
         """Close connections."""
+        if hasattr(self.reranker, "close"):
+            self.reranker.close()
         self.graph_traversal.close()

@@ -110,11 +110,12 @@ Desktop.ini
 
 # --------------------------------------------
 # Environment & credentials
-# Ignore ALL env files except .env.example
+# Ignore ALL env files except .env.example and .env.local.example
 # .envrc is safe to commit (it just loads .env)
 # --------------------------------------------
 *env*
 !.env.example
+!.env.local.example
 !.envrc
 config.yaml
 credentials.json
@@ -128,7 +129,9 @@ token.json
 # --------------------------------------------
 *.log
 logs/
+.logs/
 *.pid
+.pids/
 *.db
 *.sqlite
 *.sqlite3

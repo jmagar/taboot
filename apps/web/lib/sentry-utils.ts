@@ -1,4 +1,18 @@
+/**
+ * Sensitive keys to redact from Sentry reports
+ *
+ * These keys are stripped from all objects before being sent to Sentry to prevent
+ * PII/secret leakage in error reports. Keys are matched case-insensitively.
+ *
+ * Categories:
+ * - Authentication: password, token, authorization, api keys
+ * - Session: session_id, sid, cookie headers
+ * - PII: email, phone, address, ssn
+ * - Network: IP addresses, forwarding headers
+ * - Security: CSRF tokens
+ */
 const SCRUB_KEYS = new Set([
+  // Authentication & Authorization
   'email',
   'password',
   'pass',
@@ -10,10 +24,31 @@ const SCRUB_KEYS = new Set([
   'apikey',
   'key',
   'secret',
+  'x-api-key',
+  'x-authorization',
+  'x-auth-token',
+
+  // Session Management
   'sessionid',
+  'session_id',
+  'sid',
+  'cookie',
+  'set-cookie',
+
+  // Personal Identifiable Information
   'phone',
   'address',
   'ssn',
+
+  // Network & IP
+  'ip',
+  'ip_address',
+  'x-forwarded-for',
+  'x-real-ip',
+
+  // Security
+  'csrf',
+  'x-csrf-token',
 ]);
 
 export const scrubData = (data: unknown): unknown => {

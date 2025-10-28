@@ -322,8 +322,7 @@ open http://localhost:8000/docs
 | Routes | `apps/api/routes/*.py` |
 | Config | `packages/common/config/__init__.py` |
 | Health checks | `packages/common/health.py` |
-| Docker build | `docker/app/Dockerfile` |
+| Docker build | `docker/api/Dockerfile` |
 | Compose service | `docker-compose.yaml` (line 247) |
 | Test config | `tests/apps/api/conftest.py` |
 | Environment | `.env.example` |
-

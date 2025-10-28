@@ -1,98 +1,109 @@
-"""Reranking using Qwen3-Reranker-0.6B via SentenceTransformers."""
+"""HTTP client for the dedicated reranker microservice."""
 
-import torch
-from sentence_transformers import CrossEncoder
+from __future__ import annotations
+
+import logging
+from typing import Sequence
+
+import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class Reranker:
-    """Rerank search results using cross-encoder model."""
+    """Client for the Qwen3 reranker microservice."""
 
     def __init__(
         self,
         model_name: str = "Qwen/Qwen3-Reranker-0.6B",
         device: str = "auto",
         batch_size: int = 16,
-    ):
-        """
-        Initialize reranker with cross-encoder model.
+        *,
+        base_url: str = "http://taboot-rerank:8000",
+        timeout: float = 30.0,
+        client: httpx.Client | None = None,
+    ) -> None:
+        """Initialize the reranker client.
 
         Args:
-            model_name: HuggingFace model identifier
-            device: Device to use ('cpu', 'cuda', 'auto')
-            batch_size: Batch size for reranking
+            model_name: Logical model identifier (for logging/telemetry).
+            device: Requested device (kept for compatibility; forwarded via logs).
+            batch_size: Batch size hint (forwarded to service when relevant).
+            base_url: Base URL of the reranker service.
+            timeout: Request timeout in seconds.
+            client: Optional pre-configured httpx.Client (primarily for tests).
         """
         self.model_name = model_name
+        self.device = device
         self.batch_size = batch_size
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
 
-        # Determine device
-        if device == "auto":
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        else:
-            self.device = device
+        self._client = client or httpx.Client(timeout=self.timeout)
+        self._owns_client = client is None
 
-        # Load cross-encoder model
-        self.model = CrossEncoder(model_name=model_name, device=self.device, max_length=512)
+    def _post_rerank(self, query: str, passages: Sequence[str]) -> tuple[list[float], list[int]]:
+        """Send rerank request to the microservice and parse response."""
+        if not passages:
+            return [], []
 
-        # Configure padding token for batch processing
-        if self.model.tokenizer.pad_token is None:
-            self.model.tokenizer.pad_token = self.model.tokenizer.eos_token
-            self.model.tokenizer.pad_token_id = self.model.tokenizer.eos_token_id
+        payload = {"query": query, "documents": list(passages)}
+        try:
+            response = self._client.post(
+                f"{self.base_url}/rerank",
+                json=payload,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:  # pragma: no cover - network errors
+            logger.exception("Reranker request failed: %s", exc)
+            raise RuntimeError(f"Reranker request failed: {exc}") from exc
 
-        # Update model config to use padding token
-        if hasattr(self.model.model, "config"):
-            self.model.model.config.pad_token_id = self.model.tokenizer.pad_token_id
+        data = response.json()
+
+        scores_raw = data.get("scores", [])
+        ranking_raw = data.get("ranking", [])
+
+        if not isinstance(scores_raw, list) or not isinstance(ranking_raw, list):
+            raise RuntimeError("Reranker returned invalid payload")
+
+        try:
+            scores = [float(score) for score in scores_raw]
+            ranking = [int(idx) for idx in ranking_raw]
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("Reranker returned non-numeric payload") from exc
+
+        return scores, ranking
 
     def rerank(self, query: str, passages: list[str], top_n: int = 5) -> list[float]:
-        """
-        Rerank passages by relevance to query.
+        """Return top-n scores for passages."""
+        scores, ranking = self._post_rerank(query, passages)
 
-        Args:
-            query: Query string
-            passages: List of passage texts
-            top_n: Number of top passages to return
-
-        Returns:
-            List of relevance scores for top_n passages
-        """
-        if not passages:
+        if not scores or not ranking:
             return []
 
-        # Create query-passage pairs
-        pairs = [[query, passage] for passage in passages]
-
-        # Score pairs in batches
-        scores = self.model.predict(pairs, batch_size=self.batch_size, show_progress_bar=False)
-
-        # Get top-n scores
-        top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_n]
-
-        return [float(scores[i]) for i in top_indices]
+        top_indices = ranking[:top_n]
+        return [scores[idx] for idx in top_indices if 0 <= idx < len(scores)]
 
     def rerank_with_indices(
         self, query: str, passages: list[str], top_n: int = 5
     ) -> list[tuple[int, float]]:
-        """
-        Rerank passages and return indices with scores.
+        """Return (index, score) tuples sorted by relevance."""
+        scores, ranking = self._post_rerank(query, passages)
 
-        Args:
-            query: Query string
-            passages: List of passage texts
-            top_n: Number of top passages to return
-
-        Returns:
-            List of (index, score) tuples for top_n passages
-        """
-        if not passages:
+        if not scores or not ranking:
             return []
 
-        # Create query-passage pairs
-        pairs = [[query, passage] for passage in passages]
+        scored = [(idx, scores[idx]) for idx in ranking if 0 <= idx < len(scores)]
+        return scored[:top_n]
 
-        # Score pairs
-        scores = self.model.predict(pairs, batch_size=self.batch_size, show_progress_bar=False)
+    def close(self) -> None:
+        """Close the underlying HTTP client if owned."""
+        if self._owns_client:
+            self._client.close()
 
-        # Get top-n (index, score) pairs
-        scored_indices = [(i, float(scores[i])) for i in range(len(scores))]
-        scored_indices.sort(key=lambda x: x[1], reverse=True)
-
-        return scored_indices[:top_n]
+    def __del__(self) -> None:  # pragma: no cover - best-effort cleanup
+        try:
+            self.close()
+        except Exception:
+            pass

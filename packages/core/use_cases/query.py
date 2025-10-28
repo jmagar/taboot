@@ -16,6 +16,11 @@ def execute_query(
     neo4j_password: str,
     qdrant_collection: str = "documents",
     ollama_base_url: str = "http://localhost:11434",
+    reranker_url: str = "http://localhost:8000",
+    reranker_timeout: float = 30.0,
+    reranker_model: str = "Qwen/Qwen3-Reranker-0.6B",
+    reranker_device: str = "auto",
+    reranker_batch_size: int = 16,
     top_k: int = 20,
     rerank_top_n: int = 5,
     source_types: list[str] | None = None,
@@ -60,6 +65,11 @@ def execute_query(
         neo4j_username=neo4j_username,
         neo4j_password=neo4j_password,
         ollama_base_url=ollama_base_url,
+        reranker_url=reranker_url,
+        reranker_timeout=reranker_timeout,
+        reranker_model=reranker_model,
+        reranker_device=reranker_device,
+        reranker_batch_size=reranker_batch_size,
     )
     engine = QAQueryEngine(config=config)
 

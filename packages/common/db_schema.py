@@ -493,7 +493,7 @@ def get_postgres_client() -> connection:
             host=host,
             port=config.postgres_port,
             user=config.postgres_user,
-            password=config.postgres_password,
+            password=config.postgres_password.get_secret_value(),
             database=config.postgres_db,
             cursor_factory=RealDictCursor,
         )

@@ -1,8 +1,9 @@
 import Redis from 'ioredis';
 import { RateLimiterRedis, RateLimiterRes } from 'rate-limiter-flexible';
 import { isIP } from 'node:net';
+import { getRedisUrl } from './container-detection';
 
-const redisUrl = process.env.REDIS_URL || 'redis://taboot-cache:6379';
+const redisUrl = getRedisUrl();
 
 // Only allow stub during actual Next.js build phase
 const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build';

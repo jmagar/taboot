@@ -63,6 +63,11 @@ from __future__ import annotations
     neo4j_user: str = os.getenv("NEO4J_USER") or "neo4j"
     neo4j_password: str = os.getenv("NEO4J_PASSWORD") or "changeme"
     ollama_url: str = os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434"
+    reranker_url: str = os.getenv("RERANKER_URL") or "http://localhost:8000"
+    reranker_timeout: float = float(os.getenv("RERANKER_TIMEOUT", "30"))
+    reranker_model: str = os.getenv("RERANKER_MODEL") or "Qwen/Qwen3-Reranker-0.6B"
+    reranker_device: str = os.getenv("RERANKER_DEVICE") or "auto"
+    reranker_batch_size: int = int(os.getenv("RERANKER_BATCH_SIZE", "16"))
 
     try:
         # Execute query
@@ -74,6 +79,11 @@ from __future__ import annotations
                 neo4j_username=neo4j_user,
                 neo4j_password=neo4j_password,
                 ollama_base_url=ollama_url,
+                reranker_url=reranker_url,
+                reranker_timeout=reranker_timeout,
+                reranker_model=reranker_model,
+                reranker_device=reranker_device,
+                reranker_batch_size=reranker_batch_size,
                 top_k=top_k,
                 source_types=source_types,
                 after=after_date,

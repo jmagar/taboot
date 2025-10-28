@@ -32,7 +32,7 @@ describe('CSRF Client', () => {
     if (originalDocument !== undefined) {
       (global as any).document = originalDocument;
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+       
       delete (global as any).document;
     }
     // Restore all global stubs

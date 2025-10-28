@@ -3,7 +3,7 @@
 import hashlib
 import json
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
@@ -20,7 +20,7 @@ class ApiKeyStore:
     Key format: "api_key:{key_hash}" -> JSON serialized ApiKey
     """
 
-    def __init__(self, redis_client: "Redis[bytes]") -> None:
+    def __init__(self, redis_client: "Redis") -> None:
         """Initialize with Redis client.
 
         Args:

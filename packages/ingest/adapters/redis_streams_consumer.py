@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import Any, Awaitable, Callable, cast
+from collections.abc import Awaitable, Callable, Iterable
+from typing import Any, cast
 from uuid import UUID
 
 from redis.asyncio import Redis
@@ -76,7 +76,7 @@ class RedisDocumentEventConsumer:
 
         xack = cast(
             Callable[..., Awaitable[int]],
-            getattr(self.redis_client, "xack"),
+            self.redis_client.xack,
         )
         await xack(self.stream_name, self.group_name, *ids)
 

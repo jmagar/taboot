@@ -77,7 +77,15 @@ _DEFAULT_ENV_FILE = _resolve_env_file()
 
 
 def ensure_env_loaded() -> None:
-    """Load environment variables from disk exactly once."""
+    """Load environment variables from disk exactly once.
+
+    Loads .env first, then .env.local (if it exists) to override for local development.
+
+    Raises:
+        FileNotFoundError: If env file explicitly set via TABOOT_ENV_FILE but not found
+        PermissionError: If env file cannot be read due to permissions
+        OSError: If env file cannot be read due to I/O issues
+    """
     global _ENV_LOADED
 
     with _ENV_LOCK:
@@ -86,7 +94,23 @@ def ensure_env_loaded() -> None:
 
         env_path = _DEFAULT_ENV_FILE or _resolve_env_file()
         if env_path:
-            load_dotenv(env_path, override=False)
+            try:
+                # Load .env first
+                load_dotenv(env_path, override=False)
+
+                # Load .env.local for local development overrides
+                # (uses localhost instead of Docker names)
+                env_local_path = Path(env_path).parent / ".env.local"
+                if env_local_path.is_file():
+                    load_dotenv(env_local_path, override=True)
+            except (FileNotFoundError, PermissionError, OSError) as e:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.exception(
+                    "Failed to load environment file", extra={"env_path": env_path, "error": str(e)}
+                )
+                raise
 
         _ENV_LOADED = True
 
@@ -132,6 +156,7 @@ class TabootConfig(BaseSettings):
     neo4j_uri: str = "bolt://taboot-graph:7687"
     tei_embedding_url: str = "http://taboot-embed:80"
     reranker_url: str = "http://taboot-rerank:8000"
+    ollama_url: str = "http://taboot-ollama:11434"
     playwright_microservice_url: str = "http://taboot-playwright:3000/scrape"
 
     # ========== Database Credentials ==========
@@ -167,6 +192,7 @@ class TabootConfig(BaseSettings):
     reranker_model: str = "Qwen/Qwen3-Reranker-0.6B"
     reranker_batch_size: int = 16
     reranker_device: str = "auto"  # "auto", "cuda", or "cpu"
+    reranker_timeout: int = 30
 
     # ========== Ollama LLM Config ==========
     ollama_port: int = 11434
@@ -208,6 +234,8 @@ class TabootConfig(BaseSettings):
 
     # ========== Firecrawl Config ==========
     firecrawl_api_key: SecretStr = SecretStr("changeme")
+    firecrawl_default_country: str = "US"  # ISO 3166-1 alpha-2 country code
+    firecrawl_default_languages: str = "en-US"  # Comma-separated locale codes
     num_workers_per_queue: int = 16
     worker_concurrency: int = 8
     scrape_concurrency: int = 8
@@ -241,6 +269,7 @@ class TabootConfig(BaseSettings):
 
         if not _is_running_in_container():
             # Rewrite URLs to use localhost with mapped ports
+            self.postgres_host = "localhost"
             self.tei_embedding_url = "http://localhost:8080"
             self.qdrant_url = "http://localhost:7000"
             self.neo4j_uri = "bolt://localhost:7687"

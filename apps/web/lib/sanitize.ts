@@ -73,6 +73,15 @@ export function sanitizeErrorMessage(message: string): string {
   // Pattern 2: Bearer tokens (context-aware, very low false positive rate)
   // Expanded to include dots and underscores common in JWTs
   // Preserve case of "Bearer" keyword using callback
+  //
+  // Note: Bearer tokens are expected to be base64/JWTs. An email inside a Bearer value
+  // (e.g., "Bearer user@example.com") is not a realistic token case, but the email will
+  // still be redacted by Pattern 1 (email rule) before this pattern runs.
+  //
+  // Pattern execution order is intentional:
+  // 1. Email → 2. Bearer → 3. Session → 4. Hex → 5. Base64
+  // This ensures emails are redacted regardless of context, including edge cases like
+  // "Failed for user@example.com with Bearer abc123" (email redacted, Bearer token preserved)
   sanitized = sanitized.replace(
     /(Bearer)\s+([\w._-]+)/gi,
     (match, bearer) => `${bearer} [REDACTED]`

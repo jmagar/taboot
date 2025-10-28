@@ -16,6 +16,9 @@
   "references": [
     {
       "path": "../../packages-ts/utils"
+    },
+    {
+      "path": "../../packages-ts/user-lifecycle"
     }
   ],
   "include": [

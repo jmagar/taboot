@@ -14,7 +14,9 @@ Per MIGRATIONS.md:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import suppress
+from typing import Any
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
@@ -222,10 +224,14 @@ class QdrantMigration:
         """
         # Delete existing alias if it exists
         with suppress(Exception):
-            self.client.delete_alias(alias_name=alias_name)
+            delete_alias: Callable[..., Any] | None = getattr(self.client, "delete_alias", None)
+            if delete_alias:
+                delete_alias(alias_name=alias_name)
 
-        # Create new alias
-        self.client.create_alias(collection_name=collection_name, alias_name=alias_name)
+        create_alias: Callable[..., Any] | None = getattr(self.client, "create_alias", None)
+        if not create_alias:
+            raise AttributeError("Qdrant client does not support create_alias operation")
+        create_alias(collection_name=collection_name, alias_name=alias_name)
 
 
 # Export public API

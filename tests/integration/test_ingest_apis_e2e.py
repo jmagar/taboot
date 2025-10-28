@@ -14,9 +14,9 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import pytest
 from llama_index.core import Document as LlamaDocument
 
-import pytest
 from packages.common.config import TabootConfig, get_config
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder

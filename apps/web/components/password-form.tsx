@@ -1,8 +1,9 @@
 'use client';
 
 import { useHasPassword } from '@/hooks/use-has-password';
+import { queryKeys } from '@/lib/query-keys';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { changePassword } from '@taboot/auth/client';
 import { Button } from '@taboot/ui/components/button';
 import {
@@ -36,6 +37,7 @@ interface PasswordFormProps {
 }
 
 export function PasswordForm({ onSuccess }: PasswordFormProps) {
+  const queryClient = useQueryClient();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -82,6 +84,10 @@ export function PasswordForm({ onSuccess }: PasswordFormProps) {
       return payload;
     },
     onSuccess: () => {
+      // Invalidate hasPassword query after setting password
+      // This will update the UI to show password change form instead of set form
+      void queryClient.invalidateQueries({ queryKey: queryKeys.auth.hasPassword() });
+
       toast.success(`Password set successfully!`);
       form.reset();
       onSuccess?.();
@@ -101,6 +107,10 @@ export function PasswordForm({ onSuccess }: PasswordFormProps) {
       return result;
     },
     onSuccess: () => {
+      // Invalidate hasPassword query after password change
+      // Password change doesn't affect session state
+      void queryClient.invalidateQueries({ queryKey: queryKeys.auth.hasPassword() });
+
       toast.success('Password changed successfully!');
       form.reset();
       onSuccess?.();

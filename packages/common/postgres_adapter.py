@@ -48,7 +48,7 @@ class PostgresDocumentsClient(DocumentRepository):
         Returns:
             List of Document instances.
         """
-        query = "SELECT * FROM documents WHERE 1=1"
+        query = "SELECT * FROM rag.documents WHERE 1=1"
         params: list[str | int] = []
 
         if source_type:
@@ -83,7 +83,7 @@ class PostgresDocumentsClient(DocumentRepository):
         Returns:
             Total count of matching documents.
         """
-        query = "SELECT COUNT(*) as count FROM documents WHERE 1=1"
+        query = "SELECT COUNT(*) as count FROM rag.documents WHERE 1=1"
         params: list[str | int] = []
 
         if source_type:
@@ -104,7 +104,7 @@ class PostgresDocumentsClient(DocumentRepository):
         """Retrieve a single document by identifier."""
 
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT * FROM documents WHERE doc_id = %s", (str(doc_id),))
+            cur.execute("SELECT * FROM rag.documents WHERE doc_id = %s", (str(doc_id),))
             row = cur.fetchone()
 
         if not row:
@@ -116,7 +116,7 @@ class PostgresDocumentsClient(DocumentRepository):
         """Return documents pending extraction processing."""
 
         query = """
-            SELECT * FROM documents
+            SELECT * FROM rag.documents
             WHERE extraction_state = %s
             ORDER BY ingested_at ASC
         """
@@ -136,7 +136,10 @@ class PostgresDocumentsClient(DocumentRepository):
         """Fetch raw document content for the given document."""
 
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT content FROM document_content WHERE doc_id = %s", (str(doc_id),))
+            cur.execute(
+                "SELECT content FROM rag.document_content WHERE doc_id = %s",
+                (str(doc_id),),
+            )
             row = cur.fetchone()
 
         if not row:
@@ -150,7 +153,7 @@ class PostgresDocumentsClient(DocumentRepository):
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                UPDATE documents SET
+                UPDATE rag.documents SET
                     source_url = %s,
                     source_type = %s,
                     content_hash = %s,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import Depends, Header, HTTPException, Request, status
 from redis.asyncio import Redis
@@ -20,15 +20,13 @@ async def get_redis_client(request: Request) -> Redis:
         request: FastAPI Request object (injected).
 
     Returns:
-        redis.Redis[bytes]: Async Redis client (returns bytes, not decoded strings).
+        redis.Redis: Async Redis client (returns bytes, not decoded strings).
     """
-    from typing import cast
-
     return cast(Redis, request.app.state.redis)
 
 
 async def verify_api_key(
-    redis_client: Annotated[Redis, Depends(get_redis_client)],  # noqa: B008
+    redis_client: Annotated[Redis, Depends(get_redis_client)],
     x_api_key: Annotated[str | None, Header(description="API key for authentication")] = None,
 ) -> bool:
     """Verify API key from X-API-Key header.

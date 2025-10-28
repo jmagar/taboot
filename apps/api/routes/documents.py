@@ -25,11 +25,18 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 def list_documents(
     limit: Annotated[
         int,
-        Query(ge=1, le=100, description="Maximum documents to return"),
+        Query(
+            ge=1,
+            le=100,
+            description="Maximum documents to return",
+        ),
     ] = 10,
     offset: Annotated[
         int,
-        Query(ge=0, description="Number of documents to skip (pagination)"),
+        Query(
+            ge=0,
+            description="Number of documents to skip (pagination)",
+        ),
     ] = 0,
     source_type: Annotated[
         str | None,

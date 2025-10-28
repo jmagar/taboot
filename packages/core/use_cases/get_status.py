@@ -101,7 +101,7 @@ class GetStatusUseCase:
 
     def __init__(
         self,
-        redis_client: Redis[bytes],
+        redis_client: Redis,
         health_checker: Callable[[], Awaitable[SystemHealthStatus]],
     ) -> None:
         """Initialize GetStatusUseCase with dependencies.

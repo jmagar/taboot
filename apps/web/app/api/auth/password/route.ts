@@ -1,101 +1,129 @@
-import { auth } from '@taboot/auth';
-import { prisma } from '@taboot/db';
-import { passwordSchema } from '@taboot/utils';
-import { logger } from '@/lib/logger';
-import { NextResponse } from 'next/server';
+/**
+ * Password Management API
+ *
+ * Security Features:
+ * - CSRF Protection: All state-changing requests protected by middleware (origin/referer + double-submit token)
+ * - Rate Limiting: 5 requests per 10 minutes per IP
+ * - Authentication: Requires valid session
+ * - Input Validation: Zod schemas with strict password requirements
+ */
 
-export async function GET(req: Request) {
+import { auth } from '@taboot/auth';
+import { logger } from '@/lib/logger';
+import { passwordRateLimit } from '@/lib/rate-limit';
+import { withRateLimit } from '@/lib/with-rate-limit';
+import { revalidateSessionCache } from '@/lib/cache-utils';
+import {
+  hasPasswordResponseSchema,
+  setPasswordRequestSchema,
+  setPasswordResponseSchema,
+  errorResponseSchema,
+  type HasPasswordResponse,
+  type SetPasswordRequest,
+  type SetPasswordResponse,
+} from '@/lib/schemas/auth';
+import { authService } from '@/services/auth.service';
+import { NextResponse } from 'next/server';
+import { ZodError } from 'zod';
+
+async function handleGET(req: Request) {
   try {
     const session = await auth.api.getSession({ headers: req.headers });
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const error = errorResponseSchema.parse({ error: 'Unauthorized' });
+      return NextResponse.json(error, { status: 401 });
     }
 
-    // Check if user has a password in their account
-    const account = await prisma.account.findFirst({
-      where: {
-        userId: session.user.id,
-        providerId: 'credential',
-      },
-      select: {
-        password: true,
+    // Use AuthService to check if user has a password
+    const hasPassword = await authService.hasPassword(session.user.id);
+
+    // Validate response with schema
+    const response: HasPasswordResponse = hasPasswordResponseSchema.parse({ hasPassword });
+
+    return NextResponse.json(response, {
+      headers: {
+        // Private cache (user-specific), max-age 5 minutes, stale-while-revalidate 10 minutes
+        'Cache-Control': 'private, max-age=300, stale-while-revalidate=600',
       },
     });
-
-    const hasPassword = !!account?.password;
-
-    return NextResponse.json({ hasPassword });
   } catch (error) {
+    if (error instanceof ZodError) {
+      logger.error('Response validation error', { error: error.issues });
+      const errorResponse = errorResponseSchema.parse({
+        error: 'Internal validation error',
+      });
+      return NextResponse.json(errorResponse, { status: 500 });
+    }
+
     logger.error('Error checking password status', { error });
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const errorResponse = errorResponseSchema.parse({ error: 'Internal server error' });
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   try {
     const session = await auth.api.getSession({ headers: req.headers });
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const error = errorResponseSchema.parse({ error: 'Unauthorized' });
+      return NextResponse.json(error, { status: 401 });
     }
 
-    let newPasswordRaw: unknown;
+    // Parse and validate request body
+    let requestData: SetPasswordRequest;
     try {
       const body = await req.json();
-      if (!body || typeof body !== 'object') {
-        logger.warn('Password request body is not an object');
-        return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-      }
-      newPasswordRaw = (body as { newPassword?: unknown }).newPassword;
+      requestData = setPasswordRequestSchema.parse(body);
     } catch (parseError) {
+      if (parseError instanceof ZodError) {
+        logger.warn('Invalid password request payload', { errors: parseError.issues });
+        const errorResponse = errorResponseSchema.parse({
+          error: parseError.issues[0]?.message || 'Invalid request body',
+        });
+        return NextResponse.json(errorResponse, { status: 400 });
+      }
       logger.warn('Invalid password request payload', { error: parseError });
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+      const errorResponse = errorResponseSchema.parse({ error: 'Invalid request body' });
+      return NextResponse.json(errorResponse, { status: 400 });
     }
 
-    if (typeof newPasswordRaw !== 'string') {
-      return NextResponse.json(
-        { error: 'Password must be provided as a string' },
-        { status: 400 },
-      );
+    // Use AuthService to set password (includes validation for existing password)
+    try {
+      await authService.setPassword(session.user.id, requestData.newPassword, req.headers);
+    } catch (serviceError) {
+      if (serviceError instanceof Error && serviceError.message.includes('already exists')) {
+        const errorResponse = errorResponseSchema.parse({
+          error: serviceError.message,
+        });
+        return NextResponse.json(errorResponse, { status: 400 });
+      }
+      throw serviceError;
     }
 
-    const validation = passwordSchema.safeParse(newPasswordRaw);
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Password must be 8-100 characters long' },
-        { status: 400 },
-      );
-    }
-    const newPassword = validation.data;
+    // Invalidate session cache after password change
+    await revalidateSessionCache();
 
-    // Check if user already has a credential account with password
-    const existingAccount = await prisma.account.findFirst({
-      where: {
-        userId: session.user.id,
-        providerId: 'credential',
-      },
+    // Validate response with schema
+    const response: SetPasswordResponse = setPasswordResponseSchema.parse({
+      message: 'Password set successfully',
     });
 
-    if (existingAccount?.password) {
-      return NextResponse.json(
-        {
-          error: 'Password already exists. Please use change password instead.',
-        },
-        { status: 400 },
-      );
-    }
-
-    const result = await auth.api.setPassword({
-      body: { newPassword },
-      headers: req.headers,
-    });
-
-    if (!result.status) {
-      return NextResponse.json({ error: 'Failed to set password' }, { status: 400 });
-    }
-
-    return NextResponse.json({ message: 'Password set successfully' });
+    return NextResponse.json(response);
   } catch (error) {
+    if (error instanceof ZodError) {
+      logger.error('Response validation error', { error: error.issues });
+      const errorResponse = errorResponseSchema.parse({
+        error: 'Internal validation error',
+      });
+      return NextResponse.json(errorResponse, { status: 500 });
+    }
+
     logger.error('Error setting password', { error });
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const errorResponse = errorResponseSchema.parse({ error: 'Internal server error' });
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }
+
+// Export rate-limited handlers
+export const GET = withRateLimit(handleGET, passwordRateLimit);
+export const POST = withRateLimit(handlePOST, passwordRateLimit);

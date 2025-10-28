@@ -23,6 +23,11 @@ class QAConfig:
     llm_model: str = "qwen3:4b"
     llm_temperature: float = 0.0
     tei_embedding_url: str | None = None
+    reranker_url: str = "http://taboot-rerank:8000"
+    reranker_timeout: float = 30.0
+    reranker_model: str = "Qwen/Qwen3-Reranker-0.6B"
+    reranker_device: str = "auto"
+    reranker_batch_size: int = 16
 
 
 class QAQueryEngine:
@@ -44,6 +49,11 @@ class QAQueryEngine:
             neo4j_uri=config.neo4j_uri,
             neo4j_username=config.neo4j_username,
             neo4j_password=config.neo4j_password,
+            reranker_model=config.reranker_model,
+            reranker_device=config.reranker_device,
+            reranker_url=config.reranker_url,
+            reranker_timeout=config.reranker_timeout,
+            reranker_batch_size=config.reranker_batch_size,
             tei_embedding_url=config.tei_embedding_url,
         )
 

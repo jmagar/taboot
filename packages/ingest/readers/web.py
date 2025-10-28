@@ -6,11 +6,11 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 
 import logging
 import time
-from typing import cast
 
 from llama_index.core import Document
 from llama_index.readers.web import FireCrawlWebReader
 
+from packages.common.config import get_config
 from packages.common.resilience import resilient_external_call
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,14 @@ class RateLimitError(WebReaderError):
 class WebReader:
     """Web document reader using Firecrawl API.
 
-    Implements rate limiting, error handling, and robots.txt compliance.
+    Implements rate limiting, error handling, robots.txt compliance, and URL path filtering.
+
+    Path Filtering (Firecrawl v2):
+    - include_paths: Whitelist regex patterns for URL paths to crawl
+    - exclude_paths: Blacklist regex patterns for URL paths to skip (takes precedence)
+    - Patterns match pathname only (e.g., "/en/docs" not "https://example.com/en/docs")
+    - Configured via FIRECRAWL_INCLUDE_PATHS and FIRECRAWL_EXCLUDE_PATHS environment variables
+    - Default: Blocks 17 common non-English language paths (de, fr, es, etc.)
     """
 
     def __init__(
@@ -96,7 +103,7 @@ class WebReader:
             params=params,
         )
 
-        docs = cast(list[Document], reader.load_data(url=url))
+        docs = reader.load_data(url=url)
 
         # Add source_url to metadata
         for doc in docs:
@@ -131,11 +138,46 @@ class WebReader:
         # Enforce rate limiting
         self._enforce_rate_limit()
 
-        # Build Firecrawl params
-        # formats goes inside scrape_options per Firecrawl v2 API
-        params: dict[str, object] = {"scrape_options": {"formats": ["markdown"]}}
+        # Get locale config from environment (defaults to US/en-US)
+        config = get_config()
+
+        # Parse comma-separated languages into list
+        languages = [lang.strip() for lang in config.firecrawl_default_languages.split(",")]
+
+        # Build Firecrawl params with location parameter for language control
+        # Per Firecrawl v2 API: location parameter prevents auto-redirects to non-English locales
+        params: dict[str, object] = {
+            "scrape_options": {
+                "formats": ["markdown"],
+                "location": {
+                    "country": config.firecrawl_default_country,
+                    "languages": languages,
+                },
+            }
+        }
         if limit is not None:
             params["limit"] = limit
+
+        # Build path filtering parameters (Firecrawl v2 URL filtering)
+        # includePaths: Whitelist regex patterns for paths to crawl
+        # excludePaths: Blacklist regex patterns for paths to skip (takes precedence)
+        # Parse comma-separated config strings into lists, filtering empty strings
+        include_paths: list[str] = [
+            pattern.strip()
+            for pattern in config.firecrawl_include_paths.split(",")
+            if pattern.strip()
+        ]
+        exclude_paths: list[str] = [
+            pattern.strip()
+            for pattern in config.firecrawl_exclude_paths.split(",")
+            if pattern.strip()
+        ]
+
+        # Add to params if non-empty
+        if include_paths:
+            params["include_paths"] = include_paths
+        if exclude_paths:
+            params["exclude_paths"] = exclude_paths
 
         try:
             docs = self._fetch_with_firecrawl(url, params)

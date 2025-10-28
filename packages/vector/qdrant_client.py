@@ -78,7 +78,7 @@ class QdrantVectorClient:
 
             self.client = QdrantClient(
                 url=url,
-                timeout=30.0,
+                timeout=30,
             )
             logger.info(
                 "Qdrant client initialized with connection pooling",

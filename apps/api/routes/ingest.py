@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from functools import lru_cache
+from types import ModuleType
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
@@ -24,10 +25,12 @@ from datetime import UTC, datetime
 from apps.api.deps.auth import verify_api_key
 from packages.common.validators import URLValidationError, validate_url
 from packages.core.use_cases.ingest_web import IngestWebUseCase
+from packages.ingest.adapters.redis_streams_publisher import RedisDocumentEventPublisher
 from packages.ingest.chunker import Chunker
 from packages.ingest.embedder import Embedder
 from packages.ingest.normalizer import Normalizer
 from packages.ingest.readers.web import WebReader
+from packages.ingest.services.document_events import DocumentEventDispatcher
 from packages.schemas.models import (
     Document as DocumentModel,
 )
@@ -38,13 +41,11 @@ from packages.schemas.models import (
 )
 from packages.vector.writer import QdrantWriter
 
+redis_async: ModuleType | None
 try:
     from redis import asyncio as redis_async
 except ModuleNotFoundError:  # pragma: no cover - redis optional in some test suites
     redis_async = None
-
-from packages.ingest.adapters.redis_streams_publisher import RedisDocumentEventPublisher
-from packages.ingest.services.document_events import DocumentEventDispatcher
 
 logger = logging.getLogger(__name__)
 

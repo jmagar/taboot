@@ -19,8 +19,8 @@ def db_connection() -> None:
 
     # Cleanup
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM document_content")
-        cur.execute("DELETE FROM documents")
+        cur.execute("DELETE FROM rag.document_content")
+        cur.execute("DELETE FROM rag.documents")
     conn.commit()
     conn.close()
 
@@ -142,3 +142,59 @@ def test_get_content_raises_on_missing_document(document_store) -> None:
 
     with pytest.raises(KeyError, match=str(missing_id)):
         document_store.get_content(missing_id)
+
+
+def test_duplicate_content_hash_handles_fk_constraint(document_store, db_connection) -> None:
+    """Test that duplicate content_hash doesn't cause FK constraint violation.
+
+    Reproduces bug: When content_hash already exists, ON CONFLICT DO NOTHING
+    skips the documents insert, then document_content insert fails with FK error.
+    """
+    # Create first document with content
+    content = "Test content for duplicate detection"
+    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    doc1 = Document(
+        doc_id=uuid4(),
+        source_url="https://example.com/original",
+        source_type=SourceType.WEB,
+        content_hash=content_hash,
+        ingested_at=datetime.now(UTC),
+        extraction_state=ExtractionState.PENDING,
+        extraction_version=None,
+        updated_at=datetime.now(UTC),
+        metadata={},
+    )
+
+    # First insert should succeed
+    document_store.create(doc1, content)
+
+    # Create second document with SAME content_hash but different doc_id/URL
+    doc2 = Document(
+        doc_id=uuid4(),  # Different doc_id
+        source_url="https://example.com/duplicate",  # Different URL
+        source_type=SourceType.WEB,
+        content_hash=content_hash,  # SAME content_hash
+        ingested_at=datetime.now(UTC),
+        extraction_state=ExtractionState.PENDING,
+        extraction_version=None,
+        updated_at=datetime.now(UTC),
+        metadata={},
+    )
+
+    # Second insert should NOT raise FK constraint error
+    # Currently FAILS with: IntegrityError: insert or update on table "document_content"
+    # violates foreign key constraint "document_content_doc_id_fkey"
+    document_store.create(doc2, content)  # This should handle gracefully
+
+    # Verify: Only first document exists (deduplication worked)
+    with db_connection.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM rag.documents WHERE content_hash = %s", (content_hash,))
+        result = cur.fetchone()
+        count = result['count'] if isinstance(result, dict) else result[0]
+        assert count == 1, f"Should have exactly one document with this content_hash, got count={count}"
+
+        cur.execute("SELECT doc_id FROM rag.documents WHERE content_hash = %s", (content_hash,))
+        result2 = cur.fetchone()
+        stored_doc_id = result2['doc_id'] if isinstance(result2, dict) else result2[0]
+        assert stored_doc_id == str(doc1.doc_id), "Should keep first document's doc_id"

@@ -1,118 +1,132 @@
-# Taboot Web - Next.js Multi-stage Dockerfile
-# Based on build-elevate template with Taboot-specific adaptations
+# syntax=docker/dockerfile:1.7-labs
 
+# -------------------------------
+# Base stage - setup pnpm and turbo
+# -------------------------------
 FROM node:22-alpine AS base
 
-# Development stage - used for local development with hot reload
+# Enable fail-fast: exit immediately on error, fail on pipe errors, fail on undefined variables
+SHELL ["/bin/sh", "-euo", "pipefail", "-c"]
+
+# Install system dependencies and package managers
+ENV PNPM_HOME="/root/.local/share/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN set -eux; \
+    apk update && apk upgrade && apk add --no-cache libc6-compat \
+    && npm install -g pnpm@10.4.1 \
+    && pnpm config set global-bin-dir "$PNPM_HOME" \
+    && pnpm add -g turbo@2.3.3
+
+# -------------------------------
+# Development stage (optional, for local dev with Docker)
+# -------------------------------
 FROM base AS development
 
-ARG PNPM_VERSION=9.12.3
-ARG TURBO_VERSION=2.1.3
-
-RUN apk update && apk upgrade
-RUN apk add --no-cache libc6-compat
-
-# Install pnpm and configure PNPM_HOME
-ENV PNPM_HOME="/root/.local/share/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-
-RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate && \
-    pnpm config set global-bin-dir "$PNPM_HOME"
-
 WORKDIR /app
 
-# Copy package files for dependency installation
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
-COPY packages-ts/ ./packages-ts/
-COPY apps/web/package.json ./apps/web/
+# Copy workspace configuration
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY turbo.json ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Copy all packages and apps for development
+COPY packages-ts ./packages-ts
+COPY apps/web ./apps/web
 
-# Copy application code
-COPY apps/web/ ./apps/web/
+# Install all dependencies (including dev)
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    set -eux; \
+    pnpm install --frozen-lockfile
 
-# Expose Next.js dev server port
 EXPOSE 3000
+CMD ["pnpm", "--filter", "@taboot/web", "dev"]
 
-# Development command (overridden by docker-compose)
-CMD ["pnpm", "dev", "--filter", "@taboot/web"]
-
-# Builder stage - builds the production application
+# -------------------------------
+# Builder stage - prune workspace for web app
+# -------------------------------
 FROM base AS builder
 
-ARG PNPM_VERSION=9.12.3
-ARG TURBO_VERSION=2.1.3
-
-RUN apk update && apk upgrade
-RUN apk add --no-cache libc6-compat
-
-# Install pnpm and Turborepo
-ENV PNPM_HOME="/root/.local/share/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-
-RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate && \
-    pnpm config set global-bin-dir "$PNPM_HOME"
-
 WORKDIR /app
 
-# Copy entire workspace for Turbo prune
-COPY . .
+# Copy web app and workspace files
+COPY apps/web ./apps/web
+COPY --from=packages-ts . ./packages-ts
+# Copy workspace config from web context
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json turbo.json ./
 
-# Prune workspace to only web app dependencies
-RUN pnpm dlx turbo@${TURBO_VERSION} prune @taboot/web --docker
+# Prune workspace to only include @taboot/web and its dependencies
+RUN turbo prune @taboot/web --docker
 
-# Installer stage - installs dependencies and builds
+# -------------------------------
+# Installer stage - install deps and build
+# -------------------------------
 FROM base AS installer
 
-ARG PNPM_VERSION=9.12.3
-ARG TURBO_VERSION=2.1.3
+WORKDIR /app
 
-RUN apk update && apk upgrade
-RUN apk add --no-cache libc6-compat
+# Copy pruned workspace from builder (only the pruned package.json files)
+COPY --from=builder /app/out/json ./
 
-ENV PNPM_HOME="/root/.local/share/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
+# Install all dependencies (needed for build)
+# Note: pnpm install will create proper lockfile with all transitive dependencies
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    set -eux; \
+    pnpm install --ignore-scripts || { echo "ERROR: pnpm install failed"; exit 1; }
 
-RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate && \
-    pnpm config set global-bin-dir "$PNPM_HOME"
+# Copy source files and build configuration
+COPY --from=builder /app/out/full ./
+
+# Generate Prisma client (required before build)
+# Cache Prisma engines and retry on network failure
+RUN --mount=type=cache,target=/tmp/prisma-engines \
+    set -eux; \
+    export PRISMA_ENGINES_CACHE_DIR=/tmp/prisma-engines \
+    && export PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x" \
+    && for i in 1 2 3; do \
+        pnpm --filter @taboot/db db:generate && break || \
+        (echo "Prisma generate attempt $i failed, retrying..." && sleep 5); \
+    done \
+    || { echo "ERROR: Prisma generation failed after 3 attempts"; exit 1; }
+
+# Build Next.js app with turbo (standalone output)
+RUN set -eux; \
+    turbo build --filter=@taboot/web || { echo "ERROR: Build failed"; exit 1; }
+
+# -------------------------------
+# Production stage - minimal runtime
+# -------------------------------
+FROM node:22-alpine AS production
+
+# Install curl for health checks and libc6-compat for compatibility
+RUN apk update && apk upgrade && apk add --no-cache curl libc6-compat
 
 WORKDIR /app
 
-# Install dependencies from pruned workspace
-COPY --from=builder /app/out/json/ .
-RUN pnpm install --frozen-lockfile --ignore-scripts
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 nextjs
 
-# Copy application source
-COPY --from=builder /app/out/full/ .
-
-# Generate Prisma client (if db package exists)
-RUN pnpm --filter @taboot/db db:generate || echo "No Prisma schema found, skipping..."
-
-# Build the application with Turbo
-RUN pnpm dlx turbo@${TURBO_VERSION} build --filter=@taboot/web
-
-# Production runner stage
-FROM base AS production
-WORKDIR /app
-
-# Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-USER nextjs
-
-# Copy built application using Next.js output tracing
+# Copy standalone Next.js build
 COPY --from=installer --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=installer --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=installer --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 
+# Validate server.js exists in standalone build
+RUN test -f apps/web/server.js || { echo "ERROR: server.js not found in standalone build - check Next.js output structure"; exit 1; }
+
+# Switch to non-root user
+USER nextjs
+
 EXPOSE 3000
 
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+ENV NODE_ENV=production \
+    PORT=3000 \
+    NEXT_TELEMETRY_DISABLED=1
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD node -e "require('http').get('http://127.0.0.1:3000/api/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+# Configurable healthcheck endpoint (default: /api/health)
+ENV HEALTHCHECK_PATH=/api/health
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -fsS "http://127.0.0.1:3000${HEALTHCHECK_PATH}" || exit 1
 
+# Run Next.js standalone server
 CMD ["node", "apps/web/server.js"]

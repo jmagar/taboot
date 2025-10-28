@@ -22,6 +22,7 @@ members = [
     "taboot-retrieval",
     "taboot-schemas",
     "taboot-vector",
+    "taboot-worker",
 ]
 
 [[package]]
@@ -142,20 +143,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/13/7d/8bca2bf9a247c2c5dfeec1d7a5f40db6518f88d314b8bca9da29670d2671/aiosqlite-0.21.0.tar.gz", hash = "sha256:131bb8056daa3bc875608c631c678cda73922a2d4ba8aec373b19f18c17e7aa3", size = 13454, upload-time = "2025-02-03T07:30:16.235Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f5/10/6c25ed6de94c49f88a91fa5018cb4c0f3625f31d5be9f771ebe5cc7cd506/aiosqlite-0.21.0-py3-none-any.whl", hash = "sha256:2549cf4057f95f53dcba16f2b64e8e2791d7e1adedb13197dd8ed77bb226d7d0", size = 15792, upload-time = "2025-02-03T07:30:13.6Z" },
-]
-
-[[package]]
-name = "alembic"
-version = "1.17.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "mako" },
-    { name = "sqlalchemy" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/6b/45/6f4555f2039f364c3ce31399529dcf48dd60726ff3715ad67f547d87dfd2/alembic-1.17.0.tar.gz", hash = "sha256:4652a0b3e19616b57d652b82bfa5e38bf5dbea0813eed971612671cb9e90c0fe", size = 1975526, upload-time = "2025-10-11T18:40:13.585Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/44/1f/38e29b06bfed7818ebba1f84904afdc8153ef7b6c7e0d8f3bc6643f5989c/alembic-1.17.0-py3-none-any.whl", hash = "sha256:80523bc437d41b35c5db7e525ad9d908f79de65c27d6a5a5eab6df348a352d99", size = 247449, upload-time = "2025-10-11T18:40:16.288Z" },
 ]
 
 [[package]]
@@ -1845,18 +1832,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d9/cb/c9c5bb2a9c47292e236a808dd233a03531f53b626f36259dcd32b49c76da/lxml_html_clean-0.4.3.tar.gz", hash = "sha256:c9df91925b00f836c807beab127aac82575110eacff54d0a75187914f1bd9d8c", size = 21498, upload-time = "2025-10-02T20:49:24.895Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/10/4a/63a9540e3ca73709f4200564a737d63a4c8c9c4dd032bab8535f507c190a/lxml_html_clean-0.4.3-py3-none-any.whl", hash = "sha256:63fd7b0b9c3a2e4176611c2ca5d61c4c07ffca2de76c14059a81a2825833731e", size = 14177, upload-time = "2025-10-02T20:49:23.749Z" },
-]
-
-[[package]]
-name = "mako"
-version = "1.3.10"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "markupsafe" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/9e/38/bd5b78a920a64d708fe6bc8e0a2c075e1389d53bef8413725c63ba041535/mako-1.3.10.tar.gz", hash = "sha256:99579a6f39583fa7e5630a28c3c1f440e4e97a414b80372649c0ce338da2ea28", size = 392474, upload-time = "2025-04-10T12:44:31.16Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/fb/99f81ac72ae23375f22b7afdb7642aba97c00a713c217124420147681a2f/mako-1.3.10-py3-none-any.whl", hash = "sha256:baef24a52fc4fc514a0887ac600f9f1cff3d82c61d4d700a1fa84d597b88db59", size = 78509, upload-time = "2025-04-10T12:50:53.297Z" },
 ]
 
 [[package]]
@@ -4191,7 +4166,6 @@ version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "accelerate" },
-    { name = "alembic" },
     { name = "anyio" },
     { name = "cryptography" },
     { name = "elasticsearch" },
@@ -4273,7 +4247,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "accelerate", specifier = ">=0.33.0,<1" },
-    { name = "alembic", specifier = ">=1.15.2,<2" },
     { name = "anyio", specifier = ">=4.11.0,<5" },
     { name = "cryptography", specifier = ">=46.0.3,<47" },
     { name = "elasticsearch", specifier = ">=9.1.1,<10" },
@@ -4418,6 +4391,7 @@ dependencies = [
     { name = "google-api-python-client" },
     { name = "google-auth-oauthlib" },
     { name = "praw" },
+    { name = "psycopg2-binary" },
     { name = "pydantic" },
     { name = "pygithub" },
 ]
@@ -4434,6 +4408,7 @@ requires-dist = [
     { name = "google-api-python-client", specifier = ">=2.184.0,<3" },
     { name = "google-auth-oauthlib", specifier = ">=1.2.2,<2" },
     { name = "praw", specifier = ">=7.8.1,<8" },
+    { name = "psycopg2-binary", specifier = ">=2.9.11,<3" },
     { name = "pydantic", specifier = ">=2.12.0,<3" },
     { name = "pygithub", specifier = ">=2.8.1,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.2" },
@@ -4446,6 +4421,7 @@ name = "taboot-common"
 version = "0.4.0"
 source = { editable = "packages/common" }
 dependencies = [
+    { name = "psycopg2-binary" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "python-json-logger" },
@@ -4458,6 +4434,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "psycopg2-binary", specifier = ">=2.9.11,<3" },
     { name = "pydantic", specifier = ">=2.12.0,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.2" },
     { name = "python-dotenv", specifier = ">=1.1.1,<2" },
@@ -4668,6 +4645,36 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.2" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.2.0" },
     { name = "qdrant-client", specifier = ">=1.15.1,<2" },
+]
+provides-extras = ["dev"]
+
+[[package]]
+name = "taboot-worker"
+version = "0.4.0"
+source = { editable = "apps/worker" }
+dependencies = [
+    { name = "psycopg2-binary" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "python-json-logger" },
+    { name = "redis" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "psycopg2-binary", specifier = ">=2.9.11,<3" },
+    { name = "pydantic", specifier = ">=2.12.0,<3" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.2" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.2.0" },
+    { name = "python-dotenv", specifier = ">=1.1.1,<2" },
+    { name = "python-json-logger", specifier = ">=4.0.0,<5" },
+    { name = "redis", specifier = ">=5.0.1,<6" },
 ]
 provides-extras = ["dev"]
 

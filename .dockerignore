@@ -2,6 +2,13 @@
 # Additions below are marked with comments
 
 # ------------------------------------------------------------------------------
+# Keep both packages/ (Python) and packages-ts/ (TypeScript)
+# Each Dockerfile copies what it needs:
+#  - API/worker: COPY packages ./packages
+#  - Web: COPY packages-ts ./packages-ts
+# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
 # Build Cache & Dependencies
 # ------------------------------------------------------------------------------
 __pypackages__/          # uv local cache

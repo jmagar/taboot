@@ -37,7 +37,7 @@ open http://localhost:8000/docs
 
 Use the `taboot-app` service in `docker-compose.yaml` for a containerized stack.
 It bundles API, MCP, and web dashboard processes; adjust the command in
-`docker/app/Dockerfile` if you need a custom process manager.
+`docker/api/Dockerfile` if you need a custom process manager.
 
 ## Environment
 

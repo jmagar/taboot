@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
+from typing import Any, cast
 from uuid import UUID
 
 from redis.asyncio import Redis
@@ -15,7 +16,7 @@ class RedisDocumentEventConsumer:
 
     def __init__(
         self,
-        redis_client: Redis,
+        redis_client: Redis[Any],
         *,
         stream_name: str,
         group_name: str,
@@ -73,7 +74,11 @@ class RedisDocumentEventConsumer:
         if not ids:
             return
 
-        await self.redis_client.xack(self.stream_name, self.group_name, *ids)
+        xack = cast(
+            Callable[..., Awaitable[int]],
+            self.redis_client.xack,
+        )
+        await xack(self.stream_name, self.group_name, *ids)
 
 
 __all__ = ["RedisDocumentEventConsumer"]

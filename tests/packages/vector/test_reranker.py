@@ -1,24 +1,54 @@
-"""Tests for reranking with Qwen3-Reranker-0.6B."""
+"""Unit tests for the HTTP-based reranker client."""
 
+from __future__ import annotations
+
+import json
+from typing import Any
+
+import httpx
 import pytest
 
 from packages.vector.reranker import Reranker
 
 
+def _build_mock_client(response_payload: dict[str, Any]) -> httpx.Client:
+    """Create an httpx client backed by a mock transport for tests."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content.decode())
+        assert "query" in body
+        assert isinstance(body.get("documents"), list)
+        return httpx.Response(200, json=response_payload)
+
+    transport = httpx.MockTransport(handler)
+    return httpx.Client(transport=transport)
+
+
 @pytest.mark.unit
-def test_reranker_init() -> None:
-    """Test Reranker initialization."""
-    reranker = Reranker(model_name="Qwen/Qwen3-Reranker-0.6B", device="cpu", batch_size=16)
+def test_reranker_init_stores_metadata() -> None:
+    """Ensure constructor preserves configuration attributes."""
+    client = _build_mock_client({"scores": [], "ranking": []})
+    reranker = Reranker(
+        model_name="Qwen/Qwen3-Reranker-0.6B",
+        device="cpu",
+        batch_size=32,
+        base_url="http://mock-service",
+        client=client,
+    )
 
     assert reranker.model_name == "Qwen/Qwen3-Reranker-0.6B"
     assert reranker.device == "cpu"
-    assert reranker.batch_size == 16
+    assert reranker.batch_size == 32
+
+    client.close()
 
 
 @pytest.mark.unit
-def test_reranker_scores_passages() -> None:
-    """Test reranker scores query-passage pairs."""
-    reranker = Reranker(model_name="Qwen/Qwen3-Reranker-0.6B", device="cpu", batch_size=4)
+def test_reranker_returns_top_scores() -> None:
+    """Client returns scores ordered by ranking from service."""
+    payload = {"scores": [0.9, 0.1, 0.6], "ranking": [0, 2, 1]}
+    client = _build_mock_client(payload)
+    reranker = Reranker(client=client, base_url="http://mock")
 
     query = "Which services expose port 8080?"
     passages = [
@@ -28,24 +58,19 @@ def test_reranker_scores_passages() -> None:
     ]
 
     scores = reranker.rerank(query=query, passages=passages, top_n=2)
+    assert scores == [0.9, 0.6]
 
-    assert len(scores) == 2
-    assert all(isinstance(score, float) for score in scores)
-    assert all(0.0 <= score <= 1.0 for score in scores)
+    client.close()
 
 
-@pytest.mark.integration
-@pytest.mark.slow
-def test_reranker_with_gpu(skip_if_no_gpu) -> None:
-    """Test reranker on GPU if available."""
-    reranker = Reranker(model_name="Qwen/Qwen3-Reranker-0.6B", device="auto", batch_size=16)
+@pytest.mark.unit
+def test_reranker_returns_indices_with_scores() -> None:
+    """Client surfaces index-score tuples respecting service ranking."""
+    payload = {"scores": [0.2, 0.5, 0.9], "ranking": [2, 1, 0]}
+    client = _build_mock_client(payload)
+    reranker = Reranker(client=client, base_url="http://mock")
 
-    query = "docker compose services"
-    passages = [
-        "Docker Compose defines multi-container applications.",
-        "PostgreSQL is a relational database.",
-        "The compose file specifies service dependencies.",
-    ]
+    results = reranker.rerank_with_indices(query="q", passages=["a", "b", "c"], top_n=2)
+    assert results == [(2, 0.9), (1, 0.5)]
 
-    scores = reranker.rerank(query=query, passages=passages, top_n=3)
-    assert len(scores) == 3
+    client.close()

@@ -32,6 +32,22 @@ from starlette.requests import Request
 logger = logging.getLogger(__name__)
 
 
+class AuthSecretError(RuntimeError):
+    """Base class for auth secret validation errors."""
+
+
+class MissingAuthSecretError(AuthSecretError):
+    """Auth secret environment variable is not configured."""
+
+
+class WeakAuthSecretError(AuthSecretError):
+    """Configured auth secret does not meet minimum length."""
+
+
+class LowEntropyAuthSecretError(AuthSecretError):
+    """Configured auth secret shows insufficient entropy."""
+
+
 class AuthClaims(TypedDict, total=False):
     """Typed representation of Better Auth JWT claims."""
 
@@ -45,21 +61,84 @@ class AuthClaims(TypedDict, total=False):
     aud: NotRequired[str | list[str]]
 
 
-AUTH_SECRET_ENV_VAR = "AUTH_SECRET"
+AUTH_SECRET_ENV_VAR: Final[str] = "AUTH_SECRET"  # noqa: S105 - env var name literal, not a secret value
 JWT_ALGORITHM: Final[str] = "HS256"
+MIN_SECRET_LENGTH: Final[int] = 32  # 256 bits for HS256
 
 # HTTP Bearer token scheme
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
+def _ensure_env_loaded() -> None:
+    """Ensure .env configuration is loaded before reading process environment."""
+    try:
+        from packages.common.config import ensure_env_loaded
+    except ImportError as exc:  # pragma: no cover - defensive logging
+        logger.debug("ensure_env_loaded import skipped", extra={"error": str(exc)})
+    else:
+        ensure_env_loaded()
+
+
 @lru_cache(maxsize=1)
 def _get_auth_secret() -> str:
-    """Fetch and cache the AUTH_SECRET environment variable."""
-    auth_secret = os.getenv(AUTH_SECRET_ENV_VAR)
+    """Get and validate the JWT signing secret from environment.
+
+    Tries AUTH_SECRET first, falls back to BETTER_AUTH_SECRET if not set.
+    This allows single-user systems to use one secret for both auth systems.
+
+    Validates that secret meets minimum security requirements:
+    - Minimum 32 characters (256 bits for HS256)
+    - Basic entropy check (not all repeated characters)
+
+    Returns:
+        Validated auth secret value.
+
+    Raises:
+        AuthSecretError: If no secret found, too short, or has insufficient entropy.
+    """
+    _ensure_env_loaded()
+    auth_secret = os.getenv(AUTH_SECRET_ENV_VAR) or os.getenv("BETTER_AUTH_SECRET")
+
     if not auth_secret:
-        logger.error("AUTH_SECRET environment variable is required for JWT authentication")
-        raise RuntimeError("AUTH_SECRET environment variable is required for JWT authentication")
+        logger.error("AUTH_SECRET or BETTER_AUTH_SECRET required for JWT authentication")
+        logger.info(
+            "Generate AUTH_SECRET with: "
+            "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
+        raise MissingAuthSecretError()
+
+    # Validate minimum length (256 bits for HS256)
+    if len(auth_secret) < MIN_SECRET_LENGTH:
+        logger.error(
+            "AUTH_SECRET too short",
+            extra={"length": len(auth_secret), "minimum": MIN_SECRET_LENGTH},
+        )
+        logger.info(
+            "Generate strong secret with: "
+            "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
+        raise WeakAuthSecretError()
+
+    # Basic entropy check (not repeated characters)
+    if len(set(auth_secret)) < MIN_SECRET_LENGTH // 2:
+        logger.error("AUTH_SECRET has low entropy")
+        logger.info(
+            "Generate cryptographically random secret with: "
+            "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
+        raise LowEntropyAuthSecretError()
+
+    logger.debug("AUTH_SECRET validated", extra={"length": len(auth_secret)})
     return auth_secret
+
+
+@lru_cache(maxsize=1)
+def _get_jwt_validation_context() -> dict[str, str | None]:
+    """Return optional issuer/audience values for JWT validation."""
+    _ensure_env_loaded()
+    issuer = os.getenv("AUTH_ISSUER") or os.getenv("BETTER_AUTH_URL") or None
+    audience = os.getenv("AUTH_AUDIENCE") or None
+    return {"issuer": issuer, "audience": audience}
 
 
 def _token_log_metadata(token: str, exc: Exception) -> dict[str, object | None]:
@@ -107,18 +186,49 @@ def decode_jwt(token: str) -> AuthClaims:
     Raises:
         HTTPException: If token is invalid or expired.
     """
+    context = _get_jwt_validation_context()
+    decode_options: dict[str, object] = {
+        "verify_exp": True,
+        "verify_signature": True,
+        "require": ["exp"],
+    }
+    expected_issuer = context.get("issuer")
+    expected_audience = context.get("audience")
+
     try:
         payload_raw: dict[str, object] = jwt.decode(
             token,
-            _get_auth_secret(),
+            key=_get_auth_secret(),
             algorithms=[JWT_ALGORITHM],
-            options={"verify_exp": True, "verify_signature": True, "require": ["exp"]},
+            options=decode_options,
+            issuer=expected_issuer,
+            audience=expected_audience,
         )
     except jwt.ExpiredSignatureError as exc:
         logger.warning("JWT token expired", extra=_token_log_metadata(token, exc))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+    except jwt.InvalidIssuerError as exc:
+        metadata = _token_log_metadata(token, exc)
+        if expected_issuer:
+            metadata["expected_issuer"] = expected_issuer
+        logger.warning("JWT issuer validation failed", extra=metadata)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token issuer",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+    except jwt.InvalidAudienceError as exc:
+        metadata = _token_log_metadata(token, exc)
+        if expected_audience:
+            metadata["expected_audience"] = expected_audience
+        logger.warning("JWT audience validation failed", extra=metadata)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token audience",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
     except jwt.InvalidTokenError as exc:

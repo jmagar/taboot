@@ -5,14 +5,16 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl", "linux-musl-openssl-3.0.x"]
-  output        = "../generated/prisma"
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "linux-musl", "linux-musl-openssl-3.0.x"]
+  output          = "../generated/prisma"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["auth"]
 }
 
 model User {
@@ -24,12 +26,19 @@ model User {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @default(now()) @updatedAt
   twoFactorEnabled Boolean?    @default(false)
+
+  // Soft delete fields
+  deletedAt        DateTime?   @map("deleted_at")
+  deletedBy        String?     @map("deleted_by")
+
   sessions         Session[]
   accounts         Account[]
   twofactors       TwoFactor[]
 
   @@unique([email])
+  @@index([deletedAt])
   @@map("user")
+  @@schema("auth")
 }
 
 model Session {
@@ -45,6 +54,7 @@ model Session {
 
   @@unique([token])
   @@map("session")
+  @@schema("auth")
 }
 
 model Account {
@@ -64,6 +74,7 @@ model Account {
   updatedAt             DateTime  @updatedAt
 
   @@map("account")
+  @@schema("auth")
 }
 
 model Verification {
@@ -75,6 +86,7 @@ model Verification {
   updatedAt  DateTime @default(now()) @updatedAt
 
   @@map("verification")
+  @@schema("auth")
 }
 
 model TwoFactor {
@@ -85,4 +97,23 @@ model TwoFactor {
   user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("twoFactor")
+  @@schema("auth")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?  @map("user_id")
+  targetId   String   @map("target_id")
+  targetType String   @map("target_type")
+  action     String
+  metadata   Json?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([targetId, targetType])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_log")
+  @@schema("auth")
 }

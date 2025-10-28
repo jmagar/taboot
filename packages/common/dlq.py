@@ -28,7 +28,7 @@ class DeadLetterQueue:
 
     def __init__(
         self,
-        redis_client: Redis[bytes],
+        redis_client: Redis,
         max_retries: int = 3,
         base_delay_seconds: int = 2,
     ) -> None:

@@ -9,3 +9,6 @@ export * from './next-handlers';
 
 // Node.js helpers (for Express)
 export * from './node-handlers';
+
+// Auth constants (cookie names, headers)
+export * from './constants';

@@ -1,6 +1,9 @@
+'use client';
+
 import { useRequiredAuthUser } from '@/hooks/use-auth-user';
 import type { ComponentType, SVGProps } from 'react';
 import { signOut } from '@taboot/auth/client';
+import { revalidateSessionCache } from '@/lib/cache-utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@taboot/ui/components/avatar';
 import {
   DropdownMenu,
@@ -25,7 +28,7 @@ type DropdownItem = {
   label: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   href?: string;
-  onClick?: () => void;
+  onClick?: () => void | Promise<void>;
 };
 
 export function NavUser() {
@@ -59,14 +62,17 @@ export function NavUser() {
       {
         label: 'Log out',
         onClick: async () => {
-          await signOut({
-            fetchOptions: {
-              onSuccess: () => {
-                refetch();
-                router.push('/');
-              },
-            },
-          });
+          try {
+            await signOut();
+            // Fire-and-forget; UI shouldn't block on cache invalidation
+             
+            revalidateSessionCache();
+            refetch();
+          } catch (error) {
+            console.error('Logout error:', error);
+          } finally {
+            router.replace('/');
+          }
         },
         icon: LogOut,
       },
@@ -134,14 +140,14 @@ function renderDropdownItems(dropdownItems: DropdownItem[][]) {
               <DropdownMenuItem asChild key={item.label}>
                 <Link href={item.href}>
                   <div className="flex items-center gap-2">
-                    <item.icon className="h-4 w-4" />
+                    <item.icon className="h-4 w-4" aria-hidden="true" />
                     {item.label}
                   </div>
                 </Link>
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem key={item.label} onClick={item.onClick}>
-                <item.icon className="h-4 w-4" />
+                <item.icon className="h-4 w-4" aria-hidden="true" />
                 {item.label}
               </DropdownMenuItem>
             ),

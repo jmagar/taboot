@@ -7,7 +7,7 @@ import { config } from '@/config/site';
 import { useAuthUser } from '@/hooks/use-auth-user';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { validateCallbackUrl } from '@/lib/validate-callback-url';
-import { signIn } from '@taboot/auth';
+import { signIn } from '@taboot/auth/client';
 import { Button } from '@taboot/ui/components/button';
 import {
   Card,

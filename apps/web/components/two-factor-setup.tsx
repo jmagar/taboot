@@ -2,7 +2,7 @@
 
 import { useHasPassword } from '@/hooks/use-has-password';
 import { useMutation } from '@tanstack/react-query';
-import { twoFactor } from '@taboot/auth';
+import { twoFactor } from '@taboot/auth/client';
 import { Alert, AlertDescription, AlertTitle } from '@taboot/ui/components/alert';
 import { Button } from '@taboot/ui/components/button';
 import {
@@ -321,7 +321,6 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
                     value={totpCode}
                     onChange={(value: string) => setTotpCode(value.replace(/\D/g, ''))}
                     onComplete={handleVerify2FA}
-                    autoFocus
                   >
                     <InputOTPGroup>
                       {Array.from({ length: 6 }, (_, i) => (

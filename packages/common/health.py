@@ -144,16 +144,15 @@ async def check_tei_health() -> bool:
 async def check_ollama_health() -> bool:
     """Check Ollama LLM service health.
 
-    Queries the Ollama /api/tags endpoint with timeout.
+    Queries the Ollama /api/version endpoint with timeout.
 
     Returns:
         bool: True if Ollama is healthy and responsive, False otherwise.
     """
     config = get_config()
     try:
-        ollama_url = f"http://localhost:{config.ollama_port}"
         async with httpx.AsyncClient(timeout=config.health_check_timeout) as client:
-            response = await client.get(f"{ollama_url}/api/tags")
+            response = await client.get(f"{config.ollama_url}/api/version")
             healthy: bool = response.status_code == 200
             if healthy:
                 logger.debug("Ollama health check: OK")
@@ -171,7 +170,7 @@ async def check_ollama_health() -> bool:
 async def check_firecrawl_health() -> bool:
     """Check Firecrawl web crawling service health.
 
-    Queries the Firecrawl /health endpoint with timeout.
+    Queries the Firecrawl root endpoint with timeout.
 
     Returns:
         bool: True if Firecrawl is healthy and responsive, False otherwise.
@@ -179,7 +178,7 @@ async def check_firecrawl_health() -> bool:
     config = get_config()
     try:
         async with httpx.AsyncClient(timeout=config.health_check_timeout) as client:
-            response = await client.get(f"{config.firecrawl_api_url}/health")
+            response = await client.get(config.firecrawl_api_url)
             healthy: bool = response.status_code == 200
             if healthy:
                 logger.debug("Firecrawl health check: OK")

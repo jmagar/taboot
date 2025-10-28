@@ -3,7 +3,7 @@
 import { validateCallbackUrl } from '@/lib/validate-callback-url';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { sendVerificationEmail, signIn, signUp } from '@taboot/auth';
+import { sendVerificationEmail, signIn, signUp } from '@taboot/auth/client';
 import { Button } from '@taboot/ui/components/button';
 import {
   Form,
@@ -152,6 +152,7 @@ export function CredentialsForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
                   <Mail className="text-muted-foreground absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform" />
                   <Input
                     type="email"
+                    inputMode="email"
                     placeholder="yourname@example.com"
                     autoComplete="email"
                     className="pl-10"

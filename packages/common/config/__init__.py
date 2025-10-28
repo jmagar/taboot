@@ -7,9 +7,14 @@ All service URLs, credentials, and tuning parameters are defined here.
 import os
 from functools import lru_cache
 from pathlib import Path
+from threading import Lock
 
+from dotenv import load_dotenv
 from pydantic import Field, HttpUrl, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_ENV_LOADED = False
+_ENV_LOCK = Lock()
 
 
 def _is_running_in_container() -> bool:
@@ -42,6 +47,77 @@ def _is_running_in_container() -> bool:
     return False
 
 
+def _resolve_env_file() -> str | None:
+    """Locate the .env file regardless of the current working directory.
+
+    Preference order:
+        1. TABOOT_ENV_FILE environment variable (explicit override)
+        2. Current working directory (common for local runs)
+        3. Ancestors of this file (covers package execution within Docker)
+    """
+    override = os.getenv("TABOOT_ENV_FILE")
+    if override:
+        override_path = Path(override).expanduser()
+        if override_path.is_file():
+            return str(override_path)
+
+    cwd_candidate = Path.cwd() / ".env"
+    if cwd_candidate.is_file():
+        return str(cwd_candidate)
+
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / ".env"
+        if candidate.is_file():
+            return str(candidate)
+
+    return None
+
+
+_DEFAULT_ENV_FILE = _resolve_env_file()
+
+
+def ensure_env_loaded() -> None:
+    """Load environment variables from disk exactly once.
+
+    Loads .env first, then .env.local (if it exists) to override for local development.
+
+    Raises:
+        FileNotFoundError: If env file explicitly set via TABOOT_ENV_FILE but not found
+        PermissionError: If env file cannot be read due to permissions
+        OSError: If env file cannot be read due to I/O issues
+    """
+    global _ENV_LOADED
+
+    with _ENV_LOCK:
+        if _ENV_LOADED:
+            return
+
+        env_path = _DEFAULT_ENV_FILE or _resolve_env_file()
+        if env_path:
+            try:
+                # Load .env first
+                load_dotenv(env_path, override=False)
+
+                # Load .env.local for local development overrides
+                # (uses localhost instead of Docker names)
+                env_local_path = Path(env_path).parent / ".env.local"
+                if env_local_path.is_file():
+                    load_dotenv(env_local_path, override=True)
+            except (FileNotFoundError, PermissionError, OSError) as e:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.exception(
+                    "Failed to load environment file", extra={"env_path": env_path, "error": str(e)}
+                )
+                raise
+
+        _ENV_LOADED = True
+
+
+ensure_env_loaded()
+
+
 class TeiConfig(BaseSettings):
     """Configuration block for Text Embeddings Inference service."""
 
@@ -67,7 +143,7 @@ class TabootConfig(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_DEFAULT_ENV_FILE,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -80,6 +156,7 @@ class TabootConfig(BaseSettings):
     neo4j_uri: str = "bolt://taboot-graph:7687"
     tei_embedding_url: str = "http://taboot-embed:80"
     reranker_url: str = "http://taboot-rerank:8000"
+    ollama_url: str = "http://taboot-ollama:11434"
     playwright_microservice_url: str = "http://taboot-playwright:3000/scrape"
 
     # ========== Database Credentials ==========
@@ -115,6 +192,7 @@ class TabootConfig(BaseSettings):
     reranker_model: str = "Qwen/Qwen3-Reranker-0.6B"
     reranker_batch_size: int = 16
     reranker_device: str = "auto"  # "auto", "cuda", or "cpu"
+    reranker_timeout: int = 30
 
     # ========== Ollama LLM Config ==========
     ollama_port: int = 11434
@@ -156,6 +234,21 @@ class TabootConfig(BaseSettings):
 
     # ========== Firecrawl Config ==========
     firecrawl_api_key: SecretStr = SecretStr("changeme")
+    firecrawl_default_country: str = "US"  # ISO 3166-1 alpha-2 country code
+    firecrawl_default_languages: str = "en-US"  # Comma-separated locale codes
+
+    # Firecrawl URL path filtering (Firecrawl v2 feature)
+    # includePaths: Whitelist regex patterns for URL paths to crawl
+    # excludePaths: Blacklist regex patterns for URL paths to skip (takes precedence)
+    # Patterns match against pathname only (e.g., "/en/docs/api" not "https://example.com/en/docs/api")
+    # Comma-separated strings parsed to lists
+    firecrawl_include_paths: str = ""  # Empty = allow all paths
+    firecrawl_exclude_paths: str = (
+        # Default: Block common non-English language path segments
+        # Matches patterns like: /de/..., /docs/de/..., /api/fr/..., etc.
+        r"^.*/(de|fr|es|it|pt|nl|pl|ru|ja|zh|ko|ar|tr|cs|da|sv|no)/.*$"
+    )
+
     num_workers_per_queue: int = 16
     worker_concurrency: int = 8
     scrape_concurrency: int = 8
@@ -189,6 +282,7 @@ class TabootConfig(BaseSettings):
 
         if not _is_running_in_container():
             # Rewrite URLs to use localhost with mapped ports
+            self.postgres_host = "localhost"
             self.tei_embedding_url = "http://localhost:8080"
             self.qdrant_url = "http://localhost:7000"
             self.neo4j_uri = "bolt://localhost:7687"
@@ -208,10 +302,12 @@ class TabootConfig(BaseSettings):
     def tei_config(self) -> TeiConfig:
         """Return validated TEI configuration block."""
 
-        return TeiConfig(
-            url=self.tei_embedding_url,
-            batch_size=self.embedding_batch_size,
-            timeout=self.tei_timeout,
+        return TeiConfig.model_validate(
+            {
+                "url": self.tei_embedding_url,
+                "batch_size": self.embedding_batch_size,
+                "timeout": self.tei_timeout,
+            }
         )
 
     @property
@@ -241,4 +337,4 @@ def get_config() -> TabootConfig:
 
 
 # Export convenience accessors
-__all__ = ["TabootConfig", "TeiConfig", "get_config"]
+__all__ = ["TabootConfig", "TeiConfig", "ensure_env_loaded", "get_config"]

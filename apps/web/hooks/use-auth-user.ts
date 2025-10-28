@@ -1,13 +1,6 @@
 import { useSession } from '@taboot/auth/client';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 
 type AuthUser = NonNullable<ReturnType<typeof useSession>['data']>['user'];
-
-interface UseAuthUserOptions {
-  redirectOnUnauthenticated?: boolean;
-  redirectTo?: string;
-}
 
 interface UseAuthUserReturn {
   user: AuthUser | null;
@@ -32,30 +25,13 @@ interface UseRequiredAuthUserLoadingReturn {
 }
 
 /**
- * Hook for handling authentication state with optional auto-redirect functionality.
+ * Hook for handling authentication state.
+ * Note: Authentication enforcement is handled by middleware at the server level.
  *
- * @param options - Configuration options
- * @param options.redirectOnUnauthenticated - Whether to redirect when user is not authenticated
- * @param options.redirectTo - Custom redirect path (defaults to '/sign-in')
  * @returns Authentication state and user data
  */
-export function useAuthUser(options?: UseAuthUserOptions): UseAuthUserReturn {
+export function useAuthUser(): UseAuthUserReturn {
   const session = useSession();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const shouldRedirect = options?.redirectOnUnauthenticated ?? false;
-  const redirectTo = options?.redirectTo ?? '/';
-
-  // Only redirect if explicitly enabled and not on auth pages
-  useEffect(() => {
-    if (shouldRedirect && !session.isPending && !session.data?.user) {
-      // Don't redirect if already on auth pages
-      if (!pathname.startsWith('/sign-in') && !pathname.startsWith('/sign-up')) {
-        router.push(redirectTo);
-      }
-    }
-  }, [shouldRedirect, session.isPending, session.data?.user, router, pathname, redirectTo]);
 
   return {
     user: session.data?.user || null,
@@ -68,17 +44,15 @@ export function useAuthUser(options?: UseAuthUserOptions): UseAuthUserReturn {
 
 /**
  * Hook that guarantees an authenticated user is present.
- * Automatically redirects to sign-in if not authenticated.
  * Should only be used in components that require authentication.
+ * Note: Server-side middleware handles redirects before this component renders.
  *
- * @returns Either user data when authenticated or loading state during auth check/redirect
+ * @returns Either user data when authenticated or loading state during auth check
  */
 export function useRequiredAuthUser():
   | UseRequiredAuthUserReturn
   | UseRequiredAuthUserLoadingReturn {
-  const { user, isLoading, isAuthenticated, error, refetch } = useAuthUser({
-    redirectOnUnauthenticated: true,
-  });
+  const { user, isLoading, error, refetch } = useAuthUser();
 
   if (isLoading) {
     return {
@@ -89,7 +63,9 @@ export function useRequiredAuthUser():
     };
   }
 
-  if (!isAuthenticated || !user) {
+  if (!user) {
+    // This should not happen in protected routes due to middleware,
+    // but we handle it gracefully by showing loading state
     return {
       user: null,
       isLoading: true,
@@ -98,9 +74,8 @@ export function useRequiredAuthUser():
     };
   }
 
-  // This hook guarantees user is not null when not loading
   return {
-    user: user!,
+    user,
     isLoading: false,
     error,
     refetch,

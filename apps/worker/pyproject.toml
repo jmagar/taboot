@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "taboot-worker"
+version = "0.4.0"
+description = "Taboot background extraction worker"
+readme = "../README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Jacob Magar", email = "jmagar@gmail.com" }]
+license = { text = "Proprietary" }
+keywords = ["background", "worker", "extraction", "taboot"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: No Input/Output (Daemon)",
+  "Intended Audience :: Developers",
+  "License :: Other/Proprietary",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+  "redis>=5.0.1,<6",
+  "psycopg2-binary>=2.9.11,<3",
+  "pydantic>=2.12.0,<3",
+  "python-dotenv>=1.1.1,<2",
+  "python-json-logger>=4.0.0,<5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4.2",
+  "pytest-asyncio>=1.2.0",
+]
+
+[project.urls]
+Repository = "https://github.com/jmagar/taboot"
+Documentation = "https://github.com/jmagar/taboot/docs"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["worker"]

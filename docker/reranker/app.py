@@ -34,7 +34,7 @@ def load_model() -> CrossEncoder:
     preferred_device = os.getenv("RERANKER_DEVICE", "auto").lower()
     device = _resolve_device("cuda" if preferred_device == "auto" else preferred_device)
     max_length = int(os.getenv("MAX_LENGTH", "512"))
-    model = CrossEncoder(
+    model: CrossEncoder = CrossEncoder(
         model_id,
         device=device,
         max_length=max_length,
@@ -51,6 +51,8 @@ def health() -> dict[str, str]:
     try:
         load_model()
     except Exception as exc:  # pragma: no cover - defensive logging
+        # Catches: OSError (model file/device issues), RuntimeError (CUDA/torch errors),
+        # ValueError (invalid config), and other model initialization exceptions
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {"status": "ok"}
 

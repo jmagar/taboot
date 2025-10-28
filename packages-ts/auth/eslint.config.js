@@ -1,4 +1,4 @@
-import { config } from '@workspace/eslint-config/base';
+import libraryConfig from '@taboot/eslint-config/library';
 
-/** @type {import("eslint").Linter.Config} */
-export default config;
+/** @type {import("eslint").Linter.Config[]} */
+export default libraryConfig;

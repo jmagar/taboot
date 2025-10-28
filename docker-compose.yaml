@@ -105,9 +105,9 @@ services:
       RERANKER_DEVICE: ${RERANKER_DEVICE:-auto}
       HF_TOKEN: ${HF_TOKEN:-}
     volumes:
-      - taboot-rerank:/root/.cache/huggingface
+      - huggingface-cache:/root/.cache/huggingface
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -172,7 +172,7 @@ services:
       OLLAMA_USE_MMAP: "true"
       OLLAMA_MAX_QUEUE: "20000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      test: ["CMD", "ollama", "list"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -244,20 +244,20 @@ services:
       retries: 5
       start_period: 15s
 
-  taboot-app:
+  taboot-api:
     <<: *common-base
     build:
       context: .
-      dockerfile: docker/app/Dockerfile
-    container_name: taboot-app
+      dockerfile: docker/api/Dockerfile
+      additional_contexts:
+        packages: ./packages
+    container_name: taboot-api
     env_file:
       - .env
     environment:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
-      - .:/app
-      - ${HOME}/.ssh:/home/taboot/.ssh:ro
-    command: ["uvicorn", "apps.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+      - ${HOME}/.ssh:/home/llamacrawl/.ssh:ro
     ports:
       - "${TABOOT_HTTP_PORT:-8000}:8000"
     depends_on:
@@ -269,6 +269,8 @@ services:
         condition: service_healthy
       taboot-embed:
         condition: service_healthy
+      taboot-ollama:
+        condition: service_healthy
       taboot-db:
         condition: service_healthy
     healthcheck:
@@ -276,45 +278,52 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 40s
 
   taboot-web:
     <<: *common-base
     build:
       context: .
       dockerfile: docker/web/Dockerfile
-      target: development
+      additional_contexts:
+        packages-ts: ./packages-ts
+      cache_from:
+        - type=registry,ref=taboot/web:buildcache
+      cache_to:
+        - type=inline
     container_name: taboot-web
     env_file:
       - .env
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
+      NODE_ENV: ${NODE_ENV:-production}
+      # Internal API URL for server-side requests within Docker network
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://taboot-api:8000}
     ports:
       - "${TABOOT_WEB_PORT:-3000}:3000"
     depends_on:
-      taboot-app:
+      taboot-api:
         condition: service_healthy
-    command: ["pnpm", "dev", "--filter", "@taboot/web"]
+      taboot-db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 40s
 
   taboot-worker:
     <<: *common-base
     build:
       context: .
       dockerfile: docker/worker/Dockerfile
+      additional_contexts:
+        packages: ./packages
     container_name: taboot-worker
     env_file:
       - .env
+    volumes:
+      - spacy-models:/root/.spacy/data
     depends_on:
       taboot-cache:
         condition: service_healthy
@@ -325,6 +334,8 @@ services:
       taboot-embed:
         condition: service_healthy
       taboot-rerank:
+        condition: service_healthy
+      taboot-ollama:
         condition: service_healthy
       taboot-db:
         condition: service_healthy
@@ -346,6 +357,8 @@ volumes:
   taboot-cache:
   taboot-ollama:
   taboot-db:
+  huggingface-cache:
+  spacy-models:
 
 networks:
   taboot-net:

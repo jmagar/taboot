@@ -7,16 +7,20 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
       "env": [
+        "ADMIN_USER_ID",
+        "APP_ENV",
         "FIRECRAWL_API_URL",
-        "REDIS_URL",
-        "QDRANT_URL",
+        "LLAMACRAWL_API_URL",
+        "NEO4J_PASSWORD",
         "NEO4J_URI",
         "NEO4J_USER",
-        "NEO4J_PASSWORD",
-        "TEI_EMBEDDING_URL",
-        "RERANKER_URL",
+        "NEXT_PHASE",
         "OLLAMA_PORT",
-        "LLAMACRAWL_API_URL"
+        "QDRANT_URL",
+        "REDIS_URL",
+        "RERANKER_URL",
+        "TEI_EMBEDDING_URL",
+        "TRUST_PROXY"
       ]
     },
     "type-check": {
@@ -36,7 +40,9 @@
         "FIRECRAWL_API_URL",
         "REDIS_URL",
         "QDRANT_URL",
-        "NEO4J_URI"
+        "NEO4J_URI",
+        "UPSTASH_REDIS_REST_URL",
+        "UPSTASH_REDIS_REST_TOKEN"
       ]
     },
     "test": {

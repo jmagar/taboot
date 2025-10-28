@@ -1,0 +1,67 @@
+# Python files
+**/*.py
+**/*.pyc
+**/__pycache__/
+packages/
+.venv/
+venv/
+*.egg-info/
+
+# Build artifacts
+.next/
+.turbo/
+dist/
+build/
+
+# Dependencies
+node_modules/
+
+# Testing
+.pytest_cache/
+coverage/
+.coverage
+htmlcov/
+**/*.test.ts
+**/*.test.tsx
+**/__tests__/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Documentation (keep README.md for build context)
+docs/
+specs/
+todos/
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*

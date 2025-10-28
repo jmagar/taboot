@@ -88,7 +88,7 @@ class MetricsCollector:
     # ZSET memory bounds: keep only latest N entries to prevent unbounded growth
     MAX_ZSET_SIZE = 10_000
 
-    def __init__(self, redis_client: "Redis[bytes]") -> None:
+    def __init__(self, redis_client: "Redis") -> None:
         """Initialize metrics collector.
 
         Args:

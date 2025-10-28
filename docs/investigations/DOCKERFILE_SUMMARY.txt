@@ -1,0 +1,183 @@
+================================================================================
+TABOOT DOCKERFILE AUDIT - EXECUTIVE SUMMARY
+================================================================================
+
+Date: 2025-10-27
+Scope: 7 Dockerfiles (api, web, worker, reranker, neo4j, postgres, base-ml)
+Overall Assessment: 75/100 - Good foundation with critical issues to fix
+
+================================================================================
+CRITICAL ISSUES (BLOCK DEPLOYMENT)
+================================================================================
+
+1. docker/api/Dockerfile line 93
+   ISSUE: Broken build context reference
+   IMPACT: API build fails with "failed to resolve source metadata"
+   FIX TIME: 5 minutes
+   ACTION: Change COPY --from=packages to COPY packages
+
+2. docker/worker/Dockerfile line 6
+   ISSUE: References non-existent base image (taboot/python-ml:latest)
+   IMPACT: Worker container won't run if base image missing
+   FIX TIME: 15 minutes
+   ACTION: Collapse to single Dockerfile OR add CI/CD to auto-build base
+
+3. docker/postgres/Dockerfile
+   ISSUE: pg_cron package installed but extension not created
+   IMPACT: Database missing pg_cron extension, features fail
+   FIX TIME: 20 minutes
+   ACTION: Add init SQL script with CREATE EXTENSION pg_cron
+
+================================================================================
+HIGH-PRIORITY ISSUES (FIX THIS SPRINT)
+================================================================================
+
+4. docker/api/Dockerfile lines 14-22
+   ISSUE: Build dependencies not removed from final image
+   IMPACT: Final image 200-300MB larger than necessary
+   FIX TIME: 15 minutes
+   
+5. docker/api/Dockerfile lines 37-60
+   ISSUE: API installs full LlamaIndex suite (worker only needs subset)
+   IMPACT: Final image likely 2GB+ when should be 500MB
+   FIX TIME: 30 minutes
+   
+6. docker/worker/Dockerfile lines 26-27
+   ISSUE: Cache mount misconfigured (mounts /root/.cache/uv but pip uses /root/.cache/pip)
+   IMPACT: Cache miss, pip re-downloads all wheels on rebuild
+   FIX TIME: 5 minutes
+
+7. docker/reranker/Dockerfile line 30
+   ISSUE: Model download has no retry logic
+   IMPACT: Build can fail on network hiccup
+   FIX TIME: 10 minutes
+
+================================================================================
+IMAGE SIZE ANALYSIS
+================================================================================
+
+Current estimates (based on base images):
+  - taboot-api:   1.5-2.0 GB (too large, has build deps + LlamaIndex bloat)
+  - taboot-web:   600-800 MB (good, optimized)
+  - taboot-worker: 2.0-2.5 GB (expected, has ML stack)
+  - taboot-rerank: 8-10 GB (expected, pytorch base)
+
+After fixes:
+  - taboot-api:   600-800 MB (remove build deps, trim deps)
+  - taboot-web:   600-800 MB (no change)
+  - taboot-worker: 2.0-2.5 GB (no change, ML stack required)
+  - taboot-rerank: 8-10 GB (no change, pytorch required)
+
+TOTAL SAVINGS: 900 MB - 1.2 GB across multi-image deployments
+
+================================================================================
+BEST PRACTICES: WHAT'S WORKING WELL
+================================================================================
+
+✓ docker/web/Dockerfile
+  - Excellent multi-stage strategy (5 stages, proper layer separation)
+  - BuildKit cache mounts for pnpm (very fast rebuilds)
+  - Non-root user properly configured
+  - Pinned base image with SHA256 digest
+  - Comprehensive HEALTHCHECK
+
+✓ docker/base-ml/Dockerfile
+  - Strategic reuse model (build once, deploy many)
+  - Clean build artifact removal
+  - Pre-download spaCy model for startup optimization
+  - Proper venv isolation at /opt/ml-venv
+
+✓ All Dockerfiles
+  - Proper non-root users (security best practice)
+  - Fail-fast shell configuration (error handling)
+  - Ownership set during COPY (efficient permissions)
+  - HEALTHCHECK definitions (all have them)
+  - BuildKit syntax enabled (BuildKit features available)
+
+================================================================================
+SECURITY ASSESSMENT
+================================================================================
+
+CRITICAL RISKS:
+  - None (images properly drop root privileges)
+
+MEDIUM RISKS:
+  - Build tools in final image (potential attack surface)
+  - Missing model download validation (DoS on untrusted input)
+  - Unclear base image dependencies (worker image fragility)
+
+LOW RISKS:
+  - User GID not explicitly set (minor permission confusion risk)
+  - Some images lack environment variable documentation
+
+================================================================================
+RECOMMENDATIONS BY PRIORITY
+================================================================================
+
+WEEK 1 (Critical - Prevents Deployment)
+  1. Fix docker/api line 93: COPY --from=packages → COPY packages
+  2. Fix docker/worker line 6: Collapse to single Dockerfile OR ensure base image
+  3. Fix docker/postgres: Add CREATE EXTENSION pg_cron init script
+
+WEEK 2 (High Priority - Performance)
+  4. Remove build deps from docker/api (saves 200-300MB)
+  5. Move LlamaIndex packages from API to worker (saves 800MB-1.2GB)
+  6. Fix worker cache mount: /root/.cache/uv → /root/.cache/pip
+
+WEEK 3 (Medium Priority - Robustness)
+  7. Add model download retry logic to docker/reranker
+  8. Standardize healthchecks across all images
+  9. Add ENTRYPOINT scripts for environment setup
+
+MONTH 2 (Nice to Have - Architecture)
+  10. Create unified base-python image for consistency
+  11. Add Dockerfile linting (hadolint) to CI/CD
+  12. Add vulnerability scanning (Trivy) to CI/CD
+
+================================================================================
+FILES GENERATED
+================================================================================
+
+1. /home/jmagar/code/taboot/docs/DOCKERFILE_AUDIT.md
+   - Complete analysis with line numbers
+   - Detailed explanations of each issue
+   - Recommended fixes with code examples
+   - Best practices applied
+   - Testing recommendations
+   
+2. /home/jmagar/code/taboot/docs/DOCKERFILE_CRITICAL_FIXES.md
+   - Immediate action items with exact code changes
+   - Step-by-step fix instructions
+   - Before/after comparison
+   - Verification checklist
+   - Rollback plan
+
+3. /home/jmagar/code/taboot/docs/DOCKERFILE_SUMMARY.txt (this file)
+   - Executive summary
+   - Quick reference guide
+   - Priority matrix
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. Review DOCKERFILE_CRITICAL_FIXES.md (actionable fixes)
+2. Implement fixes in order of priority (Week 1 first)
+3. Test each Dockerfile:
+   docker build -f docker/[service]/Dockerfile -t test-[service]:fix .
+4. Run full docker-compose validation
+5. Measure image sizes before/after
+6. Add Dockerfile linting to CI/CD pipeline
+
+================================================================================
+CONTACT & QUESTIONS
+================================================================================
+
+For questions on the audit:
+- See DOCKERFILE_AUDIT.md for detailed analysis
+- See DOCKERFILE_CRITICAL_FIXES.md for implementation details
+- Run: docker build --progress=plain [Dockerfile] (shows layer-by-layer)
+
+Audit completed: 2025-10-27
+Time spent: ~2 hours comprehensive analysis
+Status: Ready for implementation

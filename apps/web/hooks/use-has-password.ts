@@ -1,17 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { api } from '@/lib/api';
+import { typedApi } from '@/lib/api-typed';
+import { queryKeys } from '@/lib/query-keys';
+import { hasPasswordResponseSchema, type HasPasswordResponse } from '@/lib/schemas/auth';
 
 export function useHasPassword() {
   return useQuery({
-    queryKey: ['has-password'],
-    queryFn: async () => {
-      const response = await api.get<{ hasPassword: boolean }>('/auth/password');
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      return Boolean(response.data?.hasPassword);
-    },
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    queryKey: queryKeys.auth.hasPassword(),
+    queryFn: async (): Promise<HasPasswordResponse> =>
+      typedApi.get({
+        path: '/auth/password',
+        responseSchema: hasPasswordResponseSchema,
+      }),
+    select: (data) => data.hasPassword,
+    staleTime: 30 * 60 * 1000, // 30 minutes - password state changes infrequently
+    gcTime: 60 * 60 * 1000, // 1 hour - keep in cache longer
   });
 }

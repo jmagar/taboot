@@ -160,3 +160,130 @@ In addition to just extracting and storing the raw data from each source, we sho
 Finally, we need to make sure that we are properly testing each reader and its associated models to ensure that they are functioning correctly and efficiently. This includes unit tests for individual components as well as integration tests to ensure that the entire ingestion process works as expected.
 
 Remember, we are developing using a TDD (Test-Driven Development) approach, so we should be writing tests before implementing the actual functionality. This will help us catch issues early and ensure that our code is robust and reliable. RED-GREEN-REFACTOR!
+
+# Follow-Up Clarifications Part 2
+
+# SWAG Reader Clarifications
+What is Proxy?
+Proxy node = The SWAG reverse proxy itself (the nginx container)
+Currently just a single node with name="swag" that acts as the central routing hub
+Think of it as: (:Proxy {name: "swag"})-[:ROUTES_TO {host, path, tls}]->(:Service {name: "api"})
+Your extraction requirements are ALL extractable from nginx config:
+✅ server_name - already extracted
+✅ upstream_app/port/proto - currently extracts as service name, can parse URL fully
+    - No don't parse the URL proxy_pass URL, it would just be variables:
+        Exmaple:
+        ```
+        set $upstream_app 100.74.16.82;
+        set $upstream_port 3005;
+        set $upstream_proto http;
+        proxy_pass $upstream_proto://$upstream_app:$upstream_port;
+        ```
+    - Just extract the three variables as-is
+
+✅ location blocks - already extracted
+✅ auth (authelia) - NOT currently extracted, need to add check for include /config/nginx/authelia-location.conf
+    - Definitiely add this, very useful for security analysis
+✅ Headers - NOT currently extracted, need to parse add_header, proxy_set_header directives
+    - Yes, extract headers being set in the config - useful for security and debugging
+
+# Docker Compose Additions
+All your requirements are extractable from docker-compose.yml: Already in YAML:
+✅ Environment Variables (under environment:)
+✅ Dependencies (depends_on:)
+✅ Image Details (image: with tags)
+✅ Health Checks (healthcheck:)
+✅ Build Context (build: with context: and dockerfile:)
+✅ Devices (devices:)
+
+ComposeFile as root entity - Excellent idea. 
+    - Should we do this for our SWAG Reader as well?
+
+Structure:
+ComposeFile
+  ├── ComposeProject (metadata)
+  ├── ComposeService[] (list)
+  ├── ComposeNetwork[] (list)
+  └── ComposeVolume[] (list)
+
+# GitHub Reader Deep Dive
+Answering your questions:
+Tag vs Label vs Milestone:
+Tag: Git tags (v1.0.0, release markers) - USEFUL for version tracking
+Label: Issue/PR labels (bug, feature, priority) - USEFUL for categorization
+Milestone: Project milestones (v2.0, Q1 2025) - USEFUL for roadmap tracking
+Verdict: Keep all three
+Comment:
+Comments on Issues/PRs
+USEFUL for discussion threads, technical decisions, Q&A context
+Organization/User:
+Should map to Core Person/Organization entities
+GitHub User → Person (with github_username property)
+GitHub Org → Organization (with github_org property)
+Releases:
+YES, add Release model - distinct from Tags
+Has release notes, assets (binaries), publication date
+README model:
+Should be File (core entity) with file_type: "documentation"
+Or create Documentation reader-specific type
+Your file type strategy is EXACTLY right:
+GitHub Repository Files:
+├── Code files (.py, .ts, .rs) → CodeFile entity + AST extraction (treesitter)
+├── Documentation (README.md, docs/*.md) → Documentation entity
+├── Config files (docker-compose.yml, .env) → Respective readers
+└── Assets (images, binaries) → BinaryAsset entity (reference only)
+For code files with treesitter:
+Extract: language, LOC, functions/classes, imports, complexity
+Store AST as JSONB in PostgreSQL or as graph nodes
+This is a MAJOR feature - might be Phase 2?
+Question: Is code AST extraction in scope for THIS refactor, or future work?
+    - AST extraction will be future work (Phase 2). 
+
+
+# Gmail Reader
+Contacts:
+Should map to Core Person entity
+Gmail Contact → Person (with email, name, phone properties)
+Link: (:Email)-[:FROM]->(:Person)
+
+# Tailscale Reader
+TailscaleACL:
+Access Control Lists - rules defining which devices can access which devices
+Example: {"action": "accept", "src": ["tag:dev"], "dst": ["tag:prod:*"]}
+USEFUL for security analysis
+All your additional fields are extractable from Tailscale API:
+✅ Device OS (os)
+✅ IPv4/IPv6 (addresses)
+✅ Hostnames (hostname, name)
+✅ Endpoints (endpoints)
+✅ Key expiry (keyExpiryDisabled, expires)
+✅ Exit node (isExitNode)
+✅ Subnet routes (advertisedRoutes, enabledRoutes)
+✅ SSH (enableSSH)
+✅ DNS names, nameservers (tailnetDNS, dns)
+
+# Unifi Reader
+Need research agents to verify API capabilities. Most of your requirements are in Unifi API:
+✅ MAC/IP/Name/Link Speed/Connection Type/Uptime (device/client stats)
+✅ Firmware Version (device info)
+✅ WAN IP/Gateway/DNS (site config)
+✅ Wifi Name (WLAN config)
+⚠️ Port forwarding/Firewall/NAT/QoS rules - Need research agent to verify
+⚠️ Static routes - Need research agent to verify
+
+# Enrichment Strategy
+Your enrichment priorities are perfect: Priority 1: Infrastructure Correlation (Docker + SWAG + Tailscale + Unifi + Elasticsearch)
+Example: (:ComposeService {name: "api"})-[:PROXIED_BY]->(:ProxyRoute {host: "api.domain.com"})
+Example: (:TailscaleDevice {hostname: "server"})-[:RUNS]->(:ComposeService {name: "api"})
+Example: (:UnifiClient {ip: "192.168.1.100"})-[:CONNECTS_TO]->(:TailscaleDevice)
+This creates a complete infrastructure topology graph.
+
+# Scope Clarification 
+
+Core + Extended Extraction
+
+All your additional fields (SWAG auth, Docker env vars, Tailscale ACLs, Unifi network rules)
+Research agents to verify API capabilities
+NO code AST extraction
+NO enrichment yet
+

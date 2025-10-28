@@ -236,6 +236,19 @@ class TabootConfig(BaseSettings):
     firecrawl_api_key: SecretStr = SecretStr("changeme")
     firecrawl_default_country: str = "US"  # ISO 3166-1 alpha-2 country code
     firecrawl_default_languages: str = "en-US"  # Comma-separated locale codes
+
+    # Firecrawl URL path filtering (Firecrawl v2 feature)
+    # includePaths: Whitelist regex patterns for URL paths to crawl
+    # excludePaths: Blacklist regex patterns for URL paths to skip (takes precedence)
+    # Patterns match against pathname only (e.g., "/en/docs/api" not "https://example.com/en/docs/api")
+    # Comma-separated strings parsed to lists
+    firecrawl_include_paths: str = ""  # Empty = allow all paths
+    firecrawl_exclude_paths: str = (
+        # Default: Block common non-English language path segments
+        # Matches patterns like: /de/..., /docs/de/..., /api/fr/..., etc.
+        r"^.*/(de|fr|es|it|pt|nl|pl|ru|ja|zh|ko|ar|tr|cs|da|sv|no)/.*$"
+    )
+
     num_workers_per_queue: int = 16
     worker_concurrency: int = 8
     scrape_concurrency: int = 8

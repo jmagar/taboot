@@ -415,6 +415,10 @@ RERANKER_BATCH_SIZE=16
 RERANKER_DEVICE=auto
 OLLAMA_PORT=11434
 LLAMACRAWL_API_URL=http://localhost:8000
+
+# Firecrawl URL path filtering (Firecrawl v2 feature)
+FIRECRAWL_INCLUDE_PATHS=""  # Comma-separated regex patterns (whitelist)
+FIRECRAWL_EXCLUDE_PATHS="^.*/(de|fr|es|it|pt|nl|pl|ru|ja|zh|ko|ar|tr|cs|da|sv|no)/.*$"  # Default blocks 17 languages
 ```
 
 Per-source credentials (GitHub, Reddit, Gmail, Elasticsearch, Unifi, Tailscale) documented in `docs/`.

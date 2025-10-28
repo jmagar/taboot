@@ -31,7 +31,14 @@ class RateLimitError(WebReaderError):
 class WebReader:
     """Web document reader using Firecrawl API.
 
-    Implements rate limiting, error handling, and robots.txt compliance.
+    Implements rate limiting, error handling, robots.txt compliance, and URL path filtering.
+
+    Path Filtering (Firecrawl v2):
+    - include_paths: Whitelist regex patterns for URL paths to crawl
+    - exclude_paths: Blacklist regex patterns for URL paths to skip (takes precedence)
+    - Patterns match pathname only (e.g., "/en/docs" not "https://example.com/en/docs")
+    - Configured via FIRECRAWL_INCLUDE_PATHS and FIRECRAWL_EXCLUDE_PATHS environment variables
+    - Default: Blocks 17 common non-English language paths (de, fr, es, etc.)
     """
 
     def __init__(
@@ -150,6 +157,27 @@ class WebReader:
         }
         if limit is not None:
             params["limit"] = limit
+
+        # Build path filtering parameters (Firecrawl v2 URL filtering)
+        # includePaths: Whitelist regex patterns for paths to crawl
+        # excludePaths: Blacklist regex patterns for paths to skip (takes precedence)
+        # Parse comma-separated config strings into lists, filtering empty strings
+        include_paths: list[str] = [
+            pattern.strip()
+            for pattern in config.firecrawl_include_paths.split(",")
+            if pattern.strip()
+        ]
+        exclude_paths: list[str] = [
+            pattern.strip()
+            for pattern in config.firecrawl_exclude_paths.split(",")
+            if pattern.strip()
+        ]
+
+        # Add to params if non-empty
+        if include_paths:
+            params["include_paths"] = include_paths
+        if exclude_paths:
+            params["exclude_paths"] = exclude_paths
 
         try:
             docs = self._fetch_with_firecrawl(url, params)

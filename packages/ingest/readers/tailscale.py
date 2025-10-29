@@ -1,9 +1,10 @@
 """Tailscale network topology reader for Taboot platform.
 
 Fetches device information from Tailscale API and extracts:
-- Host nodes (hostname)
-- IP nodes (addresses with type detection)
-- LOCATED_AT relationships (host -> IP)
+- TailscaleDevice entities (new schema format)
+- TailscaleNetwork entities (extracted from subnet routes)
+- TailscaleACL entities (placeholder for future implementation)
+- Legacy format: Host nodes, IP nodes, LOCATED_AT relationships
 
 Per data-model.md: Extracts structured network topology to nodes/edges deterministically.
 
@@ -13,11 +14,17 @@ API Reference:
 
 import ipaddress
 import logging
+from datetime import UTC, datetime
 from typing import Any, Final
 
 import requests
 
+from packages.schemas.tailscale import TailscaleACL, TailscaleDevice, TailscaleNetwork
+
 logger = logging.getLogger(__name__)
+
+# Extractor version for temporal tracking
+EXTRACTOR_VERSION: Final[str] = "1.0.0"
 
 # Tailscale API configuration
 TAILSCALE_API_BASE_URL: Final[str] = "https://api.tailscale.com/api/v2"
@@ -107,30 +114,17 @@ class TailscaleReader:
         """Load device data from Tailscale API and extract topology.
 
         Returns:
-            dict[str, Any]: Structured data with hosts, IPs, and relationships.
+            dict[str, Any]: Structured data with new entity types and legacy format.
                 {
-                    "hosts": [
-                        {
-                            "hostname": str,
-                        },
-                        ...
-                    ],
-                    "ips": [
-                        {
-                            "addr": str,
-                            "ip_type": "v4" | "v6",
-                            "allocation": "static",
-                        },
-                        ...
-                    ],
-                    "relationships": [
-                        {
-                            "type": "LOCATED_AT",
-                            "source": str,  # hostname
-                            "target": str,  # IP address
-                        },
-                        ...
-                    ]
+                    # New format (Phase 4)
+                    "devices": [TailscaleDevice, ...],
+                    "networks": [TailscaleNetwork, ...],
+                    "acls": [TailscaleACL, ...],
+
+                    # Legacy format (backward compatibility)
+                    "hosts": [{"hostname": str}, ...],
+                    "ips": [{"addr": str, "ip_type": "v4"|"v6", "allocation": "static"}, ...],
+                    "relationships": [{"type": "LOCATED_AT", "source": str, "target": str}, ...]
                 }
 
         Raises:
@@ -140,36 +134,50 @@ class TailscaleReader:
         logger.info(f"Loading data from Tailscale API for tailnet {self.tailnet}")
 
         # Fetch devices from API
-        devices = self._fetch_devices()
+        devices_raw = self._fetch_devices()
 
+        # Initialize result containers
+        devices: list[TailscaleDevice] = []
+        networks: list[TailscaleNetwork] = []
+        acls: list[TailscaleACL] = []
+
+        # Legacy format containers
         hosts: list[dict[str, Any]] = []
         ips: list[dict[str, Any]] = []
         relationships: list[dict[str, Any]] = []
 
-        # Track unique IP addresses to avoid duplicates
+        # Track unique IPs and networks to avoid duplicates
         seen_ips: set[str] = set()
+        seen_networks: set[str] = set()
 
-        for device in devices:
-            hostname = device.get("hostname", "")
+        # Current timestamp for extraction metadata
+        now = datetime.now(UTC)
+
+        for device_raw in devices_raw:
+            hostname = device_raw.get("hostname", "")
             if not hostname:
-                logger.warning(f"Skipping device without hostname: {device.get('id')}")
+                logger.warning(f"Skipping device without hostname: {device_raw.get('id')}")
                 continue
 
-            # Extract host node
+            # Extract TailscaleDevice entity
+            device_entity = self._extract_device_entity(device_raw, now)
+            devices.append(device_entity)
+
+            # Extract legacy host node
             hosts.append({"hostname": hostname})
 
             # Extract IP addresses
-            addresses = device.get("addresses", [])
+            addresses = device_raw.get("addresses", [])
             for addr in addresses:
                 # Validate and classify IP address
                 ip_info = self._parse_ip_address(addr)
 
-                # Add IP node if not already seen
+                # Add IP node if not already seen (legacy format)
                 if addr not in seen_ips:
                     ips.append(ip_info)
                     seen_ips.add(addr)
 
-                # Create LOCATED_AT relationship
+                # Create LOCATED_AT relationship (legacy format)
                 relationships.append(
                     {
                         "type": "LOCATED_AT",
@@ -178,11 +186,26 @@ class TailscaleReader:
                     }
                 )
 
+            # Extract TailscaleNetwork entities from subnet routes
+            subnet_routes = device_raw.get("advertiseRoutes", [])
+            for route in subnet_routes:
+                if route not in seen_networks:
+                    network_entity = self._extract_network_entity(route, now)
+                    networks.append(network_entity)
+                    seen_networks.add(route)
+
         logger.info(
-            f"Extracted {len(hosts)} hosts, {len(ips)} IPs, {len(relationships)} relationships"
+            f"Extracted {len(devices)} devices, {len(networks)} networks, "
+            f"{len(hosts)} hosts (legacy), {len(ips)} IPs (legacy), "
+            f"{len(relationships)} relationships (legacy)"
         )
 
         return {
+            # New format (Phase 4)
+            "devices": devices,
+            "networks": networks,
+            "acls": acls,  # Empty for now, ACL extraction requires additional API calls
+            # Legacy format (backward compatibility)
             "hosts": hosts,
             "ips": ips,
             "relationships": relationships,
@@ -324,3 +347,126 @@ class TailscaleReader:
         except ValueError as e:
             logger.error(f"Invalid IP address format: {addr}")
             raise InvalidIPError(f"Invalid IP address: {addr}") from e
+
+    def _parse_timestamp(self, timestamp_str: str | None) -> datetime | None:
+        """Parse ISO 8601 timestamp string to datetime object.
+
+        Args:
+            timestamp_str: ISO 8601 timestamp string (e.g., "2024-01-15T09:00:00Z").
+
+        Returns:
+            datetime | None: Parsed datetime object or None if invalid/missing.
+        """
+        if not timestamp_str:
+            return None
+
+        try:
+            # Replace 'Z' suffix with '+00:00' for UTC timezone
+            return datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+        except (ValueError, AttributeError) as e:
+            logger.warning(f"Failed to parse timestamp: {timestamp_str}: {e}")
+            return None
+
+    def _extract_device_entity(self, device_raw: dict[str, Any], now: datetime) -> TailscaleDevice:
+        """Extract TailscaleDevice entity from raw API response.
+
+        Converts raw Tailscale API device data into a validated TailscaleDevice Pydantic
+        model with temporal tracking metadata. Separates IPv4 and IPv6 addresses into
+        distinct fields for queryability.
+
+        Args:
+            device_raw: Raw device data from Tailscale API containing device ID, hostname,
+                       addresses, OS, and optional fields like exit node status and SSH config.
+            now: Current timestamp for extraction metadata (created_at, updated_at).
+
+        Returns:
+            TailscaleDevice: Validated device entity with temporal tracking and extraction
+                            metadata (tier, method, confidence, version).
+
+        Note:
+            - Takes first IPv4 and first IPv6 address if multiple present
+            - key_expiry not available in basic /devices API endpoint
+            - All extraction uses Tier A (deterministic API parsing)
+        """
+        # Parse addresses into IPv4 and IPv6
+        addresses = device_raw.get("addresses", [])
+        ipv4_address: str | None = None
+        ipv6_address: str | None = None
+
+        for addr in addresses:
+            try:
+                ip_obj = ipaddress.ip_address(addr)
+                if isinstance(ip_obj, ipaddress.IPv4Address) and ipv4_address is None:
+                    ipv4_address = addr
+                elif isinstance(ip_obj, ipaddress.IPv6Address) and ipv6_address is None:
+                    ipv6_address = addr
+            except ValueError:
+                logger.warning(f"Skipping invalid IP address: {addr}")
+                continue
+
+        # Parse last seen timestamp
+        source_timestamp = self._parse_timestamp(device_raw.get("lastSeen"))
+
+        # Create TailscaleDevice entity
+        return TailscaleDevice(
+            device_id=device_raw["id"],
+            hostname=device_raw["hostname"],
+            os=device_raw["os"],
+            ipv4_address=ipv4_address,
+            ipv6_address=ipv6_address,
+            endpoints=device_raw.get("endpoints"),
+            key_expiry=None,  # Not available in basic device API response
+            is_exit_node=device_raw.get("isExitNode"),
+            subnet_routes=device_raw.get("advertiseRoutes"),
+            ssh_enabled=device_raw.get("enabledSSH"),
+            tailnet_dns_name=device_raw.get("tailnetDNSName"),
+            created_at=now,
+            updated_at=now,
+            source_timestamp=source_timestamp,
+            extraction_tier="A",
+            extraction_method="tailscale_api",
+            confidence=1.0,
+            extractor_version=EXTRACTOR_VERSION,
+        )
+
+    def _extract_network_entity(self, cidr: str, now: datetime) -> TailscaleNetwork:
+        """Extract TailscaleNetwork entity from subnet route.
+
+        Creates a TailscaleNetwork entity from a subnet route advertised by a device.
+        Generates a deterministic network ID from the CIDR notation for consistent
+        identification across extractions.
+
+        Args:
+            cidr: CIDR notation for subnet route (e.g., "10.0.0.0/24").
+            now: Current timestamp for extraction metadata (created_at, updated_at).
+
+        Returns:
+            TailscaleNetwork: Validated network entity with temporal tracking and
+                             extraction metadata. DNS and nameserver fields are None
+                             as they're not available from subnet route data.
+
+        Note:
+            - Network ID is deterministic: "network-{cidr_sanitized}"
+            - DNS configuration requires separate API calls (not implemented in Phase 4)
+            - All extraction uses Tier A (deterministic API parsing)
+        """
+        # Generate network ID from CIDR (sanitize for use as identifier)
+        network_id = f"network-{cidr.replace('/', '_').replace('.', '_').replace(':', '_')}"
+
+        # Generate descriptive name from CIDR
+        name = f"Subnet {cidr}"
+
+        return TailscaleNetwork(
+            network_id=network_id,
+            name=name,
+            cidr=cidr,
+            global_nameservers=None,  # Not available from subnet routes
+            search_domains=None,  # Not available from subnet routes
+            created_at=now,
+            updated_at=now,
+            source_timestamp=None,
+            extraction_tier="A",
+            extraction_method="tailscale_api",
+            confidence=1.0,
+            extractor_version=EXTRACTOR_VERSION,
+        )

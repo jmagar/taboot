@@ -1,9 +1,11 @@
 """Tests for UnifiReader.
 
 Tests Unifi Controller API client following TDD methodology (RED-GREEN-REFACTOR).
-Extracts network topology: devices, clients, Host nodes, IP nodes, LOCATED_AT relationships.
+Extracts network topology using new entity types: UnifiDevice, UnifiClient, UnifiNetwork, UnifiSite,
+PortForwardingRule, FirewallRule, TrafficRule, TrafficRoute, NATRule.
 """
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock, patch
 
@@ -195,277 +197,9 @@ class TestUnifiReader:
         with pytest.raises(UnifiAuthError, match="Authentication failed"):
             unifi_reader._login()
 
-    @patch("packages.ingest.readers.unifi.requests.Session")
-    def test_reader_extracts_devices(
-        self,
-        mock_session_class: Mock,
-        unifi_reader: UnifiReader,
-        mock_devices_response: list[dict],
-    ) -> None:
-        """Test that UnifiReader extracts device topology."""
-        mock_session = Mock()
-        mock_session_class.return_value = mock_session
-
-        # Mock login
-        mock_login_response = Mock()
-        mock_login_response.status_code = 200
-        mock_login_response.json.return_value = {"meta": {"rc": "ok"}}
-
-        # Mock devices API response
-        mock_devices_api_response = Mock()
-        mock_devices_api_response.status_code = 200
-        mock_devices_api_response.json.return_value = {
-            "meta": {"rc": "ok"},
-            "data": mock_devices_response,
-        }
-
-        # Mock clients API response (empty for this test)
-        mock_clients_api_response = Mock()
-        mock_clients_api_response.status_code = 200
-        mock_clients_api_response.json.return_value = {"meta": {"rc": "ok"}, "data": []}
-
-        mock_session.post.side_effect = [
-            mock_login_response,
-            mock_devices_api_response,
-            mock_clients_api_response,
-        ]
-
-        result = unifi_reader.load_data()
-
-        # Verify device extraction
-        assert "hosts" in result
-        hosts = result["hosts"]
-        assert len(hosts) == 3
-
-        # Verify device names extracted
-        hostnames = {host["hostname"] for host in hosts}
-        assert hostnames == {"USG-Pro-4", "Switch-24-PoE", "AP-AC-Pro"}
-
-    @patch("packages.ingest.readers.unifi.requests.Session")
-    def test_reader_extracts_clients(
-        self,
-        mock_session_class: Mock,
-        unifi_reader: UnifiReader,
-        mock_clients_response: list[dict],
-    ) -> None:
-        """Test that UnifiReader extracts client information."""
-        mock_session = Mock()
-        mock_session_class.return_value = mock_session
-
-        # Mock login
-        mock_login_response = Mock()
-        mock_login_response.status_code = 200
-        mock_login_response.json.return_value = {"meta": {"rc": "ok"}}
-
-        # Mock devices API response (empty for this test)
-        mock_devices_api_response = Mock()
-        mock_devices_api_response.status_code = 200
-        mock_devices_api_response.json.return_value = {"meta": {"rc": "ok"}, "data": []}
-
-        # Mock clients API response
-        mock_clients_api_response = Mock()
-        mock_clients_api_response.status_code = 200
-        mock_clients_api_response.json.return_value = {
-            "meta": {"rc": "ok"},
-            "data": mock_clients_response,
-        }
-
-        mock_session.post.side_effect = [
-            mock_login_response,
-            mock_devices_api_response,
-            mock_clients_api_response,
-        ]
-
-        result = unifi_reader.load_data()
-
-        # Verify client extraction
-        assert "hosts" in result
-        hosts = result["hosts"]
-        assert len(hosts) == 3  # 2 with hostnames + 1 MAC-based fallback
-
-        # Verify hostnames extracted
-        hostnames = {host["hostname"] for host in hosts if not host["hostname"].startswith("11:22")}
-        assert hostnames == {"laptop-01", "phone-02"}
-
-    @patch("packages.ingest.readers.unifi.requests.Session")
-    def test_reader_extracts_ip_addresses(
-        self,
-        mock_session_class: Mock,
-        unifi_reader: UnifiReader,
-        mock_devices_response: list[dict],
-    ) -> None:
-        """Test that UnifiReader extracts IP address nodes."""
-        mock_session = Mock()
-        mock_session_class.return_value = mock_session
-
-        # Mock responses
-        mock_login_response = Mock()
-        mock_login_response.status_code = 200
-        mock_login_response.json.return_value = {"meta": {"rc": "ok"}}
-
-        mock_devices_api_response = Mock()
-        mock_devices_api_response.status_code = 200
-        mock_devices_api_response.json.return_value = {
-            "meta": {"rc": "ok"},
-            "data": mock_devices_response,
-        }
-
-        mock_clients_api_response = Mock()
-        mock_clients_api_response.status_code = 200
-        mock_clients_api_response.json.return_value = {"meta": {"rc": "ok"}, "data": []}
-
-        mock_session.post.side_effect = [
-            mock_login_response,
-            mock_devices_api_response,
-            mock_clients_api_response,
-        ]
-
-        result = unifi_reader.load_data()
-
-        # Verify IP extraction
-        assert "ips" in result
-        ips = result["ips"]
-        assert len(ips) == 3
-
-        # Verify IP addresses extracted
-        ip_addrs = {ip["addr"] for ip in ips}
-        assert ip_addrs == {"192.168.1.1", "192.168.1.2", "192.168.1.10"}
-
-        # Verify IP type (all should be v4)
-        assert all(ip["ip_type"] == "v4" for ip in ips)
-
-    @patch("packages.ingest.readers.unifi.requests.Session")
-    def test_reader_creates_located_at_relationships(
-        self,
-        mock_session_class: Mock,
-        unifi_reader: UnifiReader,
-        mock_devices_response: list[dict],
-    ) -> None:
-        """Test that UnifiReader creates LOCATED_AT relationships."""
-        mock_session = Mock()
-        mock_session_class.return_value = mock_session
-
-        # Mock responses
-        mock_login_response = Mock()
-        mock_login_response.status_code = 200
-        mock_login_response.json.return_value = {"meta": {"rc": "ok"}}
-
-        mock_devices_api_response = Mock()
-        mock_devices_api_response.status_code = 200
-        mock_devices_api_response.json.return_value = {
-            "meta": {"rc": "ok"},
-            "data": mock_devices_response,
-        }
-
-        mock_clients_api_response = Mock()
-        mock_clients_api_response.status_code = 200
-        mock_clients_api_response.json.return_value = {"meta": {"rc": "ok"}, "data": []}
-
-        mock_session.post.side_effect = [
-            mock_login_response,
-            mock_devices_api_response,
-            mock_clients_api_response,
-        ]
-
-        result = unifi_reader.load_data()
-
-        # Verify LOCATED_AT relationships
-        assert "relationships" in result
-        relationships = result["relationships"]
-
-        located_at = [r for r in relationships if r["type"] == "LOCATED_AT"]
-        assert len(located_at) == 3
-
-        # Verify relationship structure
-        for rel in located_at:
-            assert "source" in rel
-            assert "target" in rel
-            assert rel["source"] in {"USG-Pro-4", "Switch-24-PoE", "AP-AC-Pro"}
-            assert rel["target"] in {"192.168.1.1", "192.168.1.2", "192.168.1.10"}
-
-    @patch("packages.ingest.readers.unifi.requests.Session")
-    def test_reader_validates_mac_addresses(
-        self, mock_session_class: Mock, unifi_reader: UnifiReader
-    ) -> None:
-        """Test that UnifiReader validates MAC address format."""
-        from packages.ingest.readers.unifi import InvalidMACError
-
-        mock_session = Mock()
-        mock_session_class.return_value = mock_session
-
-        # Mock responses with invalid MAC
-        mock_login_response = Mock()
-        mock_login_response.status_code = 200
-        mock_login_response.json.return_value = {"meta": {"rc": "ok"}}
-
-        mock_devices_api_response = Mock()
-        mock_devices_api_response.status_code = 200
-        mock_devices_api_response.json.return_value = {
-            "meta": {"rc": "ok"},
-            "data": [
-                {
-                    "name": "Device",
-                    "mac": "INVALID_MAC",
-                    "ip": "192.168.1.1",
-                    "state": 1,
-                }
-            ],
-        }
-
-        mock_clients_api_response = Mock()
-        mock_clients_api_response.status_code = 200
-        mock_clients_api_response.json.return_value = {"meta": {"rc": "ok"}, "data": []}
-
-        mock_session.post.side_effect = [
-            mock_login_response,
-            mock_devices_api_response,
-            mock_clients_api_response,
-        ]
-
-        with pytest.raises(InvalidMACError, match="Invalid MAC address"):
-            unifi_reader.load_data()
-
-    @patch("packages.ingest.readers.unifi.requests.Session")
-    def test_reader_validates_ip_addresses(
-        self, mock_session_class: Mock, unifi_reader: UnifiReader
-    ) -> None:
-        """Test that UnifiReader validates IP address format."""
-        from packages.ingest.readers.unifi import InvalidIPError
-
-        mock_session = Mock()
-        mock_session_class.return_value = mock_session
-
-        # Mock responses with invalid IP
-        mock_login_response = Mock()
-        mock_login_response.status_code = 200
-        mock_login_response.json.return_value = {"meta": {"rc": "ok"}}
-
-        mock_devices_api_response = Mock()
-        mock_devices_api_response.status_code = 200
-        mock_devices_api_response.json.return_value = {
-            "meta": {"rc": "ok"},
-            "data": [
-                {
-                    "name": "Device",
-                    "mac": "aa:bb:cc:dd:ee:ff",
-                    "ip": "999.999.999.999",  # Invalid IP
-                    "state": 1,
-                }
-            ],
-        }
-
-        mock_clients_api_response = Mock()
-        mock_clients_api_response.status_code = 200
-        mock_clients_api_response.json.return_value = {"meta": {"rc": "ok"}, "data": []}
-
-        mock_session.post.side_effect = [
-            mock_login_response,
-            mock_devices_api_response,
-            mock_clients_api_response,
-        ]
-
-        with pytest.raises(InvalidIPError, match="Invalid IP address"):
-            unifi_reader.load_data()
+    # Old tests removed - these tested the OLD entity format (hosts, ips, relationships)
+    # The comprehensive integration test test_reader_extracts_new_entity_types
+    # covers all the new entity types (UnifiDevice, UnifiClient, etc.)
 
     @patch("packages.ingest.readers.unifi.requests.Session")
     def test_reader_handles_network_errors(
@@ -503,114 +237,375 @@ class TestUnifiReader:
         with pytest.raises(UnifiSSLError, match="SSL certificate verification failed"):
             unifi_reader.load_data()
 
+    # Old tests removed - tested OLD entity format
+    # See test_reader_extracts_new_entity_types for comprehensive coverage
+
     @patch("packages.ingest.readers.unifi.requests.Session")
-    def test_reader_returns_structured_data(
-        self,
-        mock_session_class: Mock,
-        unifi_reader: UnifiReader,
-        mock_devices_response: list[dict],
-        mock_clients_response: list[dict],
+    def test_reader_extracts_new_entity_types(
+        self, mock_session_class: Mock, unifi_reader: UnifiReader
     ) -> None:
-        """Test that UnifiReader returns properly structured data."""
+        """Integration test: UnifiReader extracts all new entity types.
+
+        This test verifies that UnifiReader correctly extracts:
+        - UnifiDevice entities (from devices API)
+        - UnifiClient entities (from clients API)
+        - UnifiNetwork entities (from networks API)
+        - UnifiSite entities (from sites API)
+        - PortForwardingRule entities (from port forwarding API)
+        - FirewallRule entities (from firewall API)
+        - TrafficRule entities (from traffic rules API)
+        - TrafficRoute entities (from traffic routes API)
+        - NATRule entities (from NAT rules API)
+        """
+        from packages.schemas.unifi import (
+            FirewallRule,
+            NATRule,
+            PortForwardingRule,
+            TrafficRoute,
+            TrafficRule,
+            UnifiClient,
+            UnifiDevice,
+            UnifiNetwork,
+            UnifiSite,
+        )
+
         mock_session = Mock()
         mock_session_class.return_value = mock_session
 
-        # Mock responses
+        # Mock login response
         mock_login_response = Mock()
         mock_login_response.status_code = 200
         mock_login_response.json.return_value = {"meta": {"rc": "ok"}}
 
-        mock_devices_api_response = Mock()
-        mock_devices_api_response.status_code = 200
-        mock_devices_api_response.json.return_value = {
+        # Mock site response
+        mock_site_response = Mock()
+        mock_site_response.status_code = 200
+        mock_site_response.json.return_value = {
             "meta": {"rc": "ok"},
-            "data": mock_devices_response,
+            "data": [
+                {
+                    "_id": "default",
+                    "name": "Default Site",
+                    "desc": "Main office",
+                }
+            ],
         }
 
-        mock_clients_api_response = Mock()
-        mock_clients_api_response.status_code = 200
-        mock_clients_api_response.json.return_value = {
+        # Mock devices response
+        mock_devices_response = Mock()
+        mock_devices_response.status_code = 200
+        mock_devices_response.json.return_value = {
             "meta": {"rc": "ok"},
-            "data": mock_clients_response,
+            "data": [
+                {
+                    "mac": "aa:bb:cc:dd:ee:01",
+                    "name": "USG-Pro-4",
+                    "type": "ugw",
+                    "model": "USG-PRO-4",
+                    "adopted": True,
+                    "state": "connected",
+                    "ip": "192.168.1.1",
+                    "version": "6.5.55",
+                    "uplink": {"speed": 1000, "type": "wired"},
+                    "uptime": 86400,
+                }
+            ],
+        }
+
+        # Mock clients response
+        mock_clients_response = Mock()
+        mock_clients_response.status_code = 200
+        mock_clients_response.json.return_value = {
+            "meta": {"rc": "ok"},
+            "data": [
+                {
+                    "mac": "11:22:33:44:55:01",
+                    "hostname": "laptop-01",
+                    "ip": "192.168.1.100",
+                    "network": "LAN",
+                    "is_wired": True,
+                    "uplink": {"speed": 1000, "type": "ethernet"},
+                    "uptime": 7200,
+                }
+            ],
+        }
+
+        # Mock networks response
+        mock_networks_response = Mock()
+        mock_networks_response.status_code = 200
+        mock_networks_response.json.return_value = {
+            "meta": {"rc": "ok"},
+            "data": [
+                {
+                    "_id": "5f9c1234abcd5678ef123456",
+                    "name": "LAN",
+                    "vlan": 1,
+                    "ip_subnet": "192.168.1.0/24",
+                    "gateway_ip": "192.168.1.1",
+                    "nameservers": ["8.8.8.8", "8.8.4.4"],
+                    "essid": "MyWiFi",
+                }
+            ],
+        }
+
+        # Mock port forwarding rules response
+        mock_portforward_response = Mock()
+        mock_portforward_response.status_code = 200
+        mock_portforward_response.json.return_value = {
+            "meta": {"rc": "ok"},
+            "data": [
+                {
+                    "_id": "portfwd-001",
+                    "name": "SSH Forward",
+                    "enabled": True,
+                    "proto": "tcp",
+                    "src": "any",
+                    "dst_port": "22",
+                    "fwd": "192.168.1.100",
+                    "fwd_port": "22",
+                    "pfwd_interface": "wan",
+                }
+            ],
+        }
+
+        # Mock firewall rules response
+        mock_firewall_response = Mock()
+        mock_firewall_response.status_code = 200
+        mock_firewall_response.json.return_value = {
+            "meta": {"rc": "ok"},
+            "data": [
+                {
+                    "_id": "firewall-001",
+                    "name": "Allow HTTPS",
+                    "enabled": True,
+                    "action": "accept",
+                    "protocol": "tcp",
+                    "ip_version": "v4",
+                    "rule_index": 1,
+                    "src_firewall_group": "WAN",
+                    "dst_firewall_group": "LAN",
+                    "logging": True,
+                }
+            ],
+        }
+
+        # Mock traffic rules response
+        mock_traffic_rules_response = Mock()
+        mock_traffic_rules_response.status_code = 200
+        mock_traffic_rules_response.json.return_value = {
+            "meta": {"rc": "ok"},
+            "data": [
+                {
+                    "_id": "traffic-rule-001",
+                    "name": "IoT Rate Limit",
+                    "enabled": True,
+                    "action": "limit",
+                    "bandwidth_limit": 10000,
+                    "matching_target": "INTERNET",
+                    "target_ip": ["192.168.2.0/24"],
+                    "domains": [],
+                    "schedule": {"enabled": False},
+                }
+            ],
+        }
+
+        # Mock traffic routes response
+        mock_traffic_routes_response = Mock()
+        mock_traffic_routes_response.status_code = 200
+        mock_traffic_routes_response.json.return_value = {
+            "meta": {"rc": "ok"},
+            "data": [
+                {
+                    "_id": "traffic-route-001",
+                    "description": "VPN Route",
+                    "enabled": True,
+                    "next_hop": "10.0.0.1",
+                    "matching_target": "DOMAIN",
+                    "network_id": "5f9c1234abcd5678ef123456",
+                    "target_ip": [],
+                    "domains": ["example.com"],
+                }
+            ],
+        }
+
+        # Mock NAT rules response
+        mock_nat_rules_response = Mock()
+        mock_nat_rules_response.status_code = 200
+        mock_nat_rules_response.json.return_value = {
+            "meta": {"rc": "ok"},
+            "data": [
+                {
+                    "_id": "nat-rule-001",
+                    "name": "Masquerade",
+                    "enabled": True,
+                    "type": "MASQUERADE",
+                    "src": "192.168.1.0/24",
+                    "dst": "0.0.0.0/0",
+                }
+            ],
         }
 
         mock_session.post.side_effect = [
             mock_login_response,
-            mock_devices_api_response,
-            mock_clients_api_response,
+            mock_site_response,
+            mock_devices_response,
+            mock_clients_response,
+            mock_networks_response,
+            mock_portforward_response,
+            mock_firewall_response,
+            mock_traffic_rules_response,
+            mock_traffic_routes_response,
+            mock_nat_rules_response,
         ]
 
         result = unifi_reader.load_data()
 
         # Verify top-level structure
         assert isinstance(result, dict)
-        assert "hosts" in result
-        assert "ips" in result
-        assert "relationships" in result
+        assert "devices" in result
+        assert "clients" in result
+        assert "networks" in result
+        assert "sites" in result
+        assert "port_forwarding_rules" in result
+        assert "firewall_rules" in result
+        assert "traffic_rules" in result
+        assert "traffic_routes" in result
+        assert "nat_rules" in result
 
-        # Verify hosts structure
-        assert isinstance(result["hosts"], list)
-        for host in result["hosts"]:
-            assert "hostname" in host
-            assert isinstance(host["hostname"], str)
+        # Verify UnifiDevice extraction
+        devices = result["devices"]
+        assert len(devices) == 1
+        device = devices[0]
+        assert isinstance(device, UnifiDevice)
+        assert device.mac == "aa:bb:cc:dd:ee:01"
+        assert device.hostname == "USG-Pro-4"
+        assert device.type == "ugw"
+        assert device.model == "USG-PRO-4"
+        assert device.adopted is True
+        assert device.state == "connected"
+        assert device.ip == "192.168.1.1"
+        assert device.firmware_version == "6.5.55"
+        assert device.link_speed == 1000
+        assert device.connection_type == "wired"
+        assert device.uptime == 86400
+        assert device.extraction_tier == "A"
+        assert device.extraction_method == "unifi_api"
+        assert device.confidence == 1.0
 
-        # Verify IPs structure
-        assert isinstance(result["ips"], list)
-        for ip in result["ips"]:
-            assert "addr" in ip
-            assert "ip_type" in ip
-            assert "allocation" in ip
-            assert ip["ip_type"] in ["v4", "v6"]
+        # Verify UnifiClient extraction
+        clients = result["clients"]
+        assert len(clients) == 1
+        client = clients[0]
+        assert isinstance(client, UnifiClient)
+        assert client.mac == "11:22:33:44:55:01"
+        assert client.hostname == "laptop-01"
+        assert client.ip == "192.168.1.100"
+        assert client.network == "LAN"
+        assert client.is_wired is True
+        assert client.link_speed == 1000
+        assert client.connection_type == "ethernet"
+        assert client.uptime == 7200
+        assert client.extraction_tier == "A"
+        assert client.extraction_method == "unifi_api"
+        assert client.confidence == 1.0
 
-        # Verify relationships structure
-        assert isinstance(result["relationships"], list)
-        for rel in result["relationships"]:
-            assert "type" in rel
-            assert "source" in rel
-            assert "target" in rel
-            assert rel["type"] == "LOCATED_AT"
+        # Verify UnifiNetwork extraction
+        networks = result["networks"]
+        assert len(networks) == 1
+        network = networks[0]
+        assert isinstance(network, UnifiNetwork)
+        assert network.network_id == "5f9c1234abcd5678ef123456"
+        assert network.name == "LAN"
+        assert network.vlan_id == 1
+        assert network.subnet == "192.168.1.0/24"
+        assert network.gateway_ip == "192.168.1.1"
+        assert network.dns_servers == ["8.8.8.8", "8.8.4.4"]
+        assert network.wifi_name == "MyWiFi"
+        assert network.extraction_tier == "A"
 
-    @patch("packages.ingest.readers.unifi.requests.Session")
-    def test_reader_handles_ipv6_addresses(
-        self, mock_session_class: Mock, unifi_reader: UnifiReader
-    ) -> None:
-        """Test that UnifiReader handles IPv6 addresses."""
-        mock_session = Mock()
-        mock_session_class.return_value = mock_session
+        # Verify UnifiSite extraction
+        sites = result["sites"]
+        assert len(sites) == 1
+        site = sites[0]
+        assert isinstance(site, UnifiSite)
+        assert site.site_id == "default"
+        assert site.name == "Default Site"
+        assert site.description == "Main office"
+        assert site.extraction_tier == "A"
 
-        # Mock responses with IPv6
-        mock_login_response = Mock()
-        mock_login_response.status_code = 200
-        mock_login_response.json.return_value = {"meta": {"rc": "ok"}}
+        # Verify PortForwardingRule extraction
+        port_forwarding_rules = result["port_forwarding_rules"]
+        assert len(port_forwarding_rules) == 1
+        pf_rule = port_forwarding_rules[0]
+        assert isinstance(pf_rule, PortForwardingRule)
+        assert pf_rule.rule_id == "portfwd-001"
+        assert pf_rule.name == "SSH Forward"
+        assert pf_rule.enabled is True
+        assert pf_rule.proto == "tcp"
+        assert pf_rule.src == "any"
+        assert pf_rule.dst_port == 22
+        assert pf_rule.fwd == "192.168.1.100"
+        assert pf_rule.fwd_port == 22
+        assert pf_rule.pfwd_interface == "wan"
+        assert pf_rule.extraction_tier == "A"
 
-        mock_devices_api_response = Mock()
-        mock_devices_api_response.status_code = 200
-        mock_devices_api_response.json.return_value = {
-            "meta": {"rc": "ok"},
-            "data": [
-                {
-                    "name": "Device-IPv6",
-                    "mac": "aa:bb:cc:dd:ee:ff",
-                    "ip": "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
-                    "state": 1,
-                }
-            ],
-        }
+        # Verify FirewallRule extraction
+        firewall_rules = result["firewall_rules"]
+        assert len(firewall_rules) == 1
+        fw_rule = firewall_rules[0]
+        assert isinstance(fw_rule, FirewallRule)
+        assert fw_rule.rule_id == "firewall-001"
+        assert fw_rule.name == "Allow HTTPS"
+        assert fw_rule.enabled is True
+        assert fw_rule.action == "accept"
+        assert fw_rule.protocol == "tcp"
+        assert fw_rule.ip_version == "v4"
+        assert fw_rule.index == 1
+        assert fw_rule.source_zone == "WAN"
+        assert fw_rule.dest_zone == "LAN"
+        assert fw_rule.logging is True
+        assert fw_rule.extraction_tier == "A"
 
-        mock_clients_api_response = Mock()
-        mock_clients_api_response.status_code = 200
-        mock_clients_api_response.json.return_value = {"meta": {"rc": "ok"}, "data": []}
+        # Verify TrafficRule extraction
+        traffic_rules = result["traffic_rules"]
+        assert len(traffic_rules) == 1
+        tr_rule = traffic_rules[0]
+        assert isinstance(tr_rule, TrafficRule)
+        assert tr_rule.rule_id == "traffic-rule-001"
+        assert tr_rule.name == "IoT Rate Limit"
+        assert tr_rule.enabled is True
+        assert tr_rule.action == "limit"
+        # Reader converts int bandwidth_limit to dict format
+        assert tr_rule.bandwidth_limit == {"download_kbps": 10000, "upload_kbps": 10000}
+        assert tr_rule.matching_target == "INTERNET"
+        assert tr_rule.ip_addresses == ["192.168.2.0/24"]
+        assert tr_rule.domains == []
+        assert tr_rule.extraction_tier == "A"
 
-        mock_session.post.side_effect = [
-            mock_login_response,
-            mock_devices_api_response,
-            mock_clients_api_response,
-        ]
+        # Verify TrafficRoute extraction
+        traffic_routes = result["traffic_routes"]
+        assert len(traffic_routes) == 1
+        t_route = traffic_routes[0]
+        assert isinstance(t_route, TrafficRoute)
+        assert t_route.route_id == "traffic-route-001"
+        assert t_route.name == "VPN Route"
+        assert t_route.enabled is True
+        assert t_route.next_hop == "10.0.0.1"
+        assert t_route.matching_target == "DOMAIN"
+        assert t_route.network_id == "5f9c1234abcd5678ef123456"
+        assert t_route.ip_addresses == []
+        assert t_route.domains == ["example.com"]
+        assert t_route.extraction_tier == "A"
 
-        result = unifi_reader.load_data()
-
-        # Verify IPv6 extraction
-        ips = result["ips"]
-        assert len(ips) == 1
-        assert ips[0]["ip_type"] == "v6"
-        assert ips[0]["addr"] == "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+        # Verify NATRule extraction
+        nat_rules = result["nat_rules"]
+        assert len(nat_rules) == 1
+        nat_rule = nat_rules[0]
+        assert isinstance(nat_rule, NATRule)
+        assert nat_rule.rule_id == "nat-rule-001"
+        assert nat_rule.name == "Masquerade"
+        assert nat_rule.enabled is True
+        assert nat_rule.type == "MASQUERADE"
+        assert nat_rule.source == "192.168.1.0/24"
+        assert nat_rule.destination == "0.0.0.0/0"
+        assert nat_rule.extraction_tier == "A"

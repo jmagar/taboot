@@ -40,6 +40,9 @@ def load_model() -> CrossEncoder:
         max_length=max_length,
         default_activation_function=None,
     )
+    # Fix: Qwen models need explicit padding token for batch processing
+    if model.tokenizer.pad_token is None:
+        model.tokenizer.pad_token = model.tokenizer.eos_token
     return model
 
 

@@ -12,6 +12,7 @@ from llama_index.readers.web import FireCrawlWebReader
 
 from packages.common.config import get_config
 from packages.common.resilience import resilient_external_call
+from packages.ingest.url_filter import URLFilter
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +68,34 @@ class WebReader:
         self.max_retries = max_retries
         self._last_request_time: float = 0.0
 
+        # Load URL filter patterns from config
+        config = get_config()
+        self.include_paths = config.firecrawl_include_paths
+        self.exclude_paths = config.firecrawl_exclude_paths
+
+        # Parse comma-separated patterns into lists for client-side validation
+        include_list = (
+            [pattern.strip() for pattern in self.include_paths.split(",") if pattern.strip()]
+            if self.include_paths
+            else None
+        )
+        exclude_list = (
+            [pattern.strip() for pattern in self.exclude_paths.split(",") if pattern.strip()]
+            if self.exclude_paths
+            else None
+        )
+
+        # Initialize URL filter for client-side validation (defense-in-depth)
+        self.url_filter = URLFilter(
+            include_patterns=include_list,
+            exclude_patterns=exclude_list,
+        )
+
         logger.info(
             f"Initialized WebReader (firecrawl_url={firecrawl_url}, "
-            f"rate_limit_delay={rate_limit_delay}s, max_retries={max_retries})"
+            f"rate_limit_delay={rate_limit_delay}s, max_retries={max_retries}, "
+            f"include_patterns={len(include_list) if include_list else 0}, "
+            f"exclude_patterns={len(exclude_list) if exclude_list else 0})"
         )
 
     def _enforce_rate_limit(self) -> None:
@@ -87,7 +113,7 @@ class WebReader:
 
         Args:
             url: URL to crawl.
-            params: Firecrawl API parameters.
+            params: Firecrawl API parameters (snake_case - Firecrawl Python SDK format).
 
         Returns:
             list[Document]: List of LlamaIndex Document objects.
@@ -95,7 +121,11 @@ class WebReader:
         Raises:
             Exception: If Firecrawl API call fails after retries.
         """
+        logger.debug(f"Firecrawl params: {params}")
+
         # Create reader with crawl mode
+        # Note: FireCrawlWebReader passes params to Firecrawl Python SDK which expects snake_case
+        # The SDK internally converts to camelCase for the HTTP API
         reader = FireCrawlWebReader(
             api_key=self.firecrawl_api_key,
             api_url=self.firecrawl_url,
@@ -105,11 +135,14 @@ class WebReader:
 
         docs = reader.load_data(url=url)
 
-        # Add source_url to metadata
+        # Add source_url to metadata if not already present
+        # Firecrawl may return documents from different URLs during crawl
         for doc in docs:
             if not doc.metadata:
                 doc.metadata = {}
-            doc.metadata["source_url"] = url
+            # Only set source_url if not already present (preserve actual crawled URLs)
+            if "source_url" not in doc.metadata:
+                doc.metadata["source_url"] = url
 
         return docs
 
@@ -134,6 +167,15 @@ class WebReader:
             raise ValueError(f"Invalid URL: {url}")
 
         logger.info(f"Loading data from {url} (limit: {limit})")
+
+        # Validate base URL against filters (defense-in-depth)
+        is_allowed, reason = self.url_filter.validate_url(url)
+        if not is_allowed:
+            raise ValueError(
+                f"URL rejected by filter: {reason}\n"
+                f"Exclude patterns: {self.exclude_paths}\n"
+                f"Include patterns: {self.include_paths}"
+            )
 
         # Enforce rate limiting
         self._enforce_rate_limit()
@@ -182,6 +224,26 @@ class WebReader:
         try:
             docs = self._fetch_with_firecrawl(url, params)
             logger.info(f"Loaded {len(docs)} documents from {url}")
+
+            # Post-crawl filtering: Filter returned documents by source URL
+            # (defense-in-depth to catch documents that slipped through Firecrawl filtering)
+            if docs:
+                original_count = len(docs)
+                allowed_docs = []
+                for doc in docs:
+                    doc_url = doc.metadata.get("source_url", "") if doc.metadata else ""
+                    is_allowed, reason = self.url_filter.validate_url(doc_url)
+                    if is_allowed:
+                        allowed_docs.append(doc)
+                    else:
+                        logger.warning(f"Filtered document after crawl: {reason}")
+
+                docs = allowed_docs
+                if len(docs) < original_count:
+                    logger.info(
+                        f"Post-crawl filtering: {original_count - len(docs)} documents removed"
+                    )
+
             return docs
         except Exception as e:
             logger.error(f"Failed to load {url}: {e}")

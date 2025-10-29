@@ -453,7 +453,7 @@
           "observability"
         ],
         "summary": "Prometheus Metrics",
-        "description": "Prometheus metrics endpoint.\n\nReturns metrics in Prometheus text exposition format.\nThis endpoint is scraped by Prometheus for monitoring and alerting.\n\nReturns:\n    Response: Prometheus metrics in text/plain format.\n\nExample:\n    $ curl http://localhost:8000/metrics\n    # HELP http_requests_total Total HTTP requests\n    # TYPE http_requests_total counter\n    http_requests_total{method=\"GET\",path=\"/health\",status=\"200\"} 42.0\n    ...",
+        "description": "Prometheus metrics endpoint.\n\nReturns metrics in Prometheus text exposition format.\nThis endpoint is scraped by Prometheus for monitoring and alerting.\n\nReturns:\n    Response: Prometheus metrics in text/plain format.\n\nExample:\n    $ curl http://localhost:4209/metrics\n    # HELP http_requests_total Total HTTP requests\n    # TYPE http_requests_total counter\n    http_requests_total{method=\"GET\",path=\"/health\",status=\"200\"} 42.0\n    ...",
         "operationId": "prometheus_metrics_metrics_get",
         "responses": {
           "200": {

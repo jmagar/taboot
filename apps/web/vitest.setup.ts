@@ -22,5 +22,5 @@ vi.mock('next/navigation', () => ({
 }));
 
 // Set mock environment variables
-process.env.NEXT_PUBLIC_API_URL = 'http://localhost:8000';
-process.env.NEXT_PUBLIC_BASE_URL = 'http://localhost:3000';
+process.env.NEXT_PUBLIC_API_URL = 'http://localhost:4209';
+process.env.NEXT_PUBLIC_BASE_URL = 'http://localhost:4211';

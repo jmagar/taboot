@@ -828,8 +828,8 @@ const fontMono = Geist_Mono({
    }));
 
    // Mock environment variables
-   process.env.NEXT_PUBLIC_API_URL = 'http://localhost:8000';
-   process.env.NEXT_PUBLIC_BASE_URL = 'http://localhost:3000';
+   process.env.NEXT_PUBLIC_API_URL = 'http://localhost:4209';
+   process.env.NEXT_PUBLIC_BASE_URL = 'http://localhost:4211';
    ```
 
 4. **Add test utilities**
@@ -889,7 +889,7 @@ const fontMono = Geist_Mono({
        await api.get('/health');
 
        expect(global.fetch).toHaveBeenCalledWith(
-         'http://localhost:8000/health',
+         'http://localhost:4209/health',
          expect.objectContaining({
            method: 'GET',
            credentials: 'include',
@@ -1091,7 +1091,7 @@ const fontMono = Geist_Mono({
 2. **Generate TypeScript types from FastAPI OpenAPI**
    ```bash
    # Generate types from running API
-   npx openapi-typescript http://localhost:8000/openapi.json -o apps/web/lib/api-types.ts
+   npx openapi-typescript http://localhost:4209/openapi.json -o apps/web/lib/api-types.ts
    ```
 
 3. **Add generation script**
@@ -1099,7 +1099,7 @@ const fontMono = Geist_Mono({
    // apps/web/package.json
    {
      "scripts": {
-       "generate:api-types": "openapi-typescript http://localhost:8000/openapi.json -o lib/api-types.ts",
+       "generate:api-types": "openapi-typescript http://localhost:4209/openapi.json -o lib/api-types.ts",
        "dev": "npm run generate:api-types && next dev --turbo"
      }
    }

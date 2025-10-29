@@ -2,6 +2,7 @@
 
 import logging
 import re
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -42,16 +43,25 @@ class URLFilter:
             is_allowed: True if URL passes filters.
             reason: String explaining why URL was rejected (None if allowed).
         """
+        parsed = urlparse(url)
+        # Firecrawl performs filtering on the URL path (e.g. "/en/docs").
+        # To keep behaviour consistent, we evaluate patterns against both the
+        # raw URL and the extracted path/hostname components.
+        path = parsed.path or "/"
+        netloc_path = f"{parsed.netloc}{path}" if parsed.netloc else path
+        match_targets = (url, path, netloc_path)
+
+        def _matches(pattern: re.Pattern[str]) -> bool:
+            return any(pattern.search(target) for target in match_targets)
+
         # If include patterns exist, URL must match at least one
-        if self.include_patterns and not any(
-            pattern.search(url) for pattern in self.include_patterns
-        ):
+        if self.include_patterns and not any(_matches(pattern) for pattern in self.include_patterns):
             return False, f"URL does not match any include patterns: {url}"
 
         # If exclude patterns exist, URL must not match any
         if self.exclude_patterns:
             for pattern in self.exclude_patterns:
-                if pattern.search(url):
+                if _matches(pattern):
                     return False, f"URL matches exclude pattern {pattern.pattern}: {url}"
 
         return True, None

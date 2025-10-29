@@ -22,6 +22,7 @@ class TestGitHubLabelEntity:
         """Test GitHubLabel with only required fields."""
         now = datetime.now(UTC)
         label = GitHubLabel(
+            repository_full_name="anthropics/claude-code",
             name="bug",
             color="ff0000",
             created_at=now,
@@ -40,6 +41,7 @@ class TestGitHubLabelEntity:
         """Test GitHubLabel with description."""
         now = datetime.now(UTC)
         label = GitHubLabel(
+            repository_full_name="anthropics/claude-code",
             name="bug",
             color="ff0000",
             description="Something isn't working",
@@ -59,6 +61,7 @@ class TestGitHubLabelEntity:
 
         with pytest.raises(ValidationError) as exc_info:
             GitHubLabel(
+                repository_full_name="anthropics/claude-code",
                 color="ff0000",
                 created_at=now,
                 updated_at=now,
@@ -70,3 +73,22 @@ class TestGitHubLabelEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("name",) for e in errors)
+
+    def test_label_missing_repository_full_name(self) -> None:
+        """Test GitHubLabel validation fails without repository_full_name."""
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            GitHubLabel(
+                name="bug",
+                color="ff0000",
+                created_at=now,
+                updated_at=now,
+                extraction_tier="A",
+                extraction_method="github_api",
+                confidence=1.0,
+                extractor_version="1.0.0",
+            )
+
+        errors = exc_info.value.errors()
+        assert any(e["loc"] == ("repository_full_name",) for e in errors)

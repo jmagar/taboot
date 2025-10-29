@@ -371,7 +371,7 @@ class TestSwagReader:
         assert reader._extract_service_name("http://api-service") == "api-service"
         assert reader._extract_service_name("https://api-service:443") == "api-service"
         assert reader._extract_service_name("http://10.0.0.5:8080") == "10.0.0.5"
-        assert reader._extract_service_name("http://localhost:3000") == "localhost"
+        assert reader._extract_service_name("http://localhost:4211") == "localhost"
 
     def test_parse_empty_config(self) -> None:
         """Test parsing empty config returns empty results."""

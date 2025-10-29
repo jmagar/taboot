@@ -354,13 +354,13 @@ When running on host (not in container), URLs are rewritten to localhost with ma
 
 ```python
 if not _is_running_in_container():
-    self.tei_embedding_url = "http://localhost:8080"
-    self.qdrant_url = "http://localhost:7000"
-    self.neo4j_uri = "bolt://localhost:7687"
-    self.redis_url = "redis://localhost:6379"
-    self.reranker_url = "http://localhost:8081"
-    self.firecrawl_api_url = "http://localhost:3002"
-    self.playwright_microservice_url = "http://localhost:3000/scrape"
+    self.tei_embedding_url = "http://localhost:4207"
+    self.qdrant_url = "http://localhost:4203"
+    self.neo4j_uri = "bolt://localhost:4206"
+    self.redis_url = "redis://localhost:4202"
+    self.reranker_url = "http://localhost:4208"
+    self.firecrawl_api_url = "http://localhost:4200"
+    self.playwright_microservice_url = "http://localhost:4213/scrape"
 ```
 
 ### Configuration Access
@@ -490,7 +490,7 @@ depends_on:
 
 ```yaml
 healthcheck:
-  test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+  test: ["CMD", "curl", "-f", "http://localhost:4209/health"]
   interval: 30s
   timeout: 10s
   retries: 3
@@ -864,10 +864,10 @@ def set_test_env():
     """Set environment variables before TestClient creation."""
     os.environ["RERANKER_BATCH_SIZE"] = "16"
     os.environ["OLLAMA_PORT"] = "11434"
-    os.environ["FIRECRAWL_API_URL"] = "http://localhost:3002"
-    os.environ["REDIS_URL"] = "redis://localhost:6379"
+    os.environ["FIRECRAWL_API_URL"] = "http://localhost:4200"
+    os.environ["REDIS_URL"] = "redis://localhost:4202"
     os.environ["QDRANT_URL"] = "http://localhost:6333"
-    os.environ["NEO4J_URI"] = "bolt://localhost:7687"
+    os.environ["NEO4J_URI"] = "bolt://localhost:4206"
     os.environ["TEI_EMBEDDING_URL"] = "http://localhost:80"
     yield
 

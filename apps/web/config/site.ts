@@ -26,7 +26,7 @@ export const siteConfig: Metadata = {
   openGraph: {
     title: 'Taboot',
     description: 'Doc-to-Graph RAG platform built on LlamaIndex, Firecrawl, Neo4j, and Qdrant.',
-    url: process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000',
+    url: process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:4211',
     siteName: 'Taboot',
     locale: 'en_US',
     type: 'website',
@@ -41,7 +41,7 @@ export const siteConfig: Metadata = {
 export const config = {
   name: 'Taboot',
   description: siteConfig.description,
-  baseUrl: process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000',
+  baseUrl: process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:4211',
   domain: process.env.NEXT_PUBLIC_DOMAIN ?? 'localhost',
   nav: [
     {

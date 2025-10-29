@@ -42,6 +42,12 @@ class Commit(BaseModel):
     """
 
     # Identity fields
+    repository_full_name: str = Field(
+        ...,
+        min_length=1,
+        description="Full repository name this commit belongs to (owner/name)",
+        examples=["anthropics/claude-code"],
+    )
     sha: str = Field(
         ...,
         min_length=1,
@@ -147,6 +153,7 @@ class Commit(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
+                    "repository_full_name": "anthropics/claude-code",
                     "sha": "abc123def456",
                     "message": "Fix bug in parser",
                     "author_login": "johndoe",

@@ -72,8 +72,8 @@ docker build -f docker/postgres/Dockerfile -t test-postgres:fix .
 # Verify
 docker compose up -d
 docker compose ps  # All should be "healthy"
-curl http://localhost:8000/health
-curl http://localhost:3000/api/health
+curl http://localhost:4209/health
+curl http://localhost:4211/api/health
 ```
 
 ### Issue Severity Legend

@@ -408,9 +408,18 @@ class TailscaleReader:
         source_timestamp = self._parse_timestamp(device_raw.get("lastSeen"))
 
         # Create TailscaleDevice entity
+        magic_dns_hostname = (
+            device_raw.get("tailnetDNSName")
+            or device_raw.get("dnsName")
+            or device_raw.get("magicDNSName")
+        )
+
+        long_domain = device_raw.get("name")
+
         return TailscaleDevice(
             device_id=device_raw["id"],
             hostname=device_raw["hostname"],
+            long_domain=long_domain,
             os=device_raw["os"],
             ipv4_address=ipv4_address,
             ipv6_address=ipv6_address,
@@ -419,7 +428,7 @@ class TailscaleReader:
             is_exit_node=device_raw.get("isExitNode"),
             subnet_routes=device_raw.get("advertiseRoutes"),
             ssh_enabled=device_raw.get("enabledSSH"),
-            tailnet_dns_name=device_raw.get("tailnetDNSName"),
+            tailnet_dns_name=magic_dns_hostname,
             created_at=now,
             updated_at=now,
             source_timestamp=source_timestamp,

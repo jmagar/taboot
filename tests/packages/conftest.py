@@ -40,7 +40,7 @@ def qdrant_client():
     """Real Qdrant client for integration tests."""
     from qdrant_client.models import Distance, VectorParams
 
-    client = QdrantClient(url="http://localhost:7000")
+    client = QdrantClient(url="http://localhost:4203")
 
     # Create test collection if it doesn't exist
     collections = client.get_collections().collections
@@ -57,6 +57,6 @@ def qdrant_client():
 @pytest.fixture(scope="session")
 def neo4j_client():
     """Real Neo4j driver for integration tests."""
-    driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "changeme"))
+    driver = GraphDatabase.driver("bolt://localhost:4206", auth=("neo4j", "changeme"))
     yield driver
     driver.close()

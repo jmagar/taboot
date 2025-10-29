@@ -177,7 +177,7 @@ async def prometheus_metrics() -> Response:
         Response: Prometheus metrics in text/plain format.
 
     Example:
-        $ curl http://localhost:8000/metrics
+        $ curl http://localhost:4209/metrics
         # HELP http_requests_total Total HTTP requests
         # TYPE http_requests_total counter
         http_requests_total{method="GET",path="/health",status="200"} 42.0

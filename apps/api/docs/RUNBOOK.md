@@ -4,9 +4,9 @@
 
 ## Health Checks
 
-* API: `curl -sSf http://localhost:8000/health`
+* API: `curl -sSf http://localhost:4209/health`
 * Qdrant: `curl -sSf http://localhost:6333/health`
-* Neo4j: `curl -sSf http://localhost:7474/ || true` then check logs
+* Neo4j: `curl -sSf http://localhost:4205/ || true` then check logs
 * Redis: `redis-cli PING`
 * Postgres: `pg_isready -h localhost -p 5432`
 * Playwright worker: check container logs and session count via `/sessions`

@@ -14,16 +14,16 @@ def test_no_patterns_allows_all() -> None:
 
 def test_exclude_pattern_blocks_url() -> None:
     """Exclude pattern should block matching URLs."""
-    url_filter = URLFilter(exclude_patterns=[r".*/de/.*"])
+    url_filter = URLFilter(exclude_patterns=[r"^.*/de/.*$"])
     is_allowed, reason = url_filter.validate_url("https://example.com/de/docs")
     assert not is_allowed
     assert "exclude pattern" in reason
-    assert ".*/de/.*" in reason
+    assert "^.*/de/.*$" in reason
 
 
 def test_include_pattern_allows_url() -> None:
     """Include pattern should allow matching URLs."""
-    url_filter = URLFilter(include_patterns=[r".*/en/.*"])
+    url_filter = URLFilter(include_patterns=[r"^/en/.*$"])
     is_allowed, reason = url_filter.validate_url("https://example.com/en/docs")
     assert is_allowed
     assert reason is None
@@ -31,7 +31,7 @@ def test_include_pattern_allows_url() -> None:
 
 def test_include_pattern_blocks_non_matching() -> None:
     """Include pattern should block non-matching URLs."""
-    url_filter = URLFilter(include_patterns=[r".*/en/.*"])
+    url_filter = URLFilter(include_patterns=[r"^/en/.*$"])
     is_allowed, reason = url_filter.validate_url("https://example.com/de/docs")
     assert not is_allowed
     assert "does not match" in reason
@@ -40,8 +40,8 @@ def test_include_pattern_blocks_non_matching() -> None:
 def test_exclude_takes_precedence() -> None:
     """Exclude patterns should take precedence over include."""
     url_filter = URLFilter(
-        include_patterns=[r".*/docs/.*"],
-        exclude_patterns=[r".*/de/.*"],
+        include_patterns=[r"^/docs/.*$"],
+        exclude_patterns=[r"^.*/de/.*$"],
     )
     is_allowed, _ = url_filter.validate_url("https://example.com/docs/de/api")
     assert not is_allowed
@@ -49,7 +49,7 @@ def test_exclude_takes_precedence() -> None:
 
 def test_filter_urls_list() -> None:
     """filter_urls should filter list correctly."""
-    url_filter = URLFilter(exclude_patterns=[r".*/de/.*"])
+    url_filter = URLFilter(exclude_patterns=[r"^/de/.*$"])
     urls = [
         "https://example.com/en/docs",
         "https://example.com/de/docs",
@@ -62,7 +62,7 @@ def test_filter_urls_list() -> None:
 
 def test_multiple_exclude_patterns() -> None:
     """Multiple exclude patterns should all be checked."""
-    url_filter = URLFilter(exclude_patterns=[r".*/de/.*", r".*/fr/.*", r".*/es/.*"])
+    url_filter = URLFilter(exclude_patterns=[r"^.*/de/.*$", r"^.*/fr/.*$", r"^.*/es/.*$"])
 
     # Test that all patterns are enforced
     assert not url_filter.validate_url("https://example.com/de/docs")[0]
@@ -75,7 +75,7 @@ def test_multiple_exclude_patterns() -> None:
 
 def test_multiple_include_patterns() -> None:
     """Multiple include patterns should allow any match."""
-    url_filter = URLFilter(include_patterns=[r".*/en/.*", r".*/docs/.*"])
+    url_filter = URLFilter(include_patterns=[r"^/en/.*$", r"^/docs/.*$"])
 
     # Both patterns should allow URLs
     assert url_filter.validate_url("https://example.com/en/api")[0]
@@ -117,7 +117,7 @@ def test_empty_url() -> None:
 
 def test_url_with_query_params() -> None:
     """URLs with query parameters should match patterns correctly."""
-    url_filter = URLFilter(exclude_patterns=[r".*/de/.*"])
+    url_filter = URLFilter(exclude_patterns=[r"^/de/.*$"])
 
     # Query params should not interfere with matching
     assert not url_filter.validate_url("https://example.com/de/docs?version=1.0")[0]
@@ -126,7 +126,7 @@ def test_url_with_query_params() -> None:
 
 def test_url_with_fragment() -> None:
     """URLs with fragments should match patterns correctly."""
-    url_filter = URLFilter(exclude_patterns=[r".*/de/.*"])
+    url_filter = URLFilter(exclude_patterns=[r"^/de/.*$"])
 
     # Fragments should not interfere with matching
     assert not url_filter.validate_url("https://example.com/de/docs#section")[0]
@@ -135,7 +135,7 @@ def test_url_with_fragment() -> None:
 
 def test_filter_urls_preserves_order() -> None:
     """filter_urls should preserve order of allowed URLs."""
-    url_filter = URLFilter(exclude_patterns=[r".*/de/.*"])
+    url_filter = URLFilter(exclude_patterns=[r"^/de/.*$"])
     urls = [
         "https://example.com/en/docs",
         "https://example.com/de/docs",  # filtered out
@@ -154,7 +154,7 @@ def test_filter_urls_preserves_order() -> None:
 
 def test_case_sensitive_matching() -> None:
     """Pattern matching should be case-sensitive by default."""
-    url_filter = URLFilter(exclude_patterns=[r".*/DE/.*"])
+    url_filter = URLFilter(exclude_patterns=[r"^/DE/.*$"])
 
     # Should block uppercase DE
     assert not url_filter.validate_url("https://example.com/DE/docs")[0]

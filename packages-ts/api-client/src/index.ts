@@ -47,7 +47,7 @@ export class TabootAPIClient {
   private readonly credentials: RequestCredentials;
 
   constructor(config?: Partial<APIClientConfig>) {
-    this.baseUrl = config?.baseUrl || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    this.baseUrl = config?.baseUrl || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4209";
     this.credentials = config?.credentials || "include"; // Required for JWT cookies
   }
 

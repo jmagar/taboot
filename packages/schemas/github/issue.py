@@ -38,6 +38,12 @@ class Issue(BaseModel):
     """
 
     # Identity fields
+    repository_full_name: str = Field(
+        ...,
+        min_length=1,
+        description="Full repository name this issue belongs to (owner/name)",
+        examples=["anthropics/claude-code"],
+    )
     number: int = Field(
         ...,
         ge=1,
@@ -126,6 +132,7 @@ class Issue(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
+                    "repository_full_name": "anthropics/claude-code",
                     "number": 42,
                     "title": "Fix bug in parser",
                     "state": "open",

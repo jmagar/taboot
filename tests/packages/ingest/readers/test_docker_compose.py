@@ -110,7 +110,7 @@ services:
       - frontend
       - backend
     healthcheck:
-      test: "CMD curl -f http://localhost:8080/health"
+      test: "CMD curl -f http://localhost:4207/health"
       interval: 15s
       timeout: 5s
       retries: 5

@@ -37,6 +37,12 @@ class Milestone(BaseModel):
     """
 
     # Identity fields
+    repository_full_name: str = Field(
+        ...,
+        min_length=1,
+        description="Full repository name this milestone belongs to (owner/name)",
+        examples=["anthropics/claude-code"],
+    )
     number: int = Field(
         ...,
         ge=1,
@@ -109,6 +115,7 @@ class Milestone(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
+                    "repository_full_name": "anthropics/claude-code",
                     "number": 1,
                     "title": "v1.0 Release",
                     "state": "open",

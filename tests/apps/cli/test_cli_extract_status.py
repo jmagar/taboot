@@ -117,7 +117,7 @@ class TestExtractStatusCommand:
         """Test that extract status command displays healthy system status."""
         # Mock config
         mock_config = MagicMock()
-        mock_config.redis_url = "redis://localhost:6379"
+        mock_config.redis_url = "redis://localhost:4202"
         mock_get_config.return_value = mock_config
 
         # Mock Redis client (async)
@@ -176,7 +176,7 @@ class TestExtractStatusCommand:
         """Test that extract status command displays unhealthy services with errors."""
         # Mock config
         mock_config = MagicMock()
-        mock_config.redis_url = "redis://localhost:6379"
+        mock_config.redis_url = "redis://localhost:4202"
         mock_get_config.return_value = mock_config
 
         # Mock Redis client (async)
@@ -220,7 +220,7 @@ class TestExtractStatusCommand:
         """Test that extract status command handles unexpected exceptions."""
         # Mock config
         mock_config = MagicMock()
-        mock_config.redis_url = "redis://localhost:6379"
+        mock_config.redis_url = "redis://localhost:4202"
         mock_get_config.return_value = mock_config
 
         # Mock Redis client (async)
@@ -262,7 +262,7 @@ class TestExtractStatusCommand:
         """Test that extract status command displays well-formatted output."""
         # Mock config
         mock_config = MagicMock()
-        mock_config.redis_url = "redis://localhost:6379"
+        mock_config.redis_url = "redis://localhost:4202"
         mock_get_config.return_value = mock_config
 
         # Mock Redis client (async)
@@ -301,7 +301,7 @@ class TestExtractStatusCommand:
         """Test that extract status command handles zero queue depths."""
         # Mock config
         mock_config = MagicMock()
-        mock_config.redis_url = "redis://localhost:6379"
+        mock_config.redis_url = "redis://localhost:4202"
         mock_get_config.return_value = mock_config
 
         # Mock Redis client (async)

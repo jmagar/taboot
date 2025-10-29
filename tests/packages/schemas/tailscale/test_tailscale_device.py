@@ -28,6 +28,7 @@ class TestTailscaleDeviceEntity:
         device = TailscaleDevice(
             device_id="ts-device-123",
             hostname="server.example.com",
+            long_domain="server.example.com",
             os="linux",
             created_at=now,
             updated_at=now,
@@ -65,6 +66,7 @@ class TestTailscaleDeviceEntity:
         device = TailscaleDevice(
             device_id="ts-device-456",
             hostname="gateway.example.com",
+            long_domain="gateway.example.com",
             os="linux",
             ipv4_address="100.64.1.5",
             ipv6_address="fd7a:115c:a1e0::1",
@@ -85,6 +87,7 @@ class TestTailscaleDeviceEntity:
 
         assert device.device_id == "ts-device-456"
         assert device.hostname == "gateway.example.com"
+        assert device.long_domain == "gateway.example.com"
         assert device.os == "linux"
         assert device.ipv4_address == "100.64.1.5"
         assert device.ipv6_address == "fd7a:115c:a1e0::1"

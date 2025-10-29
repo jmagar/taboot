@@ -164,9 +164,9 @@ class TestExtractPipelineEndToEnd:
         5. Records extraction metrics (tier_a_triples, tier_b_windows, tier_c_triples)
 
         This test requires:
-        - taboot-cache (Redis) at redis://localhost:6379
-        - taboot-ollama (Ollama) at http://localhost:11434
-        - taboot-graph (Neo4j) at bolt://localhost:7687
+        - taboot-cache (Redis) at redis://localhost:4202
+        - taboot-ollama (Ollama) at http://localhost:4214
+        - taboot-graph (Neo4j) at bolt://localhost:4206
         """
         # Setup: Load configuration
         config = get_config()

@@ -74,8 +74,8 @@ class TestExtractPendingCommand:
         """Test that extract pending command executes successfully."""
         # Mock config
         mock_config = Mock()
-        mock_config.redis_url = "redis://localhost:6379"
-        mock_config.ollama_base_url = "http://localhost:11434"
+        mock_config.redis_url = "redis://localhost:4202"
+        mock_config.ollama_base_url = "http://localhost:4214"
         mock_config.ollama_model = "qwen3:4b"
         mock_get_config.return_value = mock_config
 
@@ -135,8 +135,8 @@ class TestExtractPendingCommand:
         """Test that extract pending command accepts optional --limit parameter."""
         # Mock config
         mock_config = Mock()
-        mock_config.redis_url = "redis://localhost:6379"
-        mock_config.ollama_base_url = "http://localhost:11434"
+        mock_config.redis_url = "redis://localhost:4202"
+        mock_config.ollama_base_url = "http://localhost:4214"
         mock_config.ollama_model = "qwen3:4b"
         mock_get_config.return_value = mock_config
 
@@ -194,8 +194,8 @@ class TestExtractPendingCommand:
         """Test that extract pending command displays formatted summary."""
         # Mock config
         mock_config = Mock()
-        mock_config.redis_url = "redis://localhost:6379"
-        mock_config.ollama_base_url = "http://localhost:11434"
+        mock_config.redis_url = "redis://localhost:4202"
+        mock_config.ollama_base_url = "http://localhost:4214"
         mock_config.ollama_model = "qwen3:4b"
         mock_get_config.return_value = mock_config
 
@@ -252,8 +252,8 @@ class TestExtractPendingCommand:
         """Test that extract pending command handles unexpected exceptions."""
         # Mock config
         mock_config = Mock()
-        mock_config.redis_url = "redis://localhost:6379"
-        mock_config.ollama_base_url = "http://localhost:11434"
+        mock_config.redis_url = "redis://localhost:4202"
+        mock_config.ollama_base_url = "http://localhost:4214"
         mock_config.ollama_model = "qwen3:4b"
         mock_get_config.return_value = mock_config
 
@@ -310,8 +310,8 @@ class TestExtractPendingCommand:
         """Test that extract pending command handles empty queue gracefully."""
         # Mock config
         mock_config = Mock()
-        mock_config.redis_url = "redis://localhost:6379"
-        mock_config.ollama_base_url = "http://localhost:11434"
+        mock_config.redis_url = "redis://localhost:4202"
+        mock_config.ollama_base_url = "http://localhost:4214"
         mock_config.ollama_model = "qwen3:4b"
         mock_get_config.return_value = mock_config
 

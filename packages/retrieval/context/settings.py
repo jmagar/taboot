@@ -25,7 +25,7 @@ class RetrievalSettings(BaseSettings):
 
     # Ollama LLM
     ollama_base_url: str = Field(
-        default=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+        default=os.getenv("OLLAMA_BASE_URL", "http://localhost:4214"),
         description="Ollama API base URL",
     )
     llm_model_name: str = Field(

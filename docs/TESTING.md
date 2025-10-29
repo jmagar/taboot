@@ -269,7 +269,7 @@ def test_parse_docker_compose():
       api:
         image: python:3.11
         ports:
-          - "8000:8000"
+          - "4209:8000"
     """
 
     parser = DockerComposeParser()
@@ -278,7 +278,7 @@ def test_parse_docker_compose():
     assert result.entities[0].type == "Service"
     assert result.entities[0].name == "api"
     assert result.relations[0].type == "EXPOSES"
-    assert result.relations[0].properties["port"] == "8000"
+    assert result.relations[0].properties["port"] == "4209"
 ```
 
 ### Tier B (spaCy) Tests
@@ -292,7 +292,7 @@ from packages.extraction.tier_b.spacy_extractor import SpacyExtractor
 def test_spacy_entity_extraction():
     extractor = SpacyExtractor(model="en_core_web_md")
 
-    text = "The Auth0 service connects to PostgreSQL database on port 5432"
+    text = "The Auth0 service connects to PostgreSQL database on port 4201"
 
     result = extractor.extract(text)
 
@@ -451,10 +451,10 @@ def init_qdrant():
 
 ```bash
 # Verify Neo4j is accessible
-curl -f http://localhost:7474/ || echo "Neo4j not responding"
+curl -f http://localhost:4205/ || echo "Neo4j not responding"
 
 # Check if bolt port is open
-nc -zv localhost 7687
+nc -zv localhost 4206
 
 # Verify credentials
 docker compose logs taboot-graph | grep -i password

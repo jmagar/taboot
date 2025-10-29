@@ -809,12 +809,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 **Example issue - API:**
 ```dockerfile
-# Current: CMD ["uvicorn", "apps.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Current: CMD ["uvicorn", "apps.api.app:app", "--host", "0.0.0.0", "--port", "4209"]
 # But PYTHONPATH isn't guaranteed at runtime
 
 # Better: Use entrypoint script for env setup
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["uvicorn", "apps.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "apps.api.app:app", "--host", "0.0.0.0", "--port", "4209"]
 ```
 
 ```bash
@@ -1037,12 +1037,12 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 USER appuser
 
-EXPOSE 8000
+EXPOSE 4209
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:4209/health || exit 1
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "4209"]
 ```
 
 ### Node.js App (Next.js)
@@ -1102,9 +1102,9 @@ COPY --from=installer --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/we
 COPY --from=installer --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 
 USER nextjs
-EXPOSE 3000
+EXPOSE 4211
 
-ENV NODE_ENV=production PORT=3000 NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production PORT=4211 NEXT_TELEMETRY_DISABLED=1
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -fsS http://127.0.0.1:3000/api/health || exit 1

@@ -133,7 +133,7 @@ Configure the API URL via environment variables:
 
 ```env
 # .env.local (Next.js)
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:4209
 ```
 
 ## CORS Requirements
@@ -144,7 +144,7 @@ The FastAPI backend must have CORS configured to allow the Next.js origin:
 # apps/api/app.py
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3003"],
+    allow_origins=["http://localhost:4211", "http://localhost:4213"],
     allow_credentials=True,  # Required for JWT cookies
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept"],

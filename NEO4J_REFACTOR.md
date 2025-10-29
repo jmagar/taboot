@@ -14,7 +14,7 @@ Refactor Taboot's graph architecture from domain-specific entities (Service, Hos
 
 **Key Changes:**
 - 5 core entities (Person, Organization, Place, Event, File)
-- 58 reader-specific entities across 10 sources
+- 53 reader-specific entities across 10 sources
 - Temporal tracking on ALL nodes and relationships
 - Pydantic schemas for ALL relationships
 - Separate entities for properties (env vars, headers, rules) for maximum queryability
@@ -23,7 +23,7 @@ Refactor Taboot's graph architecture from domain-specific entities (Service, Hos
 
 ---
 
-## Complete Entity Inventory (63 Total)
+## Complete Entity Inventory (58 Total)
 
 ### Core Entities (5)
 
@@ -182,7 +182,7 @@ Refactor Taboot's graph architecture from domain-specific entities (Service, Hos
 ### Tailscale Reader (3)
 
 46. **TailscaleDevice**
-    - device_id, hostname, os, ipv4_address, ipv6_address, endpoints, key_expiry, is_exit_node, subnet_routes, ssh_enabled, tailnet_dns_name
+    - device_id, hostname, long_domain, os, ipv4_address, ipv6_address, endpoints, key_expiry, is_exit_node, subnet_routes, ssh_enabled, tailnet_dns_name
 
 47. **TailscaleNetwork**
     - network_id, name, cidr, global_nameservers, search_domains
@@ -386,7 +386,7 @@ All 5 rule types are extractable from Unifi Controller API with varying levels o
 - Extract all services, networks, volumes
 - Create separate entities for:
   - Each environment variable (queryable: "Find all services using SECRET_KEY")
-  - Each port binding (queryable: "Find all services exposing port 8080")
+  - Each port binding (queryable: "Find all services exposing port 4207")
   - Each dependency (queryable: "Find all services depending on postgres")
   - Each healthcheck (queryable: "Find all unhealthy services")
   - Each build context (queryable: "Find all services built from Dockerfile")
@@ -400,7 +400,7 @@ All 5 rule types are extractable from Unifi Controller API with varying levels o
 - Extract nginx variables:
   ```nginx
   set $upstream_app 100.74.16.82;
-  set $upstream_port 3005;
+  set $upstream_port 4210;
   set $upstream_proto http;
   ```
 - Extract `server_name` from server blocks
@@ -414,7 +414,7 @@ All 5 rule types are extractable from Unifi Controller API with varying levels o
 - Create separate entities for queryability:
   - "Find all routes with auth enabled"
   - "Find all routes setting X-Frame-Options header"
-  - "Find all backends on port 3000"
+  - "Find all backends on port 4211"
 
 ### GitHub (Tier A - Deterministic)
 
@@ -545,7 +545,7 @@ tests/packages/ingest/readers/ (ALL 10 reader tests - ~2,327 lines)
   - test_tailscale.py (397 lines)
 
 tests/integration/
-  - test_init_e2e.py (295 lines) - Rewrite constraint validation for 63 new constraints
+  - test_init_e2e.py (295 lines) - Rewrite constraint validation for 58 new constraints
   - test_ingest_structured_e2e.py (580 lines) - Complete rewrite for new entity model
   - test_extract_e2e.py (658 lines) - Rewrite for Entity/Claim model
 
@@ -557,7 +557,7 @@ tests/packages/core/use_cases/
 
 ```
 tests/packages/graph/
-  - test_constraints.py (45 lines) - Update constraint count to 63, spot-check validations
+  - test_constraints.py (45 lines) - Update constraint count to 58, spot-check validations
 
 tests/integration/
   - test_query_e2e.py (159 lines) - Update test queries for new entity model
@@ -624,7 +624,7 @@ specs/001-taboot-rag-platform/contracts/
 
 ## File Creation Plan
 
-### Schemas to Create (63 files)
+### Schemas to Create (58 files)
 
 ```
 packages/schemas/core/
@@ -868,7 +868,7 @@ For each entity type:
 - [ ] Constraints added to neo4j-constraints.cypher
 - [ ] Progress checkboxes marked
 
-**Gate**: All 58 reader-specific entities complete, all tests green
+**Gate**: All 53 reader-specific entities complete, all tests green
 
 ### Phase 3: Graph Writers (TDD, Parallel, 6-8h wall-clock)
 
@@ -970,7 +970,7 @@ For each use-case:
 **Agent 3**: Verify all created files exist
 **Agent 4**: Run full test suite (unit tests)
 **Agent 5**: Run integration tests
-**Agent 6**: Verify Neo4j constraints (SHOW CONSTRAINTS = 63 constraints)
+**Agent 6**: Verify Neo4j constraints (SHOW CONSTRAINTS = 58 constraints)
 **Agent 7**: Performance benchmarks (≥20k edges/min)
 **Agent 8**: Coverage report (≥95% for writers)
 **Agent 9**: End-to-end smoke tests (ingest → extract → query)
@@ -982,7 +982,7 @@ For each use-case:
 - [ ] All created files exist
 - [ ] Unit tests: 100% pass
 - [ ] Integration tests: 100% pass
-- [ ] Neo4j constraints: 63 total
+- [ ] Neo4j constraints: 58 total
 - [ ] Performance: ≥20k edges/min
 - [ ] Coverage: ≥95% writers
 - [ ] E2E smoke tests pass
@@ -995,12 +995,12 @@ For each use-case:
 ## Success Metrics
 
 ### Functional Completeness
-- ✅ 5 core + 58 reader-specific entities = 63 total
+- ✅ 5 core + 53 reader-specific entities = 58 total
 - ✅ All entities have temporal tracking
 - ✅ All relationships have Pydantic schemas
 - ✅ All 15 writers implement write_* methods
 - ✅ All 10 readers output new entity types
-- ✅ Neo4j constraints: 63 total
+- ✅ Neo4j constraints: 58 total
 
 ### Test Coverage
 - ✅ Unit tests: <10s total
@@ -1062,7 +1062,7 @@ These features will be implemented after core refactor is complete and stable.
 1. ✅ Review this document
 2. ✅ Dispatch Unifi API research agent (1-2h)
 3. ✅ Wait for research completion
-4. ✅ Finalize entity list based on API findings (63 total: 5 core + 58 reader-specific)
+4. ✅ Finalize entity list based on API findings (58 total: 5 core + 53 reader-specific)
 5. ⏳ Create detailed implementation plan with task breakdown
 6. ⏳ Execute Phase 0 (preparation)
 7. ⏳ Execute Phase 1 (core schemas)

@@ -175,7 +175,7 @@ Response:
 - 8000 (configurable via TABOOT_HTTP_PORT)
 
 **Health Check:**
-- curl -f http://localhost:8000/health
+- curl -f http://localhost:4209/health
 - interval: 30s, timeout: 10s, retries: 3, start_period: 20s
 
 ## Logging Pattern
@@ -211,7 +211,7 @@ logger.info(
 @pytest.fixture(scope="session", autouse=True)
 def set_test_env():
     """Set env vars before app creation."""
-    os.environ["REDIS_URL"] = "redis://localhost:6379"
+    os.environ["REDIS_URL"] = "redis://localhost:4202"
     os.environ["QDRANT_URL"] = "http://localhost:6333"
     # ... etc
     yield
@@ -257,7 +257,7 @@ def test_health(client):
 - Verify docker-compose postgres is healthy
 
 ### Health Check Fails
-- Run: `curl http://localhost:8000/health`
+- Run: `curl http://localhost:4209/health`
 - Check docker-compose ps (verify all services healthy)
 - Check logs: `docker compose logs taboot-app`
 
@@ -304,13 +304,13 @@ uv run pytest tests/apps/api -m "not slow"
 uv run ruff check apps/api && uv run mypy apps/api
 
 # OpenAPI docs
-curl http://localhost:8000/openapi.json
+curl http://localhost:4209/openapi.json
 
 # Health check
-curl http://localhost:8000/health
+curl http://localhost:4209/health
 
 # Swagger UI
-open http://localhost:8000/docs
+open http://localhost:4209/docs
 ```
 
 ## File Locations Reference

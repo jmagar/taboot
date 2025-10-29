@@ -1042,7 +1042,7 @@ async def ingest_documents_to_qdrant(
         print(f"Generated {len(embeddings)} embeddings")
 
         # Upsert to Qdrant (GPU indexing if enabled)
-        # Qdrant throughput: ~5000-8000 vectors/sec
+        # Qdrant throughput: ~5000-4209 vectors/sec
         print(f"Upserting {len(embeddings)} vectors...")
         await qdrant.batch_upsert(
             collection_name="technical_docs",

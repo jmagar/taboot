@@ -13,7 +13,7 @@ from packages.schemas.api_key import ApiKey
 @pytest.fixture
 async def redis_client() -> None:
     """Create Redis client for testing."""
-    client = await redis.from_url("redis://localhost:6379", decode_responses=True)
+    client = await redis.from_url("redis://localhost:4202", decode_responses=True)
     yield client
     await client.flushdb()  # Clean up
     await client.aclose()

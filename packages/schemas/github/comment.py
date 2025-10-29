@@ -37,6 +37,18 @@ class Comment(BaseModel):
     """
 
     # Identity fields
+    repository_full_name: str = Field(
+        ...,
+        min_length=1,
+        description="Full repository name this comment belongs to (owner/name)",
+        examples=["anthropics/claude-code"],
+    )
+    issue_number: int = Field(
+        ...,
+        ge=1,
+        description="Issue number associated with the comment",
+        examples=[42, 123],
+    )
     id: int = Field(
         ...,
         ge=1,
@@ -110,6 +122,8 @@ class Comment(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
+                    "repository_full_name": "anthropics/claude-code",
+                    "issue_number": 42,
                     "id": 12345,
                     "author_login": "johndoe",
                     "body": "This looks good!",

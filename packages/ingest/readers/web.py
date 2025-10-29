@@ -6,6 +6,7 @@ Per research.md: Use LlamaIndex readers for standardized Document abstraction.
 
 import logging
 import time
+from urllib.parse import urljoin
 
 from llama_index.core import Document
 from llama_index.readers.web import FireCrawlWebReader
@@ -140,9 +141,37 @@ class WebReader:
         for doc in docs:
             if not doc.metadata:
                 doc.metadata = {}
-            # Only set source_url if not already present (preserve actual crawled URLs)
-            if "source_url" not in doc.metadata:
-                doc.metadata["source_url"] = url
+
+            metadata = doc.metadata
+
+            source_url = (
+                metadata.get("source_url")
+                or metadata.get("sourceUrl")
+                or metadata.get("url")
+                or metadata.get("source")
+                or metadata.get("origin_url")
+                or metadata.get("originUrl")
+                or metadata.get("canonical_url")
+                or metadata.get("canonicalUrl")
+            )
+
+            if isinstance(source_url, str) and source_url.startswith("/"):
+                source_url = urljoin(url, source_url)
+
+            if not source_url:
+                source_url = url
+
+            metadata["source_url"] = source_url
+
+            # Firecrawl is asked for Markdown output via scrape_options.formats.
+            # Mark the document so downstream ingestion can skip re-normalizing it.
+            existing_format = metadata.get("content_format") or metadata.get("format")
+            if not existing_format:
+                metadata["content_format"] = "markdown"
+
+            content_type = metadata.get("content_type") or metadata.get("contentType")
+            if not content_type:
+                metadata["content_type"] = "text/markdown"
 
         return docs
 

@@ -139,7 +139,7 @@ export default function APITestPage() {
             <div>
               <dt className="font-medium text-muted-foreground">API URL:</dt>
               <dd className="font-mono">
-                {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}
+                {process.env.NEXT_PUBLIC_API_URL || "http://localhost:4209"}
               </dd>
             </div>
             <div>

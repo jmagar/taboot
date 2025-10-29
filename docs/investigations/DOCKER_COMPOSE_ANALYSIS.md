@@ -10,7 +10,7 @@
 
 The Docker Compose configuration demonstrates excellent microservices architecture and multi-stage Dockerfile practices, but contains **3 CRITICAL DEPLOYMENT-BLOCKING ISSUES** that must be fixed before production use:
 
-1. **Port conflict** between Playwright and Web services (both default to 3000)
+1. **Port conflict** between Playwright and Web services (both default to 4211)
 2. **Broken build contexts** for API and Web services (`additional_contexts` paths)
 3. **Missing service definition** for base ML image that Worker depends on
 
@@ -47,14 +47,14 @@ All other aspects are well-designed and follow Docker best practices.
 ```yaml
 # taboot-playwright service
 ports:
-  - "${PLAYWRIGHT_PORT:-3000}:3000"
+  - "${PLAYWRIGHT_PORT:-4211}:3000"
 
 # taboot-web service
 ports:
-  - "${TABOOT_WEB_PORT:-3000}:3000"
+  - "${TABOOT_WEB_PORT:-4211}:3000"
 ```
 
-Both services default to port 3000 on the host. When users run `docker-compose up` without explicitly setting `TABOOT_WEB_PORT` in `.env`, the second service fails:
+Both services default to port 4211 on the host. When users run `docker-compose up` without explicitly setting `TABOOT_WEB_PORT` in `.env`, the second service fails:
 
 ```
 docker: Error response from daemon: Ports are not available: exposing port TCP 0.0.0.0:3000 -> 0.0.0.0:3000: listen tcp 0.0.0.0:3000: bind: address already in use
@@ -66,7 +66,7 @@ docker: Error response from daemon: Ports are not available: exposing port TCP 0
 - Users copying `.env.example` → `.env` without reading may encounter this
 
 **Resolution:** ✓ Already in `.env.example`
-The `.env.example` file correctly sets `TABOOT_WEB_PORT="3005"` (line 20), so if users copy the template correctly, there's no conflict. However:
+The `.env.example` file correctly sets `TABOOT_WEB_PORT="4211"` (line 20), so if users copy the template correctly, there's no conflict. However:
 
 1. **Documentation is missing** - Users need to know this is required
 2. **Error message is confusing** - Should explain the port conflict clearly
@@ -76,10 +76,10 @@ The `.env.example` file correctly sets `TABOOT_WEB_PORT="3005"` (line 20), so if
 1. Add prominent comment to `.env.example`:
 ```bash
 # WARNING: PLAYWRIGHT_PORT and TABOOT_WEB_PORT MUST be different!
-# Playwright handles browser automation (3000)
-# Web app runs on different port (3005)
-PLAYWRIGHT_PORT="3000"
-TABOOT_WEB_PORT="3005"  # DO NOT change to 3000
+# Playwright handles browser automation (4211)
+# Web app runs on different port (4210)
+PLAYWRIGHT_PORT="4213"
+TABOOT_WEB_PORT="4211"  # DO NOT change to 4211
 ```
 
 2. Add startup validation script or docker-compose override
@@ -492,19 +492,19 @@ For production scaling, would need:
 ### Port Assignments (No Conflicts After Fixes)
 
 ```
-3000: taboot-playwright (browser automation)
-3002: taboot-crawler (Firecrawl)
-3005: taboot-web (Next.js dashboard)
-5432: taboot-db (PostgreSQL)
-6379: taboot-cache (Redis)
-7000: taboot-vectors HTTP (Qdrant)
-7001: taboot-vectors gRPC (Qdrant)
-7474: taboot-graph HTTP (Neo4j)
-7687: taboot-graph Bolt (Neo4j)
-8000: taboot-api (FastAPI)
-8080: taboot-embed (TEI)
-8081: taboot-rerank (Reranker)
-11434: taboot-ollama (Ollama)
+4211: taboot-playwright (browser automation)
+4200: taboot-crawler (Firecrawl)
+4210: taboot-web (Next.js dashboard)
+4201: taboot-db (PostgreSQL)
+4202: taboot-cache (Redis)
+4203: taboot-vectors HTTP (Qdrant)
+4204: taboot-vectors gRPC (Qdrant)
+4205: taboot-graph HTTP (Neo4j)
+4206: taboot-graph Bolt (Neo4j)
+4209: taboot-api (FastAPI)
+4207: taboot-embed (TEI)
+4208: taboot-rerank (Reranker)
+4214: taboot-ollama (Ollama)
 ```
 
 All distinct, no conflicts.
@@ -597,10 +597,10 @@ sleep 10
 docker-compose ps  # All should be "healthy"
 
 # 5. Test API endpoint
-curl http://localhost:8000/health
+curl http://localhost:4209/health
 
 # 6. Test web endpoint
-curl http://localhost:3005/api/health
+curl http://localhost:4211/api/health
 
 # 7. Test port uniqueness
 lsof -i :3000  # Should show only taboot-playwright

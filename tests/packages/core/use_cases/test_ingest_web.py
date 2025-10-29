@@ -132,6 +132,48 @@ class TestIngestWebUseCase:
         assert job.completed_at >= job.started_at
         assert job.errors is None
 
+    async def test_execute_skips_normalizer_for_markdown_documents(
+        self,
+        mock_web_reader: Mock,
+        mock_normalizer: Mock,
+        mock_chunker: Mock,
+        mock_embedder: Mock,
+        mock_qdrant_writer: Mock,
+        mock_document_store: PostgresDocumentStore,
+    ) -> None:
+        """Ensure normalizer is bypassed when Firecrawl already returned Markdown."""
+        from packages.core.use_cases.ingest_web import IngestWebUseCase
+
+        # Override mocked web reader to return markdown documents
+        mock_web_reader.load_data.return_value = [
+            LlamaDocument(
+                text="# Heading\n\nContent",
+                metadata={
+                    "source_url": "https://example.com/page",
+                    "content_format": "markdown",
+                    "content_type": "text/markdown",
+                },
+            )
+        ]
+
+        use_case = IngestWebUseCase(
+            web_reader=mock_web_reader,
+            normalizer=mock_normalizer,
+            chunker=mock_chunker,
+            embedder=mock_embedder,
+            qdrant_writer=mock_qdrant_writer,
+            document_store=mock_document_store,
+            collection_name="test_collection",
+        )
+
+        job = await use_case.execute(url="https://example.com", limit=1)
+
+        mock_normalizer.normalize.assert_not_called()
+        mock_embedder.embed_texts_async.assert_called_once()
+        mock_qdrant_writer.upsert_batch_async.assert_called_once()
+        assert job.pages_processed == 1
+        assert job.chunks_created == 3
+
     async def test_execute_creates_job_in_pending_state(
         self,
         mock_web_reader: Mock,

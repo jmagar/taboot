@@ -21,12 +21,12 @@ def test_query_e2e_workflow() -> None:
     4. Check latency targets
     """
     # Config from environment (use host ports from docker-compose.yaml)
-    qdrant_url = os.getenv("QDRANT_URL", "http://localhost:7000")
+    qdrant_url = os.getenv("QDRANT_URL", "http://localhost:4203")
     qdrant_collection = os.getenv("QDRANT_COLLECTION", "documents")
-    neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:4206")
     neo4j_user = os.getenv("NEO4J_USER", "neo4j")
     neo4j_password = os.getenv("NEO4J_PASSWORD", "AVqx64QRKmogToi2CykgYqA2ZkbbAGja")
-    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:4214")
 
     # Step 1: Verify services healthy
     qdrant_client = QdrantClientWrapper(url=qdrant_url)
@@ -84,11 +84,11 @@ def test_query_e2e_workflow() -> None:
 @pytest.mark.slow
 def test_query_with_source_filters() -> None:
     """Test query with source type filters."""
-    qdrant_url = os.getenv("QDRANT_URL", "http://localhost:7000")
-    neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    qdrant_url = os.getenv("QDRANT_URL", "http://localhost:4203")
+    neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:4206")
     neo4j_user = os.getenv("NEO4J_USER", "neo4j")
     neo4j_password = os.getenv("NEO4J_PASSWORD", "AVqx64QRKmogToi2CykgYqA2ZkbbAGja")
-    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:4214")
 
     result = execute_query(
         query="Show all services",
@@ -109,11 +109,11 @@ def test_query_with_source_filters() -> None:
 @pytest.mark.slow
 def test_query_with_date_filter() -> None:
     """Test query with date filter."""
-    qdrant_url = os.getenv("QDRANT_URL", "http://localhost:7000")
-    neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    qdrant_url = os.getenv("QDRANT_URL", "http://localhost:4203")
+    neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:4206")
     neo4j_user = os.getenv("NEO4J_USER", "neo4j")
     neo4j_password = os.getenv("NEO4J_PASSWORD", "AVqx64QRKmogToi2CykgYqA2ZkbbAGja")
-    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:4214")
 
     # Filter for recent documents
     after_date = datetime(2025, 10, 1, tzinfo=UTC)
@@ -137,11 +137,11 @@ def test_query_with_date_filter() -> None:
 @pytest.mark.slow
 def test_query_empty_results_gracefully() -> None:
     """Test query handles empty results gracefully."""
-    qdrant_url = os.getenv("QDRANT_URL", "http://localhost:7000")
-    neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    qdrant_url = os.getenv("QDRANT_URL", "http://localhost:4203")
+    neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:4206")
     neo4j_user = os.getenv("NEO4J_USER", "neo4j")
     neo4j_password = os.getenv("NEO4J_PASSWORD", "AVqx64QRKmogToi2CykgYqA2ZkbbAGja")
-    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:4214")
 
     # Query unlikely to match anything
     result = execute_query(

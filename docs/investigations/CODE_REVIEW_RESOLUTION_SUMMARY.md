@@ -275,7 +275,7 @@ Parallel execution of 3 independent architectural enhancements. **Status:** ✅ 
 2. **Verify rate limiting works:**
    ```bash
    # Should fail after 5 attempts
-   for i in {1..6}; do curl -X POST http://localhost:3000/api/auth/password -d '{"email":"test@example.com"}'; done
+   for i in {1..6}; do curl -X POST http://localhost:4211/api/auth/password -d '{"email":"test@example.com"}'; done
    ```
 
 ### Testing Recommendations

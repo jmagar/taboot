@@ -23,6 +23,7 @@ class TestPullRequestEntity:
         """Test PullRequest with only required fields."""
         now = datetime.now(UTC)
         pr = PullRequest(
+            repository_full_name="anthropics/claude-code",
             number=123,
             title="Add new feature",
             state="open",
@@ -53,6 +54,7 @@ class TestPullRequestEntity:
         merged_time = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
 
         pr = PullRequest(
+            repository_full_name="anthropics/claude-code",
             number=123,
             title="Add new feature",
             state="closed",
@@ -83,6 +85,7 @@ class TestPullRequestEntity:
 
         with pytest.raises(ValidationError) as exc_info:
             PullRequest(
+                repository_full_name="anthropics/claude-code",
                 number=123,
                 title="Test PR",
                 state="open",
@@ -104,6 +107,7 @@ class TestPullRequestEntity:
 
         with pytest.raises(ValidationError) as exc_info:
             PullRequest(
+                repository_full_name="anthropics/claude-code",
                 number=123,
                 title="Test PR",
                 state="open",
@@ -120,3 +124,25 @@ class TestPullRequestEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("commits",) for e in errors)
+
+    def test_pull_request_missing_repository_full_name(self) -> None:
+        """Test PullRequest validation fails without repository_full_name."""
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            PullRequest(
+                number=1,
+                title="Test PR",
+                state="open",
+                base_branch="main",
+                head_branch="feature/test",
+                created_at=now,
+                updated_at=now,
+                extraction_tier="A",
+                extraction_method="github_api",
+                confidence=1.0,
+                extractor_version="1.0.0",
+            )
+
+        errors = exc_info.value.errors()
+        assert any(e["loc"] == ("repository_full_name",) for e in errors)

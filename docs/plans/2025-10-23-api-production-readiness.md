@@ -669,7 +669,7 @@ from packages.schemas.api_key import ApiKey
 @pytest.fixture
 async def redis_client():
     """Create Redis client for testing."""
-    client = await redis.from_url("redis://localhost:6379", decode_responses=True)
+    client = await redis.from_url("redis://localhost:4202", decode_responses=True)
     yield client
     await client.flushdb()  # Clean up
     await client.close()
@@ -1196,7 +1196,7 @@ from packages.common.rate_limiter import TokenBucketRateLimiter
 @pytest.fixture
 async def redis_client():
     """Create Redis client for testing."""
-    client = await redis.from_url("redis://localhost:6379", decode_responses=True)
+    client = await redis.from_url("redis://localhost:4202", decode_responses=True)
     yield client
     await client.flushdb()
     await client.close()
@@ -2152,7 +2152,7 @@ docker compose up -d
 uv run apps/cli api-keys create --name "Manual Test" --rate-limit 60
 
 # Test authenticated request
-curl -X POST http://localhost:8000/ingest \
+curl -X POST http://localhost:4209/ingest \
   -H "X-API-Key: <your_key>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -2182,7 +2182,7 @@ uv run apps/cli api-keys create --name "My App" --rate-limit 100
 Use the key in requests:
 
 ```bash
-curl -H "X-API-Key: sk_prod_..." http://localhost:8000/ingest
+curl -H "X-API-Key: sk_prod_..." http://localhost:4209/ingest
 ```
 
 See [apps/api/docs/AUTHENTICATION.md](apps/api/docs/AUTHENTICATION.md) for details.

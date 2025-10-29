@@ -9,7 +9,7 @@
 
 ## Summary
 
-This task list implements the complete refactor from domain-specific entities (Service, Host, IP) to a flexible core + reader-specific model (5 core + 58 reader-specific entities = 63 total). The refactor enables multi-source RAG with temporal tracking, relationship validation, and infrastructure correlation.
+This task list implements the complete refactor from domain-specific entities (Service, Host, IP) to a flexible core + reader-specific model (5 core + 53 reader-specific entities = 58 total). The refactor enables multi-source RAG with temporal tracking, relationship validation, and infrastructure correlation.
 
 **Key Points**:
 - **NO backwards compatibility** - Full rewrite, database wipe required
@@ -21,10 +21,10 @@ This task list implements the complete refactor from domain-specific entities (S
 
 **Architecture Changes**:
 - **5 core entities**: Person, Organization, Place, Event, File
-- **58 reader-specific entities**: Docker Compose (12), SWAG (6), GitHub (12), Gmail (4), Reddit (3), YouTube (3), Tailscale (3), Unifi (9), Web/ES (1)
+- **53 reader-specific entities**: Docker Compose (12), SWAG (6), GitHub (12), Gmail (4), Reddit (3), YouTube (3), Tailscale (3), Unifi (9), Web/ES (1)
 - **Pydantic schemas** for ALL relationships
 - **Separate entities** for properties (env vars, headers, rules) for maximum queryability
-- **Neo4j constraints**: 63 total (up from 5)
+- **Neo4j constraints**: 58 total (up from 5)
 
 **Estimated Timeline**: 50-60 hours wall-clock with aggressive parallelization
 
@@ -40,7 +40,7 @@ This task list implements the complete refactor from domain-specific entities (S
 
 - [X] R001 ✅ Dispatch Unifi API research agent
 - [X] R002 ✅ Wait for research completion
-- [X] R003 ✅ Finalize entity list based on API capabilities (63 total: 5 core + 58 reader-specific)
+- [X] R003 ✅ Finalize entity list based on API capabilities (58 total: 5 core + 53 reader-specific)
 - [X] R004 ✅ Create complete file manifest (delete/update/create)
 - [X] R005 ✅ Set up TDD framework and test templates
 
@@ -131,7 +131,7 @@ This task list implements the complete refactor from domain-specific entities (S
 
 ## Phase 2: Reader-Specific Schemas (TDD, Parallel, 8-10h wall-clock)
 
-**Goal**: Implement 58 reader-specific entities across 8 parallel agents.
+**Goal**: Implement 53 reader-specific entities across 8 parallel agents.
 
 **Agents**: 8 programmers (max 10 constraint, reserve 2 for monitoring)
 
@@ -337,7 +337,7 @@ For each entity type:
 - [X] T145 [P] [P2-WEB] Write test for Document in tests/packages/schemas/web/test_document.py ✅
 - [X] T146 [P] [P2-WEB] Implement Document in packages/schemas/web/document.py (doc_id, source_url, source_type, content_hash, ingested_at, extraction_state + temporal) ✅
 
-**Checkpoint**: All 58 reader-specific entities complete, all tests green
+**Checkpoint**: All 53 reader-specific entities complete, all tests green
 
 ---
 
@@ -626,10 +626,10 @@ For each use-case:
 **Verification Checklist**:
 - [ ] All deleted files removed (Service, Host, IP, old Proxy, Endpoint, BatchedGraphWriter, legacy tests)
 - [ ] All updated files modified correctly (SwagWriter, __init__.py exports, constraint count)
-- [ ] All created files exist (63 schemas, 15 writers, 37 tests)
+- [ ] All created files exist (58 schemas, 15 writers, 37 tests)
 - [ ] Unit tests: 100% pass
 - [ ] Integration tests: 100% pass
-- [ ] Neo4j constraints: 63 total (SHOW CONSTRAINTS)
+- [ ] Neo4j constraints: 58 total (SHOW CONSTRAINTS)
 - [ ] Performance: ≥20k edges/min
 - [ ] Coverage: ≥95% writers
 - [ ] E2E smoke tests pass
@@ -649,11 +649,11 @@ For each use-case:
 
 - [ ] T255 [P] [P6-VER] Verify packages/graph/writers/__init__.py exports updated for new writers
 - [ ] T256 [P] [P6-VER] Verify packages/schemas/__init__.py exports updated for new entities
-- [ ] T257 [P] [P6-VER] Verify tests/packages/graph/test_constraints.py constraint count updated to 63
+- [ ] T257 [P] [P6-VER] Verify tests/packages/graph/test_constraints.py constraint count updated to 58
 
 ### Agent 3: File Creation Verification
 
-- [ ] T258 [P] [P6-VER] Verify all 63 schema files exist (5 core + 58 reader-specific)
+- [ ] T258 [P] [P6-VER] Verify all 58 schema files exist (5 core + 53 reader-specific)
 - [ ] T259 [P] [P6-VER] Verify all 15 writer files exist
 - [ ] T260 [P] [P6-VER] Verify all 37 test files exist (10 schema tests + 15 writer tests + 9 integration tests + 3 use-case tests)
 
@@ -676,7 +676,7 @@ For each use-case:
 
 - [ ] T270 [P] [P6-VER] Wipe Neo4j database: `docker volume rm taboot_neo4j_data && docker compose up -d taboot-graph`
 - [ ] T271 [P] [P6-VER] Run init: `uv run apps/cli init`
-- [ ] T272 [P] [P6-VER] Query constraints: Run `SHOW CONSTRAINTS` in Neo4j and verify exactly 63 constraints exist
+- [ ] T272 [P] [P6-VER] Query constraints: Run `SHOW CONSTRAINTS` in Neo4j and verify exactly 58 constraints exist
 - [ ] T273 [P] [P6-VER] Verify constraint names match new entity types (Person, Organization, Place, Event, File, ComposeFile, etc.)
 
 ### Agent 7: Performance Verification
@@ -702,7 +702,7 @@ For each use-case:
 
 ### Agent 10: Documentation Verification
 
-- [ ] T286 [P] [P6-VER] Update CLAUDE.md with new entity model (remove Service, Host, IP; add Person, Organization, Place, Event, File + 58 reader-specific)
+- [ ] T286 [P] [P6-VER] Update CLAUDE.md with new entity model (remove Service, Host, IP; add Person, Organization, Place, Event, File + 53 reader-specific)
 - [ ] T287 [P] [P6-VER] Update NEO4J_REFACTOR.md status to "COMPLETE"
 - [ ] T288 [P] [P6-VER] Update docs/NEO4J_COURSE_CORRECTION.md with final entity counts and implementation notes
 - [ ] T289 [P] [P6-VER] Verify all documentation references updated
@@ -714,12 +714,12 @@ For each use-case:
 ## Success Metrics
 
 ### Functional Completeness
-- [ ] 5 core + 58 reader-specific entities = 63 total ✓
+- [ ] 5 core + 53 reader-specific entities = 58 total ✓
 - [ ] All entities have temporal tracking ✓
 - [ ] All relationships have Pydantic schemas ✓
 - [ ] All 15 writers implement write_* methods ✓
 - [ ] All 10 readers output new entity types ✓
-- [ ] Neo4j constraints: 63 total ✓
+- [ ] Neo4j constraints: 58 total ✓
 
 ### Test Coverage
 - [ ] Unit tests: <10s total ✓

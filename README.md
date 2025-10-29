@@ -233,7 +233,7 @@ uv run apps/cli ingest web https://example.com --limit 50
 uv run apps/cli extract pending     # run extraction worker on new docs
 
 # Query
-uv run apps/cli query "Which services expose port 8080?"
+uv run apps/cli query "Which services expose port 4207?"
 ```
 
 ---
@@ -312,8 +312,8 @@ REDIS_URL=redis://taboot-cache:6379
 
 # Qdrant
 QDRANT_URL=http://taboot-vectors:6333
-QDRANT_HTTP_PORT=7000
-QDRANT_GRPC_PORT=7001
+QDRANT_HTTP_PORT=4203
+QDRANT_GRPC_PORT=4204
 
 # Neo4j
 NEO4J_URI=bolt://taboot-graph:7687
@@ -331,10 +331,10 @@ RERANKER_BATCH_SIZE=16
 RERANKER_DEVICE=auto
 
 # Ollama
-OLLAMA_PORT=11434
+OLLAMA_PORT=4214
 
 # API (optional)
-LLAMACRAWL_API_URL=http://localhost:8000
+LLAMACRAWL_API_URL=http://localhost:4209
 ```
 
 See `docs/configuration.md` for per-source credentials (GitHub, Reddit, Gmail, Elasticsearch, Unifi, Tailscale).

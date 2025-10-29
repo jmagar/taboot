@@ -25,6 +25,7 @@ class TestCommitEntity:
         commit_time = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
 
         commit = Commit(
+            repository_full_name="anthropics/claude-code",
             sha="abc123def456",
             message="Fix bug in parser",
             author_name="John Doe",
@@ -56,6 +57,7 @@ class TestCommitEntity:
         commit_time = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
 
         commit = Commit(
+            repository_full_name="anthropics/claude-code",
             sha="abc123def456",
             message="Fix bug in parser",
             author_login="johndoe",
@@ -86,6 +88,7 @@ class TestCommitEntity:
 
         with pytest.raises(ValidationError) as exc_info:
             Commit(
+                repository_full_name="anthropics/claude-code",
                 message="Test commit",
                 author_name="Test User",
                 author_email="test@example.com",
@@ -109,6 +112,7 @@ class TestCommitEntity:
 
         with pytest.raises(ValidationError) as exc_info:
             Commit(
+                repository_full_name="anthropics/claude-code",
                 sha="abc123",
                 message="Test",
                 author_name="Test",
@@ -126,3 +130,27 @@ class TestCommitEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("additions",) for e in errors)
+
+    def test_commit_missing_repository_full_name(self) -> None:
+        """Test Commit validation fails without repository_full_name."""
+        now = datetime.now(UTC)
+        commit_time = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            Commit(
+                sha="abc123",
+                message="Test",
+                author_name="Test",
+                author_email="test@example.com",
+                timestamp=commit_time,
+                tree_sha="tree123",
+                created_at=now,
+                updated_at=now,
+                extraction_tier="A",
+                extraction_method="github_api",
+                confidence=1.0,
+                extractor_version="1.0.0",
+            )
+
+        errors = exc_info.value.errors()
+        assert any(e["loc"] == ("repository_full_name",) for e in errors)

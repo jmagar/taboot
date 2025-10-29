@@ -41,6 +41,12 @@ class PullRequest(BaseModel):
     """
 
     # Identity fields
+    repository_full_name: str = Field(
+        ...,
+        min_length=1,
+        description="Full repository name this pull request belongs to (owner/name)",
+        examples=["anthropics/claude-code"],
+    )
     number: int = Field(
         ...,
         ge=1,
@@ -145,6 +151,7 @@ class PullRequest(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
+                    "repository_full_name": "anthropics/claude-code",
                     "number": 123,
                     "title": "Add new feature",
                     "state": "merged",

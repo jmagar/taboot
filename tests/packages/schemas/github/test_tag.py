@@ -21,6 +21,7 @@ class TestTagEntity:
         """Test Tag with only required fields."""
         now = datetime.now(UTC)
         tag = Tag(
+            repository_full_name="anthropics/claude-code",
             name="v1.0.0",
             sha="abc123def456",
             ref="refs/tags/v1.0.0",
@@ -42,6 +43,7 @@ class TestTagEntity:
         """Test Tag with message and tagger."""
         now = datetime.now(UTC)
         tag = Tag(
+            repository_full_name="anthropics/claude-code",
             name="v1.0.0",
             sha="abc123def456",
             ref="refs/tags/v1.0.0",
@@ -64,6 +66,7 @@ class TestTagEntity:
 
         with pytest.raises(ValidationError) as exc_info:
             Tag(
+                repository_full_name="anthropics/claude-code",
                 sha="abc123",
                 ref="refs/tags/test",
                 created_at=now,
@@ -76,3 +79,23 @@ class TestTagEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("name",) for e in errors)
+
+    def test_tag_missing_repository_full_name(self) -> None:
+        """Test Tag validation fails without repository_full_name."""
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            Tag(
+                name="v1.0.0",
+                sha="abc123",
+                ref="refs/tags/v1.0.0",
+                created_at=now,
+                updated_at=now,
+                extraction_tier="A",
+                extraction_method="github_api",
+                confidence=1.0,
+                extractor_version="1.0.0",
+            )
+
+        errors = exc_info.value.errors()
+        assert any(e["loc"] == ("repository_full_name",) for e in errors)

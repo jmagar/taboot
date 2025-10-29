@@ -37,6 +37,12 @@ class Tag(BaseModel):
     """
 
     # Identity fields
+    repository_full_name: str = Field(
+        ...,
+        min_length=1,
+        description="Full repository name this tag belongs to (owner/name)",
+        examples=["anthropics/claude-code"],
+    )
     name: str = Field(
         ...,
         min_length=1,
@@ -110,6 +116,7 @@ class Tag(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
+                    "repository_full_name": "anthropics/claude-code",
                     "name": "v1.0.0",
                     "sha": "abc123def456",
                     "ref": "refs/tags/v1.0.0",

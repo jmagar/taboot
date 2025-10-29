@@ -46,13 +46,13 @@ def setup_test_env():
     # Set integer env vars that were causing validation errors
     # Use direct assignment to override any shell/direnv interpolation syntax
     os.environ["RERANKER_BATCH_SIZE"] = "16"
-    os.environ["OLLAMA_PORT"] = "11434"
+    os.environ["OLLAMA_PORT"] = "4214"
 
     # Set other required env vars with sensible test defaults
-    os.environ.setdefault("FIRECRAWL_API_URL", "http://localhost:3002")
-    os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
+    os.environ.setdefault("FIRECRAWL_API_URL", "http://localhost:4200")
+    os.environ.setdefault("REDIS_URL", "redis://localhost:4202")
     os.environ.setdefault("QDRANT_URL", "http://localhost:6333")
-    os.environ.setdefault("NEO4J_URI", "bolt://localhost:7687")
+    os.environ.setdefault("NEO4J_URI", "bolt://localhost:4206")
     os.environ.setdefault("NEO4J_USER", "neo4j")
     os.environ.setdefault("NEO4J_PASSWORD", "changeme")
     os.environ.setdefault("TEI_EMBEDDING_URL", "http://localhost:80")
@@ -322,7 +322,7 @@ def docker_services_ready() -> None:
         try:
             # Environment should already be loaded by setup_test_env fixture
             neo4j_password = os.getenv("NEO4J_PASSWORD", "changeme")
-            driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", neo4j_password))
+            driver = GraphDatabase.driver("bolt://localhost:4206", auth=("neo4j", neo4j_password))
             driver.verify_connectivity()
             driver.close()
             return True
@@ -336,9 +336,9 @@ def docker_services_ready() -> None:
     # Check for required services
     # Use ports from .env.example that map to host
     http_services = [
-        ("http://localhost:7000/", "Qdrant"),  # QDRANT_HTTP_PORT=7000
-        ("http://localhost:8080/health", "TEI"),  # TEI_HTTP_PORT=8080
-        ("http://localhost:3002/", "Firecrawl"),  # FIRECRAWL_PORT=3002
+        ("http://localhost:4203/", "Qdrant"),  # QDRANT_HTTP_PORT=7000
+        ("http://localhost:4207/health", "TEI"),  # TEI_HTTP_PORT=8080
+        ("http://localhost:4200/", "Firecrawl"),  # FIRECRAWL_PORT=3002
     ]
 
     # Quick check first (no retry)

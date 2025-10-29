@@ -33,7 +33,7 @@ describe('CSRF Protection', () => {
   });
   describe('getCsrfToken', () => {
     it('should generate a new CSRF token', async () => {
-      const request = new NextRequest('http://localhost:3000/api/test', {
+      const request = new NextRequest('http://localhost:4211/api/test', {
         method: 'GET',
       });
 
@@ -48,7 +48,7 @@ describe('CSRF Protection', () => {
       // Mock verify to return true so the existing token is accepted
       (crypto.subtle.verify as unknown as vi.Mock).mockResolvedValueOnce(true);
       const existingToken = 'test-token.test-signature';
-      const request = new NextRequest('http://localhost:3000/api/test', {
+      const request = new NextRequest('http://localhost:4211/api/test', {
         method: 'GET',
         headers: {
           cookie: `__Host-taboot.csrf=${existingToken}`,
@@ -63,7 +63,7 @@ describe('CSRF Protection', () => {
 
   describe('csrfMiddleware', () => {
     it('should allow GET requests and set CSRF token cookie', async () => {
-      const request = new NextRequest('http://localhost:3000/api/test', {
+      const request = new NextRequest('http://localhost:4211/api/test', {
         method: 'GET',
       });
 
@@ -81,7 +81,7 @@ describe('CSRF Protection', () => {
     });
 
     it('should allow HEAD requests', async () => {
-      const request = new NextRequest('http://localhost:3000/api/test', {
+      const request = new NextRequest('http://localhost:4211/api/test', {
         method: 'HEAD',
       });
 
@@ -91,7 +91,7 @@ describe('CSRF Protection', () => {
     });
 
     it('should allow OPTIONS requests', async () => {
-      const request = new NextRequest('http://localhost:3000/api/test', {
+      const request = new NextRequest('http://localhost:4211/api/test', {
         method: 'OPTIONS',
       });
 
@@ -101,10 +101,10 @@ describe('CSRF Protection', () => {
     });
 
     it('should reject POST request without origin/referer', async () => {
-      const request = new NextRequest('http://localhost:3000/api/test', {
+      const request = new NextRequest('http://localhost:4211/api/test', {
         method: 'POST',
         headers: {
-          host: 'localhost:3000',
+          host: 'localhost:4211',
         },
       });
 
@@ -116,10 +116,10 @@ describe('CSRF Protection', () => {
     });
 
     it('should reject POST request with mismatched origin', async () => {
-      const request = new NextRequest('http://localhost:3000/api/test', {
+      const request = new NextRequest('http://localhost:4211/api/test', {
         method: 'POST',
         headers: {
-          host: 'localhost:3000',
+          host: 'localhost:4211',
           origin: 'http://evil.com',
         },
       });
@@ -132,11 +132,11 @@ describe('CSRF Protection', () => {
     });
 
     it('should reject POST request without CSRF token', async () => {
-      const request = new NextRequest('http://localhost:3000/api/test', {
+      const request = new NextRequest('http://localhost:4211/api/test', {
         method: 'POST',
         headers: {
-          host: 'localhost:3000',
-          origin: 'http://localhost:3000',
+          host: 'localhost:4211',
+          origin: 'http://localhost:4211',
         },
       });
 
@@ -151,11 +151,11 @@ describe('CSRF Protection', () => {
       // Mock verify to return true so token validation passes
       (crypto.subtle.verify as unknown as vi.Mock).mockResolvedValueOnce(true);
       const token = 'test-token.test-signature';
-      const request = new NextRequest('http://localhost:3000/api/test', {
+      const request = new NextRequest('http://localhost:4211/api/test', {
         method: 'POST',
         headers: {
-          host: 'localhost:3000',
-          origin: 'http://localhost:3000',
+          host: 'localhost:4211',
+          origin: 'http://localhost:4211',
           'x-csrf-token': token,
           cookie: `__Host-taboot.csrf=${token}`,
         },
@@ -170,11 +170,11 @@ describe('CSRF Protection', () => {
       // Mock verify to return true so token validation passes
       (crypto.subtle.verify as unknown as vi.Mock).mockResolvedValueOnce(true);
       const token = 'test-token.test-signature';
-      const request = new NextRequest('http://localhost:3000/api/test', {
+      const request = new NextRequest('http://localhost:4211/api/test', {
         method: 'POST',
         headers: {
-          host: 'localhost:3000',
-          referer: 'http://localhost:3000/page',
+          host: 'localhost:4211',
+          referer: 'http://localhost:4211/page',
           'x-csrf-token': token,
           cookie: `__Host-taboot.csrf=${token}`,
         },
@@ -200,7 +200,7 @@ describe('CSRF Protection', () => {
 
     it('should allow GET requests without CSRF check', async () => {
       const handler = withCsrf(mockHandler);
-      const request = new Request('http://localhost:3000/api/test', {
+      const request = new Request('http://localhost:4211/api/test', {
         method: 'GET',
       });
 
@@ -212,10 +212,10 @@ describe('CSRF Protection', () => {
 
     it('should reject POST without origin', async () => {
       const handler = withCsrf(mockHandler);
-      const request = new Request('http://localhost:3000/api/test', {
+      const request = new Request('http://localhost:4211/api/test', {
         method: 'POST',
         headers: {
-          host: 'localhost:3000',
+          host: 'localhost:4211',
         },
       });
 
@@ -227,11 +227,11 @@ describe('CSRF Protection', () => {
 
     it('should reject POST with invalid CSRF token', async () => {
       const handler = withCsrf(mockHandler);
-      const request = new Request('http://localhost:3000/api/test', {
+      const request = new Request('http://localhost:4211/api/test', {
         method: 'POST',
         headers: {
-          host: 'localhost:3000',
-          origin: 'http://localhost:3000',
+          host: 'localhost:4211',
+          origin: 'http://localhost:4211',
           'x-csrf-token': 'invalid-token',
         },
       });

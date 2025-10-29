@@ -268,21 +268,21 @@ packages/retrieval/
 ### GPU Services (4)
 | Service | Image | Port | Purpose |
 |---------|-------|------|---------|
-| `taboot-vectors` | qdrant/qdrant:gpu-nvidia | 7000 (HTTP), 7001 (gRPC) | Vector DB (HNSW GPU) |
-| `taboot-embed` | ghcr.io/huggingface/text-embeddings-inference | 8080 | TEI embeddings (Qwen3-Embedding-0.6B) |
-| `taboot-rerank` | ./docker/reranker/Dockerfile | 8081 | Reranker (Qwen3-Reranker-0.6B) |
-| `taboot-ollama` | ollama/ollama:latest | 11434 | LLM (Qwen3-4B-Instruct) |
+| `taboot-vectors` | qdrant/qdrant:gpu-nvidia | 4203 (HTTP), 4204 (gRPC) | Vector DB (HNSW GPU) |
+| `taboot-embed` | ghcr.io/huggingface/text-embeddings-inference | 4207 | TEI embeddings (Qwen3-Embedding-0.6B) |
+| `taboot-rerank` | ./docker/reranker/Dockerfile | 4208 | Reranker (Qwen3-Reranker-0.6B) |
+| `taboot-ollama` | ollama/ollama:latest | 4214 | LLM (Qwen3-4B-Instruct) |
 
 ### Non-GPU Services (7)
 | Service | Image | Port | Purpose |
 |---------|-------|------|---------|
-| `taboot-graph` | ./docker/neo4j/Dockerfile (5.23) | 7474, 7687 | Neo4j property graph |
-| `taboot-cache` | redis:7.2-alpine | 6379 | Redis (state, DLQ, cache) |
-| `taboot-db` | ./docker/postgres/Dockerfile (16) | 5432 | PostgreSQL (Firecrawl metadata) |
-| `taboot-playwright` | ghcr.io/firecrawl/playwright-service | 3000 | Browser microservice |
-| `taboot-crawler` | ghcr.io/firecrawl/firecrawl | 3002 | Firecrawl orchestrator |
-| `taboot-api` | ./docker/api/Dockerfile (Python 3.13) | 8000 | FastAPI HTTP service |
-| `taboot-web` | ./docker/web/Dockerfile (Node 22) | 3000 | Next.js dashboard |
+| `taboot-graph` | ./docker/neo4j/Dockerfile (5.23) | 4205, 4206 | Neo4j property graph |
+| `taboot-cache` | redis:7.2-alpine | 4202 | Redis (state, DLQ, cache) |
+| `taboot-db` | ./docker/postgres/Dockerfile (16) | 4201 | PostgreSQL (Firecrawl metadata) |
+| `taboot-playwright` | ghcr.io/firecrawl/playwright-service | 4213 | Browser microservice |
+| `taboot-crawler` | ghcr.io/firecrawl/firecrawl | 4200 | Firecrawl orchestrator |
+| `taboot-api` | ./docker/api/Dockerfile (Python 3.13) | 4209 | FastAPI HTTP service |
+| `taboot-web` | ./docker/web/Dockerfile (Node 22) | 4211 | Next.js dashboard |
 | `taboot-worker` | ./docker/worker/Dockerfile (Python 3.13) | — | Extraction worker (optional) |
 
 ### Health Checks
@@ -310,7 +310,7 @@ QDRANT_URL=http://taboot-vectors:6333
 NEO4J_URI=bolt://taboot-graph:7687
 TEI_EMBEDDING_URL=http://taboot-embed:80
 RERANKER_URL=http://taboot-rerank:8000
-OLLAMA_PORT=11434
+OLLAMA_PORT=4214
 ```
 
 ---

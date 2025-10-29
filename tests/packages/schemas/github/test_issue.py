@@ -23,6 +23,7 @@ class TestIssueEntity:
         """Test Issue with only required fields."""
         now = datetime.now(UTC)
         issue = Issue(
+            repository_full_name="anthropics/claude-code",
             number=42,
             title="Fix bug in parser",
             state="open",
@@ -49,6 +50,7 @@ class TestIssueEntity:
         closed_time = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
 
         issue = Issue(
+            repository_full_name="anthropics/claude-code",
             number=42,
             title="Fix bug in parser",
             state="closed",
@@ -76,6 +78,7 @@ class TestIssueEntity:
 
         with pytest.raises(ValidationError) as exc_info:
             Issue(
+                repository_full_name="anthropics/claude-code",
                 title="Test Issue",
                 state="open",
                 author_login="user",
@@ -96,6 +99,7 @@ class TestIssueEntity:
 
         with pytest.raises(ValidationError) as exc_info:
             Issue(
+                repository_full_name="anthropics/claude-code",
                 number=-1,
                 title="Test Issue",
                 state="open",
@@ -110,3 +114,24 @@ class TestIssueEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("number",) for e in errors)
+
+    def test_issue_missing_repository_full_name(self) -> None:
+        """Test Issue validation fails without repository_full_name."""
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            Issue(
+                number=1,
+                title="Test Issue",
+                state="open",
+                author_login="user",
+                created_at=now,
+                updated_at=now,
+                extraction_tier="A",
+                extraction_method="github_api",
+                confidence=1.0,
+                extractor_version="1.0.0",
+            )
+
+        errors = exc_info.value.errors()
+        assert any(e["loc"] == ("repository_full_name",) for e in errors)

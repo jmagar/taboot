@@ -350,12 +350,12 @@ spec:
 ### 2. Test Soft Delete Behavior
 ```bash
 # Create test user via API
-curl -X POST http://localhost:8000/api/users \
+curl -X POST http://localhost:4209/api/users \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "name": "Test"}'
 
 # Delete user (should be soft delete)
-curl -X DELETE http://localhost:8000/api/users/test-user-id
+curl -X DELETE http://localhost:4209/api/users/test-user-id
 
 # Verify in database
 psql -h localhost -U postgres -d taboot -c \

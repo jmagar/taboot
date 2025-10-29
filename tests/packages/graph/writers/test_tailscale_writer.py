@@ -46,6 +46,7 @@ def sample_device() -> TailscaleDevice:
     return TailscaleDevice(
         device_id="ts-device-123",
         hostname="gateway.example.com",
+        long_domain="gateway.example.com",
         os="linux",
         ipv4_address="100.64.1.5",
         ipv6_address="fd7a:115c:a1e0::1",
@@ -154,6 +155,7 @@ def test_write_devices_single_entity(
         node = record["d"]
         assert node["device_id"] == sample_device.device_id
         assert node["hostname"] == sample_device.hostname
+        assert node["long_domain"] == sample_device.long_domain
         assert node["os"] == sample_device.os
         assert node["ipv4_address"] == sample_device.ipv4_address
         assert node["ipv6_address"] == sample_device.ipv6_address

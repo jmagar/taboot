@@ -373,7 +373,7 @@ docker compose ps | grep -E "healthy|unhealthy"
 # All services should show "healthy"
 
 # 5. API accepts requests
-curl http://localhost:8000/health | jq .
+curl http://localhost:4209/health | jq .
 # Should return: {"status":"ok"} or similar
 
 # 6. Worker healthcheck works

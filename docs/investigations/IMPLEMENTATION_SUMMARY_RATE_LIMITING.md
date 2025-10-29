@@ -182,7 +182,7 @@ SESSION_TOKEN="your-token"
 
 # Should succeed 5 times, then fail with 429
 for i in {1..6}; do
-  curl -X GET http://localhost:3000/api/auth/password \
+  curl -X GET http://localhost:4211/api/auth/password \
     -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
     -s -o /dev/null -w "Request $i: %{http_code}\n"
 done

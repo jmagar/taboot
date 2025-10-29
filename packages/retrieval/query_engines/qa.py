@@ -19,7 +19,7 @@ class QAConfig:
     neo4j_uri: str
     neo4j_username: str
     neo4j_password: str
-    ollama_base_url: str = "http://localhost:11434"
+    ollama_base_url: str = "http://localhost:4214"
     llm_model: str = "qwen3:4b"
     llm_temperature: float = 0.0
     tei_embedding_url: str | None = None

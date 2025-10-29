@@ -22,6 +22,7 @@ class TestMilestoneEntity:
         """Test Milestone with only required fields."""
         now = datetime.now(UTC)
         milestone = Milestone(
+            repository_full_name="anthropics/claude-code",
             number=1,
             title="v1.0 Release",
             state="open",
@@ -45,6 +46,7 @@ class TestMilestoneEntity:
         due_date = datetime(2024, 12, 31, 0, 0, 0, tzinfo=UTC)
 
         milestone = Milestone(
+            repository_full_name="anthropics/claude-code",
             number=1,
             title="v1.0 Release",
             state="open",
@@ -67,6 +69,7 @@ class TestMilestoneEntity:
 
         with pytest.raises(ValidationError) as exc_info:
             Milestone(
+                repository_full_name="anthropics/claude-code",
                 title="Test Milestone",
                 state="open",
                 created_at=now,
@@ -79,3 +82,23 @@ class TestMilestoneEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("number",) for e in errors)
+
+    def test_milestone_missing_repository_full_name(self) -> None:
+        """Test Milestone validation fails without repository_full_name."""
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            Milestone(
+                number=1,
+                title="v1.0 Release",
+                state="open",
+                created_at=now,
+                updated_at=now,
+                extraction_tier="A",
+                extraction_method="github_api",
+                confidence=1.0,
+                extractor_version="1.0.0",
+            )
+
+        errors = exc_info.value.errors()
+        assert any(e["loc"] == ("repository_full_name",) for e in errors)

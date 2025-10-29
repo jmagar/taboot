@@ -62,10 +62,10 @@ networks:
 **Finding:** All port bindings map to `0.0.0.0` (all interfaces)
 
 **Problematic Services:**
-- Qdrant: `7000:6333`, `7001:6334` (vector search engine)
-- Neo4j: `7474:7474`, `7687:7687` (graph database)
-- PostgreSQL: `5432:5432` (main database)
-- Redis: `6379:6379` (cache/session store)
+- Qdrant: `4203:6333`, `4204:6334` (vector search engine)
+- Neo4j: `4205:7474`, `4206:7687` (graph database)
+- PostgreSQL: `4201:5432` (main database)
+- Redis: `4202:6379` (cache/session store)
 
 **Impact:**
 - Anyone on network can access databases directly
@@ -94,7 +94,7 @@ taboot-db:
     - "127.0.0.1:5432:5432"
 ```
 
-**Note:** Keep external ports for Firecrawl (3002), Playwright (3000), Ollama (11434), API (8000), Web (3000) if needed for local development.
+**Note:** Keep external ports for Firecrawl (4200), Playwright (4211), Ollama (4214), API (4209), Web (4211) if needed for local development.
 
 ---
 
@@ -927,12 +927,12 @@ taboot-graph:
 # BEFORE: Insecure port binding
 taboot-graph:
   ports:
-    - "${NEO4J_HTTP_PORT:-7474}:7474"
+    - "${NEO4J_HTTP_PORT:-4205}:7474"
 
 # AFTER: Localhost only
 taboot-graph:
   ports:
-    - "127.0.0.1:${NEO4J_HTTP_PORT:-7474}:7474"
+    - "127.0.0.1:${NEO4J_HTTP_PORT:-4205}:7474"
 
 # BEFORE: No resource limits
 taboot-api:
@@ -966,7 +966,7 @@ docker inspect taboot-api | grep -i memory
 watch -n 1 'docker stats --no-stream'
 
 # Test database accessibility
-nc -zv localhost 5432  # Should fail if bound to 127.0.0.1
+nc -zv localhost 4201  # Should fail if bound to 127.0.0.1
 ```
 
 ---

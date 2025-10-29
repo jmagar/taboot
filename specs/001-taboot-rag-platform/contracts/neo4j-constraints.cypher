@@ -2,6 +2,16 @@
 // Execute these queries during initialization (taboot init command)
 // All constraints ensure uniqueness and enable fast lookups for the new graph model
 
+// === LEGACY CONSTRAINT CLEANUP ===
+
+DROP CONSTRAINT class_unique IF EXISTS;
+DROP CONSTRAINT function_unique IF EXISTS;
+DROP CONSTRAINT module_name IF EXISTS;
+DROP CONSTRAINT variable_unique IF EXISTS;
+DROP CONSTRAINT directory_path IF EXISTS;
+DROP CONSTRAINT file_path IF EXISTS;
+DROP CONSTRAINT repository_path IF EXISTS;
+
 // === CORE ENTITY CONSTRAINTS ===
 
 CREATE CONSTRAINT person_email_unique
@@ -130,60 +140,60 @@ IF NOT EXISTS
 FOR (r:Repository)
 REQUIRE r.full_name IS UNIQUE;
 
-CREATE CONSTRAINT issue_number_unique
+CREATE CONSTRAINT issue_repo_number_unique
 IF NOT EXISTS
 FOR (i:Issue)
-REQUIRE i.number IS UNIQUE;
+REQUIRE (i.repo_full_name, i.number) IS UNIQUE;
 
-CREATE CONSTRAINT pull_request_number_unique
+CREATE CONSTRAINT pull_request_repo_number_unique
 IF NOT EXISTS
 FOR (p:PullRequest)
-REQUIRE p.number IS UNIQUE;
+REQUIRE (p.repo_full_name, p.number) IS UNIQUE;
 
 CREATE CONSTRAINT commit_sha_unique
 IF NOT EXISTS
 FOR (c:Commit)
 REQUIRE c.sha IS UNIQUE;
 
-CREATE CONSTRAINT branch_ref_unique
+CREATE CONSTRAINT branch_repo_name_unique
 IF NOT EXISTS
 FOR (b:Branch)
-REQUIRE b.ref IS UNIQUE;
+REQUIRE (b.repo_full_name, b.name) IS UNIQUE;
 
-CREATE CONSTRAINT tag_ref_unique
+CREATE CONSTRAINT tag_repo_name_unique
 IF NOT EXISTS
 FOR (t:Tag)
-REQUIRE t.ref IS UNIQUE;
+REQUIRE (t.repo_full_name, t.name) IS UNIQUE;
 
-CREATE CONSTRAINT github_label_name_unique
+CREATE CONSTRAINT github_label_repo_name_unique
 IF NOT EXISTS
 FOR (l:GitHubLabel)
-REQUIRE l.name IS UNIQUE;
+REQUIRE (l.repo_full_name, l.name) IS UNIQUE;
 
-CREATE CONSTRAINT milestone_number_unique
+CREATE CONSTRAINT milestone_repo_number_unique
 IF NOT EXISTS
 FOR (m:Milestone)
-REQUIRE m.number IS UNIQUE;
+REQUIRE (m.repo_full_name, m.number) IS UNIQUE;
 
 CREATE CONSTRAINT github_comment_id_unique
 IF NOT EXISTS
 FOR (c:Comment)
 REQUIRE c.id IS UNIQUE;
 
-CREATE CONSTRAINT release_tag_unique
+CREATE CONSTRAINT release_repo_tag_unique
 IF NOT EXISTS
 FOR (r:Release)
-REQUIRE r.tag_name IS UNIQUE;
+REQUIRE (r.repo_full_name, r.tag_name) IS UNIQUE;
 
-CREATE CONSTRAINT documentation_path_unique
+CREATE CONSTRAINT documentation_repo_path_unique
 IF NOT EXISTS
 FOR (d:Documentation)
-REQUIRE d.file_path IS UNIQUE;
+REQUIRE (d.repo_full_name, d.file_path) IS UNIQUE;
 
-CREATE CONSTRAINT binary_asset_path_unique
+CREATE CONSTRAINT binary_asset_repo_release_file_unique
 IF NOT EXISTS
 FOR (b:BinaryAsset)
-REQUIRE b.file_path IS UNIQUE;
+REQUIRE (b.repo_full_name, b.release_tag, b.file_path) IS UNIQUE;
 
 // === GMAIL ENTITY CONSTRAINTS ===
 

@@ -549,19 +549,19 @@ pnpm --filter @taboot/web dev
 # 3. Verify CSRF cookie present after visiting site
 
 # 4. Try mutation WITHOUT token (should fail)
-curl -X POST http://localhost:3000/api/auth/sign-out \
+curl -X POST http://localhost:4211/api/auth/sign-out \
   -H "Cookie: taboot.csrf=fake_token"
 # Expected: 403 Forbidden (missing x-csrf-token header)
 
 # 5. Try mutation WITH mismatched token (should fail)
-curl -X POST http://localhost:3000/api/auth/sign-out \
+curl -X POST http://localhost:4211/api/auth/sign-out \
   -H "Cookie: taboot.csrf=real_token_from_browser" \
   -H "x-csrf-token: different_token"
 # Expected: 403 Forbidden (token mismatch)
 
 # 6. Try mutation WITH correct token (should succeed)
 # Get token from browser DevTools, then:
-curl -X POST http://localhost:3000/api/auth/sign-out \
+curl -X POST http://localhost:4211/api/auth/sign-out \
   -H "Cookie: taboot.csrf=<token_from_browser>" \
   -H "x-csrf-token: <same_token_from_browser>"
 # Expected: 200 OK (or appropriate success response)
@@ -573,7 +573,7 @@ curl -X POST http://localhost:3000/api/auth/sign-out \
 
 ```bash
 # 1. Attempt to inject script via user input
-curl -X POST http://localhost:3000/api/profile \
+curl -X POST http://localhost:4211/api/profile \
   -H "x-csrf-token: <valid_token>" \
   -d '{"name": "<script>alert(1)</script>"}'
 

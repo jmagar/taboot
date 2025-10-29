@@ -73,6 +73,7 @@ class TailscaleWriter:
                 {
                     "device_id": d.device_id,
                     "hostname": d.hostname,
+                    "long_domain": d.long_domain,
                     "os": d.os,
                     "ipv4_address": d.ipv4_address,
                     "ipv6_address": d.ipv6_address,
@@ -109,6 +110,7 @@ class TailscaleWriter:
                     MERGE (d:TailscaleDevice {device_id: row.device_id})
                     SET d.hostname = row.hostname,
                         d.os = row.os,
+                        d.long_domain = row.long_domain,
                         d.ipv4_address = row.ipv4_address,
                         d.ipv6_address = row.ipv6_address,
                         d.endpoints = row.endpoints,

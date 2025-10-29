@@ -20,7 +20,7 @@ class TestWebReader:
         """Test that WebReader can load a single URL."""
         from packages.ingest.readers.web import WebReader
 
-        reader = WebReader(firecrawl_url="http://localhost:3002", firecrawl_api_key="test-key")
+        reader = WebReader(firecrawl_url="http://localhost:4200", firecrawl_api_key="test-key")
         docs = reader.load_data(url="https://example.com", limit=1)
 
         assert len(docs) == 1
@@ -33,7 +33,7 @@ class TestWebReader:
         """Test that WebReader respects the limit parameter."""
         from packages.ingest.readers.web import WebReader
 
-        reader = WebReader(firecrawl_url="http://localhost:3002", firecrawl_api_key="test-key")
+        reader = WebReader(firecrawl_url="http://localhost:4200", firecrawl_api_key="test-key")
         docs = reader.load_data(url="https://example.com/docs", limit=3)
 
         assert len(docs) <= 3
@@ -42,7 +42,7 @@ class TestWebReader:
         """Test that WebReader validates URL format."""
         from packages.ingest.readers.web import WebReader
 
-        reader = WebReader(firecrawl_url="http://localhost:3002", firecrawl_api_key="test-key")
+        reader = WebReader(firecrawl_url="http://localhost:4200", firecrawl_api_key="test-key")
 
         with pytest.raises(ValueError, match="Invalid URL"):
             reader.load_data(url="not-a-url", limit=1)
@@ -51,7 +51,7 @@ class TestWebReader:
         """Test that WebReader rejects empty URLs."""
         from packages.ingest.readers.web import WebReader
 
-        reader = WebReader(firecrawl_url="http://localhost:3002", firecrawl_api_key="test-key")
+        reader = WebReader(firecrawl_url="http://localhost:4200", firecrawl_api_key="test-key")
 
         with pytest.raises(ValueError, match="URL"):
             reader.load_data(url="", limit=1)
@@ -67,11 +67,45 @@ class TestWebReader:
         """Test that WebReader returns a list of Document objects."""
         from packages.ingest.readers.web import WebReader
 
-        reader = WebReader(firecrawl_url="http://localhost:3002", firecrawl_api_key="test-key")
+        reader = WebReader(firecrawl_url="http://localhost:4200", firecrawl_api_key="test-key")
         docs = reader.load_data(url="https://example.com", limit=1)
 
         assert isinstance(docs, list)
         assert all(isinstance(doc, Document) for doc in docs)
+
+    def test_web_reader_marks_markdown_content(self) -> None:
+        """Firecrawl documents should be tagged as Markdown for downstream ingestion."""
+        from unittest.mock import MagicMock, Mock, patch
+
+        from packages.ingest.readers.web import WebReader
+
+        with patch("packages.ingest.readers.web.get_config") as mock_config:
+            mock_cfg = Mock()
+            mock_cfg.firecrawl_default_country = "US"
+            mock_cfg.firecrawl_default_languages = "en-US"
+            mock_cfg.firecrawl_include_paths = ""
+            mock_cfg.firecrawl_exclude_paths = ""
+            mock_config.return_value = mock_cfg
+
+            with patch("packages.ingest.readers.web.FireCrawlWebReader") as mock_reader_class:
+                mock_reader_instance = MagicMock()
+                mock_reader_instance.load_data.return_value = [
+                    Document(text="# Heading\n\nContent", metadata={})
+                ]
+                mock_reader_class.return_value = mock_reader_instance
+
+                web_reader = WebReader(
+                    firecrawl_url="http://test:3002", firecrawl_api_key="test-key"
+                )
+
+                docs = web_reader.load_data("https://example.com/docs", limit=1)
+
+                assert docs, "Expected at least one document"
+                metadata = docs[0].metadata
+                assert metadata is not None
+                assert metadata["source_url"] == "https://example.com/docs"
+                assert metadata["content_format"] == "markdown"
+                assert metadata["content_type"] == "text/markdown"
 
     def test_web_reader_includes_location_in_params(self) -> None:
         """Test that WebReader includes location parameter for language control.
@@ -165,7 +199,7 @@ class TestWebReader:
             mock_cfg = Mock()
             mock_cfg.firecrawl_default_country = "US"
             mock_cfg.firecrawl_default_languages = "en-US"
-            mock_cfg.firecrawl_include_paths = "^.*/en/.*$,^.*/docs/.*$"  # Match full URLs
+            mock_cfg.firecrawl_include_paths = "^/en/.*$,^/docs/.*$"  # Match URL paths
             mock_cfg.firecrawl_exclude_paths = ""
             mock_config.return_value = mock_cfg
 
@@ -187,8 +221,8 @@ class TestWebReader:
                 assert "include_paths" in params, "include_paths (snake_case) should be in params"
                 assert isinstance(params["include_paths"], list), "includePaths should be a list"
                 assert len(params["include_paths"]) == 2, "Should have 2 include patterns"
-                assert "^.*/en/.*$" in params["include_paths"]
-                assert "^.*/docs/.*$" in params["include_paths"]
+                assert "^/en/.*$" in params["include_paths"]
+                assert "^/docs/.*$" in params["include_paths"]
 
     def test_web_reader_exclude_paths_defaults_to_common_languages(self) -> None:
         """Test that excludePaths defaults block common non-English languages.
@@ -237,7 +271,7 @@ class TestWebReader:
             mock_cfg.firecrawl_default_languages = "en-US"
             # Use patterns that match full URLs for client-side URLFilter validation
             mock_cfg.firecrawl_include_paths = (
-                "^.*/en/.*$, ^.*/docs/.*$ , ^.*/api/.*$"  # Whitespace variations
+                "^/en/.*$, ^/docs/.*$ , ^/api/.*$"  # Whitespace variations
             )
             mock_cfg.firecrawl_exclude_paths = "^.*/de/.*$,^.*/fr/.*$"
             mock_config.return_value = mock_cfg
@@ -259,9 +293,9 @@ class TestWebReader:
 
                 # Verify parsing with whitespace handling (camelCase keys)
                 assert len(params["include_paths"]) == 3, "Should parse 3 include patterns"
-                assert "^.*/en/.*$" in params["include_paths"]
-                assert "^.*/docs/.*$" in params["include_paths"]
-                assert "^.*/api/.*$" in params["include_paths"]
+                assert "^/en/.*$" in params["include_paths"]
+                assert "^/docs/.*$" in params["include_paths"]
+                assert "^/api/.*$" in params["include_paths"]
 
                 assert len(params["exclude_paths"]) == 2, "Should parse 2 exclude patterns"
                 assert "^.*/de/.*$" in params["exclude_paths"]
@@ -281,7 +315,7 @@ class TestWebReader:
             mock_cfg.firecrawl_default_country = "US"
             mock_cfg.firecrawl_default_languages = "en-US"
             mock_cfg.firecrawl_include_paths = ""  # Test empty patterns handling
-            mock_cfg.firecrawl_exclude_paths = "^.*/(de|fr)/.*$,,"  # Trailing commas
+            mock_cfg.firecrawl_exclude_paths = "^.*/(de|fr)/.*$,"  # Trailing comma
             mock_config.return_value = mock_cfg
 
             with patch("packages.ingest.readers.web.FireCrawlWebReader") as mock_reader_class:
@@ -351,7 +385,7 @@ class TestWebReader:
             mock_cfg = Mock()
             mock_cfg.firecrawl_default_country = "US"
             mock_cfg.firecrawl_default_languages = "en-US"
-            mock_cfg.firecrawl_include_paths = r"^.*/en/.*$"  # Only allow /en/ paths
+            mock_cfg.firecrawl_include_paths = r"^/en/.*$"  # Only allow /en/ paths
             mock_cfg.firecrawl_exclude_paths = ""
             mock_config.return_value = mock_cfg
 
@@ -380,7 +414,7 @@ class TestWebReader:
             mock_cfg = Mock()
             mock_cfg.firecrawl_default_country = "US"
             mock_cfg.firecrawl_default_languages = "en-US"
-            mock_cfg.firecrawl_include_paths = r"^.*/en/.*$"  # Only allow /en/ paths
+            mock_cfg.firecrawl_include_paths = r"^/en/.*$"  # Only allow /en/ paths
             mock_cfg.firecrawl_exclude_paths = ""
             mock_config.return_value = mock_cfg
 
@@ -451,3 +485,40 @@ class TestWebReader:
                 assert all("/en/" in doc.metadata["source_url"] for doc in docs)
                 assert not any("/de/" in doc.metadata.get("source_url", "") for doc in docs)
                 assert not any("/fr/" in doc.metadata.get("source_url", "") for doc in docs)
+
+    def test_web_reader_sets_source_url_from_various_metadata_keys(self) -> None:
+        """Ensure metadata variants (url/sourceUrl/etc.) populate source_url consistently."""
+        from unittest.mock import MagicMock, Mock, patch
+
+        from llama_index.core import Document
+
+        from packages.ingest.readers.web import WebReader
+
+        with patch("packages.ingest.readers.web.get_config") as mock_config:
+            mock_cfg = Mock()
+            mock_cfg.firecrawl_default_country = "US"
+            mock_cfg.firecrawl_default_languages = "en-US"
+            mock_cfg.firecrawl_include_paths = ""
+            mock_cfg.firecrawl_exclude_paths = r"^.*/(de|fr)/.*$"
+            mock_config.return_value = mock_cfg
+
+            with patch("packages.ingest.readers.web.FireCrawlWebReader") as mock_reader_class:
+                mock_docs = [
+                    Document(text="Doc", metadata={"url": "/en/docs/intro"}),
+                    Document(text="Absolute", metadata={"sourceUrl": "https://example.com/en/api"}),
+                    Document(text="Fallback", metadata={}),
+                ]
+
+                mock_reader_instance = MagicMock()
+                mock_reader_instance.load_data.return_value = mock_docs
+                mock_reader_class.return_value = mock_reader_instance
+
+                web_reader = WebReader(
+                    firecrawl_url="http://test:3002", firecrawl_api_key="test-key"
+                )
+
+                docs = web_reader.load_data("https://example.com/en/", limit=5)
+
+                assert docs[0].metadata["source_url"] == "https://example.com/en/docs/intro"
+                assert docs[1].metadata["source_url"] == "https://example.com/en/api"
+                assert docs[2].metadata["source_url"] == "https://example.com/en/"

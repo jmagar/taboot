@@ -41,6 +41,12 @@ class Release(BaseModel):
     """
 
     # Identity fields
+    repository_full_name: str = Field(
+        ...,
+        min_length=1,
+        description="Full repository name this release belongs to (owner/name)",
+        examples=["anthropics/claude-code"],
+    )
     tag_name: str = Field(
         ...,
         min_length=1,
@@ -135,6 +141,7 @@ class Release(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
+                    "repository_full_name": "anthropics/claude-code",
                     "tag_name": "v1.0.0",
                     "name": "Version 1.0.0",
                     "body": "# What's New\n\n- Feature A\n- Feature B",

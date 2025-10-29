@@ -245,12 +245,12 @@ Soft delete operations **do** fail if:
 docker compose up taboot-api taboot-web taboot-db
 
 # 2. Authenticate and get session token
-curl -X POST http://localhost:3000/api/auth/sign-in \
+curl -X POST http://localhost:4211/api/auth/sign-in \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password"}'
 
 # 3. Perform deletion with context
-curl -X DELETE http://localhost:3000/api/users/USER_ID \
+curl -X DELETE http://localhost:4211/api/users/USER_ID \
   -H "Authorization: Bearer SESSION_TOKEN" \
   -H "X-Forwarded-For: 203.0.113.42"
 

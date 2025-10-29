@@ -30,7 +30,7 @@ clients: ## Generate TS/Python clients
 	openapi-python-client generate --path apps/api/openapi.yaml --output packages/clients/python
 
 run-api: ## Run FastAPI with reload
-	uvicorn apps.api.main:app --reload --port 8000
+	uvicorn apps.api.main:app --reload --port 4209
 
 format: ## Format Python
 	ruff format .

@@ -22,7 +22,7 @@
 
 This session focused on addressing critical issues in the retrieval layer integration tests where embedding, vector, graph, and query engine tests were using mocked or incorrectly configured services instead of the actual Docker-based infrastructure. The primary problem was discovered when test output showed HuggingFace's BAAI/bge-small-en-v1.5 embedding model being used instead of the project's designated Qwen3-Embedding-0.6B model running in the TEI service.
 
-The fix involved correcting service URLs (particularly Qdrant port mapping from 6333 to 7000, and TEI endpoint configuration), updating fixture initialization to create test collections and connections to real services, and modifying query engines to accept and use the TEI embedding service URL. All changes maintain the strict dependency flow architecture (apps → adapters → core) and follow the project's convention of throwing errors early rather than using fallbacks.
+The fix involved correcting service URLs (particularly Qdrant port mapping from 6333 to 4203, and TEI endpoint configuration), updating fixture initialization to create test collections and connections to real services, and modifying query engines to accept and use the TEI embedding service URL. All changes maintain the strict dependency flow architecture (apps → adapters → core) and follow the project's convention of throwing errors early rather than using fallbacks.
 
 ---
 
@@ -35,16 +35,16 @@ The fix involved correcting service URLs (particularly Qdrant port mapping from 
 
 **Details:**
 
-The vector index tests were failing to connect to the real Qdrant service running in Docker. The root cause was twofold: (1) incorrect port mapping (using 6333 instead of the host-mapped port 7000), and (2) missing proper embeddings model configuration. Tests were implicitly using HuggingFace's default BAAI/bge-small-en-v1.5 model instead of the project's real Qwen3-Embedding-0.6B model served by the TEI container.
+The vector index tests were failing to connect to the real Qdrant service running in Docker. The root cause was twofold: (1) incorrect port mapping (using 6333 instead of the host-mapped port 4203), and (2) missing proper embeddings model configuration. Tests were implicitly using HuggingFace's default BAAI/bge-small-en-v1.5 model instead of the project's real Qwen3-Embedding-0.6B model served by the TEI container.
 
 **Implementation:**
 1. Updated `test_vector.py` to explicitly set `TextEmbeddingsInference` with correct parameters:
    - Set `model_name="Qwen/Qwen3-Embedding-0.6B"` to match real service configuration
-   - Set `base_url="http://localhost:8080"` to connect to TEI service on host port 8080
+   - Set `base_url="http://localhost:4207"` to connect to TEI service on host port 4207
    - Set `timeout=60` for network latency allowance
 
 2. Created a session-scoped `qdrant_client()` fixture in `tests/packages/conftest.py` that:
-   - Connects to the real Qdrant service at `http://localhost:7000`
+   - Connects to the real Qdrant service at `http://localhost:4203`
    - Automatically creates the `test_documents` collection with 1024-dimensional COSINE distance vectors (matching Qwen3 embedding output)
    - Yields the client for test use and cleans up on teardown
 
@@ -75,7 +75,7 @@ Tests across the retrieval layer were not properly configured to use the TEI ser
    ```python
    Settings.embed_model = TextEmbeddingsInference(
        model_name="Qwen/Qwen3-Embedding-0.6B",
-       base_url="http://localhost:8080",  # Host port mapping
+       base_url="http://localhost:4207",  # Host port mapping
        timeout=60,
        embed_batch_size=32
    )
@@ -87,7 +87,7 @@ Tests across the retrieval layer were not properly configured to use the TEI ser
    - `test_hybrid.py` - for hybrid retriever tests
    - `test_qa.py` - for query engine tests
 
-3. Key insight: Container DNS names (e.g., `taboot-embed:80`) only work inside the Docker network. Tests running on the host must use `localhost:8080` (host port mapping) instead.
+3. Key insight: Container DNS names (e.g., `taboot-embed:80`) only work inside the Docker network. Tests running on the host must use `localhost:4207` (host port mapping) instead.
 
 **Relations:**
 - USES: Docker TEI service (taboot-embed), llama_index embeddings integration
@@ -108,7 +108,7 @@ Integration tests required direct access to the real Qdrant service to manage te
 
 **Implementation:**
 Created a session-scoped pytest fixture that:
-1. Initializes `QdrantClient(url="http://localhost:7000")` to the real service
+1. Initializes `QdrantClient(url="http://localhost:4203")` to the real service
 2. Automatically creates `test_documents` collection with proper vector configuration:
    - Vector size: 1024 dimensions (matching Qwen3-Embedding-0.6B output)
    - Distance metric: COSINE
@@ -125,7 +125,7 @@ def qdrant_client():
     """Real Qdrant client for integration tests."""
     from qdrant_client.models import Distance, VectorParams
 
-    client = QdrantClient(url="http://localhost:7000")
+    client = QdrantClient(url="http://localhost:4203")
 
     # Create test collection if it doesn't exist
     collections = client.get_collections().collections
@@ -158,7 +158,7 @@ Graph index and query engine tests needed direct access to Neo4j for setting up 
 
 **Implementation:**
 Created a session-scoped `neo4j_client()` fixture that:
-1. Connects to real Neo4j service at `bolt://localhost:7687`
+1. Connects to real Neo4j service at `bolt://localhost:4206`
 2. Uses credentials from environment (NEO4J_USER, NEO4J_PASSWORD)
 3. Provides driver for test use
 4. Properly closes connection on teardown
@@ -180,11 +180,11 @@ This fixture follows the same pattern as the Qdrant fixture for consistency and 
 
 **Details:**
 
-The hybrid retriever tests were failing to initialize the Qdrant-backed vector store due to incorrect port mapping. The tests used `http://localhost:6333` (the internal container port) instead of `http://localhost:7000` (the host-mapped port).
+The hybrid retriever tests were failing to initialize the Qdrant-backed vector store due to incorrect port mapping. The tests used `http://localhost:6333` (the internal container port) instead of `http://localhost:4203` (the host-mapped port).
 
 **Implementation:**
-1. Updated all Qdrant URL references from `6333` to `7000`
-2. Added `tei_embedding_url="http://localhost:8080"` parameter to HybridRetriever initialization to ensure it uses the real TEI service
+1. Updated all Qdrant URL references from `6333` to `4203`
+2. Added `tei_embedding_url="http://localhost:4207"` parameter to HybridRetriever initialization to ensure it uses the real TEI service
 3. Updated test to verify that the hybrid retriever successfully initializes and can query both vector and graph stores
 
 **Specific changes:**
@@ -254,7 +254,7 @@ class QAQueryEngine:
 Similar to vector index tests, graph index tests were using incorrect Qdrant port mapping. While graph indices primarily interact with Neo4j, they also use vector embeddings for hybrid operations and need proper TEI configuration.
 
 **Implementation:**
-1. Updated Qdrant connection from `localhost:6333` to `localhost:7000`
+1. Updated Qdrant connection from `localhost:6333` to `localhost:4203`
 2. Applied same TEI configuration as other retrieval tests
 3. Tests now properly create and query graph indices against real services
 
@@ -273,10 +273,10 @@ The critical insight is understanding Docker port mappings. Container internal p
 
 | Service | Container Port | Host Port | Access from Tests |
 |---------|-----------------|-----------|-------------------|
-| Qdrant | 6333 | 7000 | http://localhost:7000 |
-| TEI | 80 | 8080 | http://localhost:8080 |
-| Neo4j | 7687 | 7687 | bolt://localhost:7687 |
-| Redis | 6379 | 6379 | redis://localhost:6379 |
+| Qdrant | 6333 | 4203 | http://localhost:4203 |
+| TEI | 80 | 4207 | http://localhost:4207 |
+| Neo4j | 4206 | 4206 | bolt://localhost:4206 |
+| Redis | 4202 | 4202 | redis://localhost:4202 |
 
 ### TEI Embeddings Configuration
 
@@ -287,7 +287,7 @@ from llama_index.embeddings.text_embeddings_inference import TextEmbeddingsInfer
 # Configure for Qwen3-Embedding-0.6B with 1024-dimensional output
 Settings.embed_model = TextEmbeddingsInference(
     model_name="Qwen/Qwen3-Embedding-0.6B",
-    base_url="http://localhost:8080",
+    base_url="http://localhost:4207",
     timeout=60,
     embed_batch_size=32
 )
@@ -299,7 +299,7 @@ Settings.embed_model = TextEmbeddingsInference(
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
-client = QdrantClient(url="http://localhost:7000")
+client = QdrantClient(url="http://localhost:4203")
 
 # Create collection for 1024-dim embeddings
 client.create_collection(
@@ -314,7 +314,7 @@ client.create_collection(
 from neo4j import GraphDatabase
 
 driver = GraphDatabase.driver(
-    "bolt://localhost:7687",
+    "bolt://localhost:4206",
     auth=("neo4j", "changeme")  # From .env
 )
 ```
@@ -325,11 +325,11 @@ driver = GraphDatabase.driver(
 from packages.retrieval.retrievers.hybrid import HybridRetriever
 
 retriever = HybridRetriever(
-    qdrant_url="http://localhost:7000",
-    neo4j_uri="bolt://localhost:7687",
+    qdrant_url="http://localhost:4203",
+    neo4j_uri="bolt://localhost:4206",
     neo4j_user="neo4j",
     neo4j_password="changeme",
-    tei_embedding_url="http://localhost:8080",
+    tei_embedding_url="http://localhost:4207",
 )
 
 # Perform hybrid search
@@ -342,11 +342,11 @@ results = retriever.retrieve("What services depend on PostgreSQL?")
 from packages.retrieval.query_engines.qa import QAQueryEngine
 
 engine = QAQueryEngine(
-    qdrant_url="http://localhost:7000",
-    neo4j_uri="bolt://localhost:7687",
+    qdrant_url="http://localhost:4203",
+    neo4j_uri="bolt://localhost:4206",
     neo4j_user="neo4j",
     neo4j_password="changeme",
-    tei_embedding_url="http://localhost:8080",
+    tei_embedding_url="http://localhost:4207",
 )
 
 # Generate QA response with citations
@@ -387,15 +387,15 @@ docker compose ps
 ### Verify Service Connectivity
 ```bash
 # Test TEI health endpoint
-curl -s http://localhost:8080/health
+curl -s http://localhost:4207/health
 # Expected: HTTP 200 with model info
 
 # Test Qdrant health
-curl -s http://localhost:7000/health
+curl -s http://localhost:4203/health
 # Expected: HTTP 200 with "status": "ok"
 
 # Test Neo4j connectivity
-curl -s -u neo4j:changeme http://localhost:7474/db/neo4j/cypher -X POST \
+curl -s -u neo4j:changeme http://localhost:4205/db/neo4j/cypher -X POST \
   -H "Content-Type: application/json" \
   -d '{"query": "RETURN 1 as test"}'
 # Expected: HTTP 200 with query result
@@ -445,7 +445,7 @@ from llama_index.embeddings.text_embeddings_inference import TextEmbeddingsInfer
 
 embed = TextEmbeddingsInference(
     model_name='Qwen/Qwen3-Embedding-0.6B',
-    base_url='http://localhost:8080'
+    base_url='http://localhost:4207'
 )
 result = embed.get_text_embedding('test')
 print(f'Embedding dimensions: {len(result)}')
@@ -459,7 +459,7 @@ print(f'Expected: 1024')
 ### Verify Qdrant Collection
 ```bash
 # Check test collection exists and has correct configuration
-curl -s http://localhost:7000/collections/test_documents | jq .
+curl -s http://localhost:4203/collections/test_documents | jq .
 # Expected: Collection config with:
 # "vectors": {"size": 1024, "distance": "Cosine"}
 ```
@@ -510,8 +510,8 @@ curl -s http://localhost:7000/collections/test_documents | jq .
 
 **Key Commands Executed:**
 - `uv run pytest tests/packages/retrieval/ -v --tb=short` (validation)
-- `curl -s http://localhost:8080/health` (service verification)
-- `curl -s http://localhost:7000/health` (service verification)
+- `curl -s http://localhost:4207/health` (service verification)
+- `curl -s http://localhost:4203/health` (service verification)
 
 **Technologies & Frameworks:**
 - Python 3.11+

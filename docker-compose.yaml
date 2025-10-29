@@ -34,8 +34,8 @@ services:
     container_name: taboot-vectors
     image: qdrant/qdrant:gpu-nvidia-latest
     ports:
-      - "${QDRANT_HTTP_PORT:-7000}:6333"
-      - "${QDRANT_GRPC_PORT:-7001}:6334"
+      - "${QDRANT_HTTP_PORT:-4203}:6333"
+      - "${QDRANT_GRPC_PORT:-4204}:6334"
     volumes:
       - taboot-vectors:/qdrant/storage
     environment:
@@ -59,7 +59,7 @@ services:
       taboot-vectors:
         condition: service_healthy
     ports:
-      - "${TEI_HTTP_PORT:-8080}:80"
+      - "${TEI_HTTP_PORT:-4207}:80"
     volumes:
       - taboot-embed:/data
     command:
@@ -89,30 +89,6 @@ services:
       retries: 3
       start_period: 20s
 
-  taboot-rerank:
-    <<: [*common-base, *gpu-deploy]
-    build:
-      context: ./docker/reranker
-      dockerfile: Dockerfile
-    image: taboot/rerank:latest
-    container_name: taboot-rerank
-    ports:
-      - "${RERANKER_HTTP_PORT:-8081}:8000"
-    environment:
-      <<: *gpu-env
-      MODEL_ID: ${RERANKER_MODEL:-Qwen/Qwen3-Reranker-0.6B}
-      BATCH_SIZE: ${RERANKER_BATCH_SIZE:-16}
-      RERANKER_DEVICE: ${RERANKER_DEVICE:-auto}
-      HF_TOKEN: ${HF_TOKEN:-}
-    volumes:
-      - huggingface-cache:/root/.cache/huggingface
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-
   taboot-graph:
     <<: *common-base
     build:
@@ -121,8 +97,8 @@ services:
     image: taboot/neo4j:5.23-community
     container_name: taboot-graph
     ports:
-      - "${NEO4J_HTTP_PORT:-7474}:7474"
-      - "${NEO4J_BOLT_PORT:-7687}:7687"
+      - "${NEO4J_HTTP_PORT:-4205}:7474"
+      - "${NEO4J_BOLT_PORT:-4206}:7687"
     volumes:
       - taboot-graph_data:/data
       - taboot-graph_logs:/logs
@@ -146,7 +122,7 @@ services:
     image: redis:7.2-alpine
     container_name: taboot-cache
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_PORT:-4202}:6379"
     volumes:
       - taboot-cache:/data
     command: redis-server --appendonly yes --appendfsync everysec --save 900 1 --save 300 10 --save 60 10000
@@ -162,7 +138,7 @@ services:
     image: ollama/ollama:latest
     container_name: taboot-ollama
     ports:
-      - "${OLLAMA_PORT:-11434}:11434"
+      - "${OLLAMA_PORT:-4214}:11434"
     volumes:
       - taboot-ollama:/root/.ollama
     environment:
@@ -185,7 +161,7 @@ services:
     environment:
       PORT: 3000
     ports:
-      - "${PLAYWRIGHT_PORT:-3000}:3000"
+      - "${PLAYWRIGHT_PORT:-4213}:3000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
@@ -200,7 +176,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${FIRECRAWL_PORT:-3002}:${FIRECRAWL_INTERNAL_PORT:-3002}"
+      - "${FIRECRAWL_PORT:-4200}:${FIRECRAWL_INTERNAL_PORT:-3002}"
     command: node dist/src/harness.js --start-docker
     depends_on:
       taboot-db:
@@ -210,7 +186,7 @@ services:
       taboot-playwright:
         condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:4200/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -236,7 +212,7 @@ services:
     volumes:
       - taboot-db:/var/lib/postgresql/data
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-4201}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-taboot}"]
       interval: 5s
@@ -244,112 +220,8 @@ services:
       retries: 5
       start_period: 15s
 
-  taboot-api:
-    <<: *common-base
-    build:
-      context: .
-      dockerfile: docker/api/Dockerfile
-      additional_contexts:
-        packages: ./packages
-    container_name: taboot-api
-    env_file:
-      - .env
-    environment:
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    volumes:
-      - ${HOME}/.ssh:/home/llamacrawl/.ssh:ro
-    ports:
-      - "${TABOOT_HTTP_PORT:-8000}:8000"
-    depends_on:
-      taboot-cache:
-        condition: service_healthy
-      taboot-vectors:
-        condition: service_healthy
-      taboot-graph:
-        condition: service_healthy
-      taboot-embed:
-        condition: service_healthy
-      taboot-ollama:
-        condition: service_healthy
-      taboot-db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  taboot-web:
-    <<: *common-base
-    build:
-      context: .
-      dockerfile: docker/web/Dockerfile
-      additional_contexts:
-        packages-ts: ./packages-ts
-      cache_from:
-        - type=registry,ref=taboot/web:buildcache
-      cache_to:
-        - type=inline
-    container_name: taboot-web
-    env_file:
-      - .env
-    environment:
-      NODE_ENV: ${NODE_ENV:-production}
-      # Internal API URL for server-side requests within Docker network
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://taboot-api:8000}
-    ports:
-      - "${TABOOT_WEB_PORT:-3000}:3000"
-    depends_on:
-      taboot-api:
-        condition: service_healthy
-      taboot-db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  taboot-worker:
-    <<: *common-base
-    build:
-      context: .
-      dockerfile: docker/worker/Dockerfile
-      additional_contexts:
-        packages: ./packages
-    container_name: taboot-worker
-    env_file:
-      - .env
-    volumes:
-      - spacy-models:/root/.spacy/data
-    depends_on:
-      taboot-cache:
-        condition: service_healthy
-      taboot-vectors:
-        condition: service_healthy
-      taboot-graph:
-        condition: service_healthy
-      taboot-embed:
-        condition: service_healthy
-      taboot-rerank:
-        condition: service_healthy
-      taboot-ollama:
-        condition: service_healthy
-      taboot-db:
-        condition: service_healthy
-    command: ["python", "-m", "apps.worker.main"]
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'apps.worker.main' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
 volumes:
   taboot-embed:
-  taboot-rerank:
   taboot-vectors:
   taboot-graph_data:
   taboot-graph_logs:
@@ -357,8 +229,6 @@ volumes:
   taboot-cache:
   taboot-ollama:
   taboot-db:
-  huggingface-cache:
-  spacy-models:
 
 networks:
   taboot-net:

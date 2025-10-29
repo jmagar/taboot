@@ -194,7 +194,7 @@ POSTGRES_HOST=localhost
 ### POSTGRES_PORT
 
 **Status:** OPTIONAL
-**Default:** `5432`
+**Default:** `4201`
 **Type:** Integer (1-65535)
 **Used By:** Python API, Next.js app
 
@@ -203,7 +203,7 @@ PostgreSQL server port.
 
 **Example:**
 ```env
-POSTGRES_PORT=5432
+POSTGRES_PORT=4201
 ```
 
 ### DATABASE_URL
@@ -294,7 +294,7 @@ NEO4J_DB=neo4j
 **Used By:** Python API
 
 **Description:**
-Neo4j Bolt protocol connection URL. Rewritten to localhost:7687 when running on host.
+Neo4j Bolt protocol connection URL. Rewritten to localhost:4206 when running on host.
 
 **Example (Docker):**
 ```env
@@ -303,7 +303,7 @@ NEO4J_URI=bolt://taboot-graph:7687
 
 **Example (Host Development):**
 ```env
-NEO4J_URI=bolt://localhost:7687
+NEO4J_URI=bolt://localhost:4206
 ```
 
 ---
@@ -327,7 +327,7 @@ REDIS_URL=redis://taboot-cache:6379
 
 **Example (Host Development):**
 ```env
-REDIS_URL=redis://localhost:6379
+REDIS_URL=redis://localhost:4202
 ```
 
 **Example (With Auth):**
@@ -352,7 +352,7 @@ QDRANT_URL=http://taboot-vectors:6333
 
 **Example (Host Development):**
 ```env
-QDRANT_URL=http://localhost:7000
+QDRANT_URL=http://localhost:4203
 ```
 
 ### NEO4J_URI
@@ -376,7 +376,7 @@ FIRECRAWL_API_URL=http://taboot-crawler:3002
 
 **Example (Host Development):**
 ```env
-FIRECRAWL_API_URL=http://localhost:3002
+FIRECRAWL_API_URL=http://localhost:4200
 ```
 
 ### FIRECRAWL_API_KEY
@@ -416,7 +416,7 @@ TEI_EMBEDDING_URL=http://taboot-embed:80
 
 **Example (Host Development):**
 ```env
-TEI_EMBEDDING_URL=http://localhost:8080
+TEI_EMBEDDING_URL=http://localhost:4207
 ```
 
 ### RERANKER_URL
@@ -436,7 +436,7 @@ RERANKER_URL=http://taboot-rerank:8000
 
 **Example (Host Development):**
 ```env
-RERANKER_URL=http://localhost:8081
+RERANKER_URL=http://localhost:4208
 ```
 
 ### PLAYWRIGHT_MICROSERVICE_URL

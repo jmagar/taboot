@@ -181,10 +181,10 @@ describe('CSRF Client', () => {
 
       mockDocument.cookie = 'taboot.csrf=test-token; path=/';
 
-      await csrfFetch('http://localhost:3000/api/test', { method: 'POST' });
+      await csrfFetch('http://localhost:4211/api/test', { method: 'POST' });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3000/api/test',
+        'http://localhost:4211/api/test',
         expect.objectContaining({
           method: 'POST',
         })

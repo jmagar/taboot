@@ -20,6 +20,7 @@ class TailscaleDevice(BaseModel):
         >>> device = TailscaleDevice(
         ...     device_id="ts-device-123",
         ...     hostname="gateway.example.com",
+        ...     long_domain="gateway.example.com",
         ...     os="linux",
         ...     ipv4_address="100.64.1.5",
         ...     ipv6_address="fd7a:115c:a1e0::1",
@@ -48,6 +49,11 @@ class TailscaleDevice(BaseModel):
         min_length=1,
         description="Device hostname",
         examples=["gateway.example.com", "server.tailnet.ts.net"],
+    )
+    long_domain: str | None = Field(
+        None,
+        description="Fully qualified domain name reported by Tailscale (outside MagicDNS)",
+        examples=["gateway.example.com", "workstation.corp.example.com"],
     )
     os: str = Field(
         ...,
@@ -93,7 +99,7 @@ class TailscaleDevice(BaseModel):
     )
     tailnet_dns_name: str | None = Field(
         None,
-        description="DNS name within the tailnet",
+        description="MagicDNS hostname within the tailnet (e.g., device.tailnet.ts.net)",
         examples=["gateway.tailnet-abc.ts.net"],
     )
 
@@ -139,6 +145,7 @@ class TailscaleDevice(BaseModel):
                 {
                     "device_id": "ts-device-456",
                     "hostname": "gateway.example.com",
+                    "long_domain": "gateway.example.com",
                     "os": "linux",
                     "ipv4_address": "100.64.1.5",
                     "ipv6_address": "fd7a:115c:a1e0::1",

@@ -22,6 +22,8 @@ class TestCommentEntity:
         """Test Comment with only required fields."""
         now = datetime.now(UTC)
         comment = Comment(
+            repository_full_name="anthropics/claude-code",
+            issue_number=42,
             id=12345,
             author_login="johndoe",
             body="This looks good!",
@@ -47,6 +49,8 @@ class TestCommentEntity:
         updated_time = datetime(2024, 1, 2, 12, 0, 0, tzinfo=UTC)
 
         comment = Comment(
+            repository_full_name="anthropics/claude-code",
+            issue_number=42,
             id=12345,
             author_login="johndoe",
             body="This looks good! (edited)",
@@ -68,6 +72,8 @@ class TestCommentEntity:
 
         with pytest.raises(ValidationError) as exc_info:
             Comment(
+                repository_full_name="anthropics/claude-code",
+                issue_number=42,
                 author_login="user",
                 body="Test comment",
                 comment_created_at=now,
@@ -81,3 +87,47 @@ class TestCommentEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("id",) for e in errors)
+
+    def test_comment_missing_repository_full_name(self) -> None:
+        """Test Comment validation fails without repository_full_name."""
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            Comment(
+                issue_number=42,
+                id=12345,
+                author_login="user",
+                body="Test comment",
+                comment_created_at=now,
+                created_at=now,
+                updated_at=now,
+                extraction_tier="A",
+                extraction_method="github_api",
+                confidence=1.0,
+                extractor_version="1.0.0",
+            )
+
+        errors = exc_info.value.errors()
+        assert any(e["loc"] == ("repository_full_name",) for e in errors)
+
+    def test_comment_missing_issue_number(self) -> None:
+        """Test Comment validation fails without issue_number."""
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            Comment(
+                repository_full_name="anthropics/claude-code",
+                id=12345,
+                author_login="user",
+                body="Test comment",
+                comment_created_at=now,
+                created_at=now,
+                updated_at=now,
+                extraction_tier="A",
+                extraction_method="github_api",
+                confidence=1.0,
+                extractor_version="1.0.0",
+            )
+
+        errors = exc_info.value.errors()
+        assert any(e["loc"] == ("issue_number",) for e in errors)

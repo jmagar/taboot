@@ -434,6 +434,7 @@ class TestTailscaleReaderNewEntities:
                     "addresses": ["100.64.2.10"],
                     "os": "darwin",
                     "name": "workstation.local",
+                    "dnsName": "workstation.tailnet-abc.ts.net",
                     "endpoints": ["192.168.1.200:41641"],
                     "keyExpiryDisabled": False,
                     "isExitNode": False,
@@ -469,6 +470,7 @@ class TestTailscaleReaderNewEntities:
         assert isinstance(gateway, TailscaleDevice)
         assert gateway.device_id == "device-123"
         assert gateway.hostname == "gateway.example.com"
+        assert gateway.long_domain == "gateway.example.com"
         assert gateway.os == "linux"
         assert gateway.ipv4_address == "100.64.1.5"
         assert gateway.ipv6_address == "fd7a:115c:a1e0::1"
@@ -492,11 +494,13 @@ class TestTailscaleReaderNewEntities:
         assert isinstance(workstation, TailscaleDevice)
         assert workstation.device_id == "device-456"
         assert workstation.hostname == "workstation.local"
+        assert workstation.long_domain == "workstation.local"
         assert workstation.os == "darwin"
         assert workstation.ipv4_address == "100.64.2.10"
         assert workstation.ipv6_address is None
         assert workstation.is_exit_node is False
         assert workstation.ssh_enabled is False
+        assert workstation.tailnet_dns_name == "workstation.tailnet-abc.ts.net"
 
     @patch("requests.get")
     def test_reader_outputs_tailscale_network_entities(

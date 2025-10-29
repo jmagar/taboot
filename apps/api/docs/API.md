@@ -13,7 +13,7 @@ X-API-Key: <your key>
 ## Base URL
 
 ```
-http://localhost:8000
+http://localhost:4209
 ```
 
 ## Resources

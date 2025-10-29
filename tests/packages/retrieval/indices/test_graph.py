@@ -13,19 +13,19 @@ from packages.retrieval.indices.graph import create_graph_index
 def test_create_graph_index_with_neo4j() -> None:
     """Test PropertyGraphIndex creation with Neo4j backend - real integration."""
     # Configure LlamaIndex to use ACTUAL services running in Docker
-    # TEI: Qwen3-Embedding-0.6B (1024-dim) on localhost:8080
-    # Ollama: qwen3:4b on localhost:11434
+    # TEI: Qwen3-Embedding-0.6B (1024-dim) on localhost:4207
+    # Ollama: qwen3:4b on localhost:4214
     Settings.embed_model = TextEmbeddingsInference(
         model_name="Qwen/Qwen3-Embedding-0.6B",
-        base_url="http://localhost:8080",
+        base_url="http://localhost:4207",
         timeout=60,
         embed_batch_size=32,
     )
-    Settings.llm = Ollama(model="qwen3:4b", base_url="http://localhost:11434")
+    Settings.llm = Ollama(model="qwen3:4b", base_url="http://localhost:4214")
 
     # Use actual password from .env and real Neo4j connection
     index = create_graph_index(
-        neo4j_uri="bolt://localhost:7687",
+        neo4j_uri="bolt://localhost:4206",
         username="neo4j",
         password="AVqx64QRKmogToi2CykgYqA2ZkbbAGja",
         database="neo4j",
@@ -39,19 +39,19 @@ def test_create_graph_index_with_neo4j() -> None:
 def test_graph_index_query() -> None:
     """Test querying PropertyGraphIndex - real integration."""
     # Configure LlamaIndex to use ACTUAL services running in Docker
-    # TEI: Qwen3-Embedding-0.6B (1024-dim) on localhost:8080
-    # Ollama: qwen3:4b on localhost:11434
+    # TEI: Qwen3-Embedding-0.6B (1024-dim) on localhost:4207
+    # Ollama: qwen3:4b on localhost:4214
     Settings.embed_model = TextEmbeddingsInference(
         model_name="Qwen/Qwen3-Embedding-0.6B",
-        base_url="http://localhost:8080",
+        base_url="http://localhost:4207",
         timeout=60,
         embed_batch_size=32,
     )
-    Settings.llm = Ollama(model="qwen3:4b", base_url="http://localhost:11434")
+    Settings.llm = Ollama(model="qwen3:4b", base_url="http://localhost:4214")
 
     # Use actual password from .env and real Neo4j connection
     index = create_graph_index(
-        neo4j_uri="bolt://localhost:7687",
+        neo4j_uri="bolt://localhost:4206",
         username="neo4j",
         password="AVqx64QRKmogToi2CykgYqA2ZkbbAGja",
         database="neo4j",

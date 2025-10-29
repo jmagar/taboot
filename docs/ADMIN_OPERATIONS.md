@@ -391,7 +391,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 ```bash
 # .env.test
 ADMIN_USER_ID="admin456"
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/taboot_test"
+DATABASE_URL="postgresql://postgres:postgres@localhost:4201/taboot_test"
 AUTH_SECRET="test-auth-secret-min-32-chars-long"
 ```
 
@@ -408,13 +408,13 @@ pnpm --filter @taboot/db prisma migrate deploy
 
 ```bash
 # 1. Sign in as user
-curl -X POST http://localhost:3000/api/auth/sign-in \
+curl -X POST http://localhost:4211/api/auth/sign-in \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "password123"}'
 # → Returns session token
 
 # 2. Erase own account
-curl -X POST http://localhost:3000/api/users/user123/erase \
+curl -X POST http://localhost:4211/api/users/user123/erase \
   -H "Authorization: Bearer <user_session_token>"
 # → Expected: 200 OK (self-operation authorized)
 ```
@@ -446,13 +446,13 @@ curl -X POST http://localhost:3000/api/users/user123/erase \
 
 ```bash
 # 1. Sign in as admin
-curl -X POST http://localhost:3000/api/auth/sign-in \
+curl -X POST http://localhost:4211/api/auth/sign-in \
   -H "Content-Type: application/json" \
   -d '{"email": "admin@example.com", "password": "admin_password"}'
 # → Returns admin session token
 
 # 2. Erase another user's account
-curl -X POST http://localhost:3000/api/users/user123/erase \
+curl -X POST http://localhost:4211/api/users/user123/erase \
   -H "Authorization: Bearer <admin_session_token>"
 # → Expected: 200 OK (admin operation authorized)
 ```
@@ -479,13 +479,13 @@ curl -X POST http://localhost:3000/api/users/user123/erase \
 
 ```bash
 # 1. Sign in as user
-curl -X POST http://localhost:3000/api/auth/sign-in \
+curl -X POST http://localhost:4211/api/auth/sign-in \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "password123"}'
 # → Returns session token
 
 # 2. Attempt to erase another user's account
-curl -X POST http://localhost:3000/api/users/other_user_id/erase \
+curl -X POST http://localhost:4211/api/users/other_user_id/erase \
   -H "Authorization: Bearer <user_session_token>"
 # → Expected: 403 Forbidden (not authorized)
 ```
@@ -521,12 +521,12 @@ unset ADMIN_USER_ID
 pnpm --filter @taboot/web dev
 
 # 3. Sign in as user
-curl -X POST http://localhost:3000/api/auth/sign-in \
+curl -X POST http://localhost:4211/api/auth/sign-in \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "password123"}'
 
 # 4. Attempt to erase another user's account
-curl -X POST http://localhost:3000/api/users/other_user_id/erase \
+curl -X POST http://localhost:4211/api/users/other_user_id/erase \
   -H "Authorization: Bearer <user_session_token>"
 # → Expected: 503 Service Unavailable (admin not configured)
 ```
@@ -555,7 +555,7 @@ curl -X POST http://localhost:3000/api/users/other_user_id/erase \
 **Scenario**: No session token provided
 
 ```bash
-curl -X POST http://localhost:3000/api/users/user123/erase
+curl -X POST http://localhost:4211/api/users/user123/erase
 # → Expected: 401 Unauthorized (no session)
 ```
 

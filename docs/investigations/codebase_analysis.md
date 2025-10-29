@@ -365,17 +365,17 @@ retrieval/
 
 | Service | Purpose | GPU | Port |
 |---------|---------|-----|------|
-| `taboot-api` | FastAPI server | ❌ | 8000 |
-| `taboot-web` | Next.js app | ❌ | 3000 |
+| `taboot-api` | FastAPI server | ❌ | 4209 |
+| `taboot-web` | Next.js app | ❌ | 4211 |
 | `taboot-worker` | Extraction worker | ❌ | - |
 | `taboot-vectors` | Qdrant | ✅ | 6333 |
 | `taboot-embed` | TEI embeddings | ✅ | 80 |
-| `taboot-rerank` | Qwen3 reranker | ✅ | 8000 |
-| `taboot-ollama` | LLM server | ✅ | 11434 |
-| `taboot-graph` | Neo4j | ❌ | 7687 |
-| `taboot-cache` | Redis | ❌ | 6379 |
-| `taboot-db` | PostgreSQL | ❌ | 5432 |
-| `taboot-crawler` | Firecrawl v2 | ❌ | 3002 |
+| `taboot-rerank` | Qwen3 reranker | ✅ | 4209 |
+| `taboot-ollama` | LLM server | ✅ | 4214 |
+| `taboot-graph` | Neo4j | ❌ | 4206 |
+| `taboot-cache` | Redis | ❌ | 4202 |
+| `taboot-db` | PostgreSQL | ❌ | 4201 |
+| `taboot-crawler` | Firecrawl v2 | ❌ | 4200 |
 | `taboot-playwright` | Browser service | ❌ | 9222 |
 
 **Dockerfiles**:
@@ -620,7 +620,7 @@ specs/
 
 ### FastAPI REST API (`apps/api/`)
 
-**Base URL**: `http://localhost:8000`
+**Base URL**: `http://localhost:4209`
 
 #### **Authentication**
 - **Method**: JWT (RS256) + API keys
@@ -751,7 +751,7 @@ Response: {status: "ok", services: {neo4j: "up", qdrant: "up", redis: "up"}}
 
 ### Next.js API Routes (`apps/web/app/api/`)
 
-**Base URL**: `http://localhost:3000/api`
+**Base URL**: `http://localhost:4211/api`
 
 #### **Auth Routes** (via Better-Auth)
 ```
@@ -1073,8 +1073,8 @@ REDIS_URL=redis://taboot-cache:6379
 
 # Qdrant
 QDRANT_URL=http://taboot-vectors:6333
-QDRANT_HTTP_PORT=7000
-QDRANT_GRPC_PORT=7001
+QDRANT_HTTP_PORT=4203
+QDRANT_GRPC_PORT=4204
 
 # Neo4j
 NEO4J_URI=bolt://taboot-graph:7687
@@ -1103,7 +1103,7 @@ OLLAMA_MODEL=qwen3:4b
 ```bash
 # Auth (Better-Auth)
 AUTH_SECRET=<random-256-bit-hex>  # openssl rand -hex 32
-AUTH_URL=http://localhost:3000
+AUTH_URL=http://localhost:4211
 
 # Database (Prisma)
 DATABASE_URL=postgresql://postgres:postgres@taboot-db:5432/taboot
@@ -1116,7 +1116,7 @@ REDIS_URL=redis://taboot-cache:6379
 TRUST_PROXY=false  # Set to 'true' only behind verified reverse proxy
 
 # API Backend
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:4209
 ```
 
 #### **External Services (Optional)**
@@ -1224,10 +1224,10 @@ uv run apps/cli init  # Creates Neo4j constraints, Qdrant collections, PostgreSQ
 **7. Verify Setup**
 ```bash
 # Check API health
-curl http://localhost:8000/health
+curl http://localhost:4209/health
 
 # Check web app
-curl http://localhost:3000/api/health
+curl http://localhost:4211/api/health
 
 # Run tests
 uv run pytest -m "not slow"  # Unit tests (~30 seconds)
@@ -1350,7 +1350,7 @@ services:
           cpus: '2'
           memory: 4G
     healthcheck:
-      test: curl -f http://localhost:8000/health || exit 1
+      test: curl -f http://localhost:4209/health || exit 1
       interval: 30s
       timeout: 10s
       retries: 3
@@ -1558,7 +1558,7 @@ docker exec taboot-cache redis-cli BGSAVE
 - **Relationships**: DEPENDS_ON, ROUTES_TO, BINDS, RUNS, EXPOSES_ENDPOINT, MENTIONS
 
 **Access**:
-- **Protocol**: Bolt (port 7687)
+- **Protocol**: Bolt (port 4206)
 - **Driver**: neo4j Python driver (async)
 
 #### **Qdrant** (Vector Database)
@@ -1576,7 +1576,7 @@ docker exec taboot-cache redis-cli BGSAVE
 
 **Access**:
 - **HTTP API**: Port 6333
-- **gRPC API**: Port 7001 (faster for bulk operations)
+- **gRPC API**: Port 4204 (faster for bulk operations)
 - **Client**: qdrant-client Python library
 
 #### **PostgreSQL 16** (Relational Database)
@@ -1600,7 +1600,7 @@ docker exec taboot-cache redis-cli BGSAVE
    - `AuditLog`: Permanent audit trail
 
 **Access**:
-- **Protocol**: libpq (port 5432)
+- **Protocol**: libpq (port 4201)
 - **Python Driver**: asyncpg (async)
 - **TypeScript ORM**: Prisma
 
@@ -1615,7 +1615,7 @@ docker exec taboot-cache redis-cli BGSAVE
 - **Sorted Sets**: Rate limiting (sliding window)
 
 **Access**:
-- **Protocol**: RESP (port 6379)
+- **Protocol**: RESP (port 4202)
 - **Python Driver**: redis (async)
 - **TypeScript Driver**: ioredis
 

@@ -582,7 +582,7 @@ class SwagReader:
         - http://service -> service
         - https://service:443 -> service
         - http://10.0.0.5:8080 -> 10.0.0.5
-        - http://localhost:3000 -> localhost
+        - http://localhost:4211 -> localhost
 
         Args:
             proxy_pass: Proxy pass URL (e.g., "http://api-service:8080").

@@ -24,7 +24,7 @@
         │  ┌──────────┐  ┌───────────┐  ┌──────────┐  ┌────────┐  │
         │  │taboot-db │  │taboot-    │  │taboot-   │  │taboot- │  │
         │  │(Postgres)│  │vectors    │  │graph     │  │cache   │  │
-        │  │port 5432 │  │(Qdrant GPU)  (Neo4j)   │  │(Redis) │  │
+        │  │port 4201 │  │(Qdrant GPU)  (Neo4j)   │  │(Redis) │  │
         │  └──────────┘  └───────────┘  └──────────┘  └────────┘  │
         │                                     │                     │
         │  ┌──────────────────┐               │                     │
@@ -41,9 +41,9 @@
         │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐   │
         │  │taboot-embed  │ │taboot-       │ │taboot-       │   │
         │  │(TEI GPU)     │ │rerank        │ │playwright    │   │
-        │  │port 8080     │ │(SentenceTran)│ │port 3000     │   │
-        │  │depends on    │ │GPU           │ │port 3000     │   │
-        │  │vectors       │ │port 8081     │ │(BROWSER!)    │   │
+        │  │port 4207     │ │(SentenceTran)│ │port 4211     │   │
+        │  │depends on    │ │GPU           │ │port 4211     │   │
+        │  │vectors       │ │port 4208     │ │(BROWSER!)    │   │
         │  └──────────────┘ └──────────────┘ └──────────────┘   │
         │                                                        │
         │  ┌──────────────────────────────────────────┐          │
@@ -61,7 +61,7 @@
         │  ┌──────────────────┐    ┌──────────────────────┐     │
         │  │  taboot-crawler  │    │   taboot-api         │     │
         │  │  (Firecrawl)     │    │   (FastAPI)          │     │
-        │  │  port 3002       │    │   port 8000          │     │
+        │  │  port 4200       │    │   port 4209          │     │
         │  │  Depends on:     │    │   Depends on:        │     │
         │  │  - db            │    │   - db               │     │
         │  │  - cache         │    │   - cache            │     │
@@ -79,7 +79,7 @@
         │  ┌──────────────────┐    ┌──────────────────────┐     │
         │  │  taboot-web      │    │  taboot-worker       │     │
         │  │  (Next.js)       │    │  (Extraction)        │     │
-        │  │  port 3005       │    │  No ports (internal) │     │
+        │  │  port 4210       │    │  No ports (internal) │     │
         │  │  Depends on:     │    │  Depends on:         │     │
         │  │  - api           │    │  - base-ml           │     │
         │  │  - db            │    │  - cache             │     │
@@ -99,21 +99,21 @@
 ```
 Development/Browser        Service                Port
 ─────────────────────────  ──────────────────────  ────
-http://localhost:3000      taboot-playwright      3000
-http://localhost:3002      taboot-crawler         3002
-http://localhost:3005      taboot-web             3005
+http://localhost:4211      taboot-playwright      4211
+http://localhost:4200      taboot-crawler         4200
+http://localhost:4211      taboot-web             4210
 
 (Internal only)
-                           taboot-db              5432
-                           taboot-cache           6379
-                           taboot-vectors HTTP    7000
-                           taboot-vectors gRPC    7001
-                           taboot-graph HTTP      7474
-                           taboot-graph Bolt      7687
-                           taboot-api             8000
-                           taboot-embed           8080
-                           taboot-rerank          8081
-                           taboot-ollama          11434
+                           taboot-db              4201
+                           taboot-cache           4202
+                           taboot-vectors HTTP    4203
+                           taboot-vectors gRPC    4204
+                           taboot-graph HTTP      4205
+                           taboot-graph Bolt      4206
+                           taboot-api             4209
+                           taboot-embed           4207
+                           taboot-rerank          4208
+                           taboot-ollama          4214
 ```
 
 ---
@@ -461,8 +461,8 @@ docker-compose up -d
 docker-compose up -d --scale taboot-api=3
 
 # Health check endpoints
-curl http://localhost:8000/health        # API
-curl http://localhost:3005/api/health    # Web
+curl http://localhost:4209/health        # API
+curl http://localhost:4211/api/health    # Web
 
 # Database queries
 docker-compose exec taboot-db psql -U taboot -d taboot -c "SELECT * FROM users;"

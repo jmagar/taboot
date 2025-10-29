@@ -32,7 +32,7 @@ only.
 uv run uvicorn taboot.api.app:app --reload --port 8000
 
 # Inspect OpenAPI once server is running
-open http://localhost:8000/docs
+open http://localhost:4209/docs
 ```
 
 Use the `taboot-app` service in `docker-compose.yaml` for a containerized stack.

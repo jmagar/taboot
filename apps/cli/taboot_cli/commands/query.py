@@ -50,17 +50,17 @@ def query_command(
 
     # Get config from environment - ensure all required strings are non-None
     resolved_qdrant_url: str = (
-        qdrant_url if qdrant_url is not None else os.getenv("QDRANT_URL") or "http://localhost:7000"
+        qdrant_url if qdrant_url is not None else os.getenv("QDRANT_URL") or "http://localhost:4203"
     )
     resolved_neo4j_uri: str = (
-        neo4j_uri if neo4j_uri is not None else os.getenv("NEO4J_URI") or "bolt://localhost:7687"
+        neo4j_uri if neo4j_uri is not None else os.getenv("NEO4J_URI") or "bolt://localhost:4206"
     )
     neo4j_user: str = os.getenv("NEO4J_USER") or "neo4j"
     neo4j_password: str = os.getenv("NEO4J_PASSWORD") or "changeme"
     qdrant_collection: str = os.getenv("COLLECTION_NAME") or "documents"
-    tei_url: str = os.getenv("TEI_EMBEDDING_URL") or "http://localhost:8080"
-    ollama_url: str = os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434"
-    reranker_url: str = os.getenv("RERANKER_URL") or "http://localhost:8081"
+    tei_url: str = os.getenv("TEI_EMBEDDING_URL") or "http://localhost:4207"
+    ollama_url: str = os.getenv("OLLAMA_BASE_URL") or "http://localhost:4214"
+    reranker_url: str = os.getenv("RERANKER_URL") or "http://localhost:4208"
     reranker_timeout: float = float(os.getenv("RERANKER_TIMEOUT", "30"))
     reranker_model: str = os.getenv("RERANKER_MODEL") or "Qwen/Qwen3-Reranker-0.6B"
     reranker_device: str = os.getenv("RERANKER_DEVICE") or "auto"

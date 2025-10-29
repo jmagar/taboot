@@ -22,6 +22,7 @@ class TestBranchEntity:
         """Test Branch with only required fields."""
         now = datetime.now(UTC)
         branch = Branch(
+            repository_full_name="anthropics/claude-code",
             name="main",
             sha="abc123def456",
             ref="refs/heads/main",
@@ -42,6 +43,7 @@ class TestBranchEntity:
         """Test Branch with protected flag."""
         now = datetime.now(UTC)
         branch = Branch(
+            repository_full_name="anthropics/claude-code",
             name="main",
             protected=True,
             sha="abc123def456",
@@ -62,6 +64,7 @@ class TestBranchEntity:
 
         with pytest.raises(ValidationError) as exc_info:
             Branch(
+                repository_full_name="anthropics/claude-code",
                 sha="abc123",
                 ref="refs/heads/test",
                 created_at=now,
@@ -74,3 +77,23 @@ class TestBranchEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("name",) for e in errors)
+
+    def test_branch_missing_repository_full_name(self) -> None:
+        """Test Branch validation fails without repository_full_name."""
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            Branch(
+                name="main",
+                sha="abc123",
+                ref="refs/heads/main",
+                created_at=now,
+                updated_at=now,
+                extraction_tier="A",
+                extraction_method="github_api",
+                confidence=1.0,
+                extractor_version="1.0.0",
+            )
+
+        errors = exc_info.value.errors()
+        assert any(e["loc"] == ("repository_full_name",) for e in errors)

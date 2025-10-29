@@ -13,7 +13,7 @@ def test_execute_query_validates_inputs() -> None:
         execute_query(
             query="",
             qdrant_url="http://localhost:6333",
-            neo4j_uri="bolt://localhost:7687",
+            neo4j_uri="bolt://localhost:4206",
             neo4j_username="neo4j",
             neo4j_password="test",
         )
@@ -27,10 +27,10 @@ def test_execute_query_with_real_services(qdrant_client, neo4j_client) -> None:
         query="Which services expose port 8080?",
         qdrant_url="http://localhost:6333",
         qdrant_collection="test_documents",
-        neo4j_uri="bolt://localhost:7687",
+        neo4j_uri="bolt://localhost:4206",
         neo4j_username="neo4j",
         neo4j_password="changeme",
-        ollama_base_url="http://localhost:11434",
+        ollama_base_url="http://localhost:4214",
         top_k=10,
     )
 
@@ -49,7 +49,7 @@ def test_execute_query_with_filters() -> None:
     result = execute_query(
         query="test question",
         qdrant_url="http://localhost:6333",
-        neo4j_uri="bolt://localhost:7687",
+        neo4j_uri="bolt://localhost:4206",
         neo4j_username="neo4j",
         neo4j_password="test",
         source_types=["web", "docker_compose"],

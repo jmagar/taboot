@@ -192,7 +192,7 @@ class TestNeo4jClient:
 def mock_config(mocker) -> None:
     """Mock TabootConfig for tests."""
     mock = mocker.Mock()
-    mock.neo4j_uri = "bolt://localhost:7687"
+    mock.neo4j_uri = "bolt://localhost:4206"
     mock.neo4j_user = "neo4j"
     mock.neo4j_password = "test_password"
     mock.neo4j_db = "neo4j"

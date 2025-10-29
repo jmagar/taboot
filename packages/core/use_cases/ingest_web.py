@@ -308,18 +308,31 @@ class IngestWebUseCase:
         Returns:
             list[Chunk]: Processed chunks with metadata.
         """
-        # Step 4a: Normalize HTML to Markdown
-        markdown = self.normalizer.normalize(doc.text)
+        # Step 4a: Normalize only when we don't already have Markdown
+        metadata = doc.metadata or {}
+        format_hint = metadata.get("content_format") or metadata.get("format")
+        content_type = metadata.get("content_type") or metadata.get("contentType")
+
+        is_markdown = False
+        if isinstance(format_hint, str) and format_hint.lower() == "markdown":
+            is_markdown = True
+        if isinstance(content_type, str) and "markdown" in content_type.lower():
+            is_markdown = True
+
+        if is_markdown:
+            markdown = (doc.text or "").strip()
+        else:
+            markdown = self.normalizer.normalize(doc.text)
 
         # Filter metadata to only essential fields needed for chunking/retrieval
         # This prevents LlamaIndex SentenceSplitter from failing when metadata
         # serialization exceeds chunk_size (512 tokens)
         filtered_metadata = {}
-        if doc.metadata:
+        if metadata:
             # Only keep fields that are: (1) needed for retrieval or (2) small
             allowed_keys = {"source_url", "section", "title"}
             filtered_metadata = {
-                k: v for k, v in doc.metadata.items()
+                k: v for k, v in metadata.items()
                 if k in allowed_keys and isinstance(v, (str, int, float, bool))
             }
 

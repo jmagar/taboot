@@ -322,7 +322,7 @@ BULL_AUTH_KEY
 BETTER_AUTH_URL=http://localhost:3001
 ```
 
-But this should be `http://localhost:3000` (the web service port). This causes configuration errors when developers copy the example.
+But this should be `http://localhost:4211` (the web service port). This causes configuration errors when developers copy the example.
 
 ---
 
@@ -737,7 +737,7 @@ The following files require updates:
 
 | File | Change | Severity |
 |------|--------|----------|
-| `.env.example` | Fix BETTER_AUTH_URL port from 3001→3000 | MEDIUM |
+| `.env.example` | Fix BETTER_AUTH_URL port from 3001→4211 | MEDIUM |
 | `.env.example` | Add missing variable documentation | MEDIUM |
 | `packages/common/env_validator.py` | Expand validation coverage | MEDIUM |
 | `apps/web/lib/csrf.ts` | Remove hardcoded fallback | HIGH |

@@ -13,15 +13,15 @@ def test_qa_query_engine_init() -> None:
     config = QAConfig(
         qdrant_url="http://localhost:6333",
         qdrant_collection="test_documents",
-        neo4j_uri="bolt://localhost:7687",
+        neo4j_uri="bolt://localhost:4206",
         neo4j_username="neo4j",
         neo4j_password="test",
-        ollama_base_url="http://localhost:11434",
+        ollama_base_url="http://localhost:4214",
     )
     engine = QAQueryEngine(config=config)
 
     assert engine.config.qdrant_url == "http://localhost:6333"
-    assert engine.config.neo4j_uri == "bolt://localhost:7687"
+    assert engine.config.neo4j_uri == "bolt://localhost:4206"
 
 
 @pytest.mark.integration
@@ -29,13 +29,13 @@ def test_qa_query_engine_init() -> None:
 def test_qa_query_engine_with_real_services(qdrant_client: Any, neo4j_client: Any) -> None:
     """Test query engine against real services."""
     config = QAConfig(
-        qdrant_url="http://localhost:7000",  # Host port mapping
+        qdrant_url="http://localhost:4203",  # Host port mapping
         qdrant_collection="test_documents",
-        neo4j_uri="bolt://localhost:7687",
+        neo4j_uri="bolt://localhost:4206",
         neo4j_username="neo4j",
         neo4j_password="changeme",
-        ollama_base_url="http://localhost:11434",
-        tei_embedding_url="http://localhost:8080",  # Real TEI service
+        ollama_base_url="http://localhost:4214",
+        tei_embedding_url="http://localhost:4207",  # Real TEI service
     )
     engine = QAQueryEngine(config=config)
 
@@ -52,7 +52,7 @@ def test_qa_query_engine_formats_citations() -> None:
     config = QAConfig(
         qdrant_url="http://localhost:6333",
         qdrant_collection="test",
-        neo4j_uri="bolt://localhost:7687",
+        neo4j_uri="bolt://localhost:4206",
         neo4j_username="neo4j",
         neo4j_password="test",
     )

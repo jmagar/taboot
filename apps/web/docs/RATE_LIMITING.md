@@ -178,7 +178,7 @@ export const POST = withRateLimit(handlePOST, authRateLimit);
    ```bash
    # Send 6 requests in quick succession
    for i in {1..6}; do
-     curl -X POST http://localhost:3000/api/auth/password \
+     curl -X POST http://localhost:4211/api/auth/password \
        -H "Content-Type: application/json" \
        -H "Cookie: your-session-cookie" \
        -d '{"newPassword":"testpass123"}' \
@@ -189,7 +189,7 @@ export const POST = withRateLimit(handlePOST, authRateLimit);
 2. **Verify headers**:
 
    ```bash
-   curl -X GET http://localhost:3000/api/auth/password \
+   curl -X GET http://localhost:4211/api/auth/password \
      -H "Cookie: your-session-cookie" \
      -i | grep X-RateLimit
    ```
@@ -198,11 +198,11 @@ export const POST = withRateLimit(handlePOST, authRateLimit);
 
    ```bash
    # Simulate different clients
-   curl -X GET http://localhost:3000/api/auth/password \
+   curl -X GET http://localhost:4211/api/auth/password \
      -H "x-forwarded-for: 192.168.1.1" \
      -H "Cookie: your-session-cookie"
 
-   curl -X GET http://localhost:3000/api/auth/password \
+   curl -X GET http://localhost:4211/api/auth/password \
      -H "x-forwarded-for: 192.168.1.2" \
      -H "Cookie: your-session-cookie"
    ```

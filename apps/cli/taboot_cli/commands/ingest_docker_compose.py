@@ -1,14 +1,11 @@
 """Ingest Docker Compose command for Taboot CLI.
 
-Implements Docker Compose YAML ingestion workflow:
+Implements the Docker Compose ingestion workflow using the core use-case:
 1. Accept file path argument
-2. Parse docker-compose.yaml file using DockerComposeReader
-3. Extract Service nodes with image and version
-4. Extract DEPENDS_ON and BINDS relationships
-5. Write nodes and relationships to Neo4j using direct Cypher queries
-6. Display progress and results
-
-This command is thin - parsing logic is in packages/ingest/readers/docker_compose.py.
+2. Parse docker-compose.yaml via DockerComposeReader
+3. Convert raw dictionaries into Pydantic schema models
+4. Persist nodes and relationships with DockerComposeWriter
+5. Display ingest statistics and handle errors gracefully
 """
 
 from __future__ import annotations
@@ -20,7 +17,9 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
+from packages.core.use_cases.ingest_docker_compose import IngestDockerComposeUseCase
 from packages.graph.client import Neo4jClient
+from packages.graph.writers.docker_compose_writer import DockerComposeWriter
 from packages.ingest.readers.docker_compose import (
     DockerComposeError,
     DockerComposeReader,
@@ -67,23 +66,21 @@ def ingest_docker_compose_command(
         # Track start time for duration calculation
         start_time = datetime.now(UTC)
 
-        # Create reader and load data
         logger.info("Parsing docker-compose file: %s", file_path)
         reader = DockerComposeReader()
-        data = reader.load_data(file_path=file_path)
 
-        # Extract services and relationships
-        services = data["services"]
-        relationships = data["relationships"]
+        # Execute use-case within Neo4j client context
+        with Neo4jClient() as neo4j_client:
+            writer = DockerComposeWriter(neo4j_client)
+            use_case = IngestDockerComposeUseCase(reader=reader, writer=writer)
+            result = use_case.execute(file_path=file_path)
 
-        console.print(f"[green]✓ {len(services)} services extracted[/green]")
-        console.print(f"[green]✓ {len(relationships)} relationships extracted[/green]")
-
-        # Write to Neo4j
-        logger.info("Writing services and relationships to Neo4j")
-        _write_to_neo4j(
-            services=services,
-            relationships=relationships,
+        console.print(f"[green]✓ Nodes written: {result.total_nodes}[/green]")
+        console.print(
+            f"[green]✓ DEPENDS_ON relationships written: {result.total_relationships}[/green]"
+        )
+        console.print(
+            f"[green]✓ Compose services: {result.compose_services} | Port bindings: {result.port_bindings}[/green]"
         )
 
         # Calculate duration
@@ -91,14 +88,12 @@ def ingest_docker_compose_command(
         duration_seconds = (end_time - start_time).total_seconds()
 
         # Display success
-        console.print(f"[green]✓ {len(services)} services written to Neo4j[/green]")
-        console.print(f"[green]✓ {len(relationships)} relationships written to Neo4j[/green]")
         console.print(f"[green]✓ Duration: {duration_seconds:.0f}s[/green]")
 
         logger.info(
-            "Docker Compose ingestion completed: %s services, %s relationships in %ss",
-            len(services),
-            len(relationships),
+            "Docker Compose ingestion completed: nodes=%s relationships=%s duration=%ss",
+            result.total_nodes,
+            result.total_relationships,
             f"{duration_seconds:.0f}",
         )
 
@@ -129,66 +124,6 @@ def ingest_docker_compose_command(
         console.print(f"[red]✗ Ingestion failed: {e}[/red]")
         logger.exception("Ingestion failed for %s", file_path)
         raise typer.Exit(1) from None
-
-
-def _write_to_neo4j(
-    services: list[dict[str, str]],
-    relationships: list[dict[str, str | int]],
-) -> None:
-    """Write services and relationships to Neo4j using direct Cypher queries.
-
-    Args:
-        services: List of service dictionaries with name, image, version.
-        relationships: List of relationship dictionaries with type, source, target/port.
-    """
-    # Create Neo4j client using context manager
-    with Neo4jClient() as client, client.session() as session:
-        # Write Service nodes
-        for service in services:
-            query = """
-                MERGE (s:Service {name: $name})
-                SET s.image = $image,
-                    s.version = $version
-                RETURN s
-                """
-            session.run(
-                query,
-                {
-                    "name": service["name"],
-                    "image": service.get("image", ""),
-                    "version": service.get("version", ""),
-                },
-            )
-
-        # Write relationships
-        for rel in relationships:
-            if rel["type"] == "DEPENDS_ON":
-                query = """
-                    MATCH (source:Service {name: $source}),
-                          (target:Service {name: $target})
-                    MERGE (source)-[:DEPENDS_ON]->(target)
-                    """
-                session.run(
-                    query,
-                    {
-                        "source": str(rel["source"]),
-                        "target": str(rel["target"]),
-                    },
-                )
-
-            elif rel["type"] == "BINDS":
-                query = """
-                    MATCH (s:Service {name: $service})
-                    MERGE (s)-[b:BINDS {port: $port, protocol: $protocol}]->(s)
-                    """
-                session.run(
-                    query,
-                    {
-                        "service": rel["source"],
-                        "port": rel["port"],
-                        "protocol": rel["protocol"],
-                    },
-                )
 
 
 # Export public API

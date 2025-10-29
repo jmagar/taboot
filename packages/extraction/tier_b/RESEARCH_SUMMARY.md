@@ -416,7 +416,7 @@ class TierBExtractor:
     def __init__(
         self,
         model: str = "en_core_web_md",
-        redis_url: str = "redis://localhost:6379",
+        redis_url: str = "redis://localhost:4202",
         batch_size: int = 1000,
         cache_ttl_days: int = 7
     ):
@@ -522,7 +522,7 @@ Output: List[Dict] (entities, relationships, technical_sentences)
 ```python
 extractor = TierBExtractor(
     model="en_core_web_md",           # CPU-optimized
-    redis_url="redis://localhost:6379",
+    redis_url="redis://localhost:4202",
     batch_size=1000,                  # Optimal for 500-2000 char docs
     cache_ttl_days=7,                 # 7d cache retention
     extractor_version="1.0.0"         # For cache invalidation

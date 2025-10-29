@@ -52,16 +52,16 @@ export function rewriteDockerUrl(url: string): string {
 
   // Map of Docker service hostnames to localhost ports
   const serviceMap: Record<string, string> = {
-    'taboot-cache:6379': 'localhost:6379',
-    'taboot-db:5432': 'localhost:5432',
-    'taboot-vectors:6333': 'localhost:7000', // QDRANT_HTTP_PORT
-    'taboot-graph:7687': 'localhost:7687',
-    'taboot-embed:80': 'localhost:8080',
-    'taboot-rerank:8000': 'localhost:8081',
-    'taboot-ollama:11434': 'localhost:11434',
-    'taboot-crawler:3002': 'localhost:3002',
-    'taboot-playwright:3000': 'localhost:3000',
-    'taboot-api:8000': 'localhost:8000',
+    'taboot-cache:6379': 'localhost:4202',
+    'taboot-db:5432': 'localhost:4201',
+    'taboot-vectors:6333': 'localhost:4203', // QDRANT_HTTP_PORT
+    'taboot-graph:7687': 'localhost:4206',
+    'taboot-embed:80': 'localhost:4207',
+    'taboot-rerank:8000': 'localhost:4208',
+    'taboot-ollama:11434': 'localhost:4214',
+    'taboot-crawler:3002': 'localhost:4200',
+    'taboot-playwright:3000': 'localhost:4213',
+    'taboot-api:8000': 'localhost:4209',
   };
 
   let rewritten = url;

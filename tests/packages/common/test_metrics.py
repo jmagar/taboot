@@ -28,7 +28,7 @@ async def redis_client() -> aioredis.Redis:
     """
     # Connect to localhost Redis (assumes docker compose is running)
     client = aioredis.from_url(
-        "redis://localhost:6379",
+        "redis://localhost:4202",
         decode_responses=True,
     )
     # Clean up any existing test metrics

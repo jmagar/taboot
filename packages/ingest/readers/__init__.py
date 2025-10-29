@@ -6,7 +6,7 @@ from packages.ingest.readers.docker_compose import (
     InvalidPortError,
     InvalidYAMLError,
 )
-from packages.ingest.readers.swag import ParsedConfig, RouteInfo, SwagReader, SwagReaderError
+from packages.ingest.readers.swag import ParsedConfig, SwagReader, SwagReaderError
 from packages.ingest.readers.tailscale import (
     InvalidIPError,
     TailscaleAPIError,
@@ -22,7 +22,6 @@ __all__ = [
     "InvalidPortError",
     "InvalidYAMLError",
     "ParsedConfig",
-    "RouteInfo",
     "SwagReader",
     "SwagReaderError",
     "TailscaleAPIError",

@@ -31,7 +31,7 @@ DATABASE_URL=your-database-connection-string
 For example, a PostgreSQL URL:
 
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/mydb
+DATABASE_URL=postgresql://user:password@localhost:4201/mydb
 ```
 
 > [!NOTE]
@@ -42,7 +42,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/mydb
 Set the base URL for API requests:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:4209
 ```
 
 The web app uses this to communicate with the FastAPI backend.
@@ -78,4 +78,4 @@ pnpm db:migrate
 pnpm dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) to see the app running.
+Visit [http://localhost:4211](http://localhost:4211) to see the app running.

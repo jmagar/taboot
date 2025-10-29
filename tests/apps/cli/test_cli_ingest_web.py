@@ -93,7 +93,7 @@ class TestIngestWebCommand:
         # Mock config
         mock_config = Mock()
         mock_config.collection_name = "documents"
-        mock_config.firecrawl_api_url = "http://localhost:3002"
+        mock_config.firecrawl_api_url = "http://localhost:4200"
         mock_config.qdrant_url = "http://localhost:6333"
         mock_config.tei_embedding_url = "http://localhost:80"
         mock_get_config.return_value = mock_config
@@ -136,7 +136,7 @@ class TestIngestWebCommand:
         # Mock config
         mock_config = Mock()
         mock_config.collection_name = "documents"
-        mock_config.firecrawl_api_url = "http://localhost:3002"
+        mock_config.firecrawl_api_url = "http://localhost:4200"
         mock_config.qdrant_url = "http://localhost:6333"
         mock_config.tei_embedding_url = "http://localhost:80"
         mock_get_config.return_value = mock_config
@@ -178,7 +178,7 @@ class TestIngestWebCommand:
         # Mock config
         mock_config = Mock()
         mock_config.collection_name = "documents"
-        mock_config.firecrawl_api_url = "http://localhost:3002"
+        mock_config.firecrawl_api_url = "http://localhost:4200"
         mock_config.qdrant_url = "http://localhost:6333"
         mock_config.tei_embedding_url = "http://localhost:80"
         mock_get_config.return_value = mock_config
@@ -239,7 +239,7 @@ class TestIngestWebCommand:
         # Mock config
         mock_config = Mock()
         mock_config.collection_name = "documents"
-        mock_config.firecrawl_api_url = "http://localhost:3002"
+        mock_config.firecrawl_api_url = "http://localhost:4200"
         mock_config.qdrant_url = "http://localhost:6333"
         mock_config.tei_embedding_url = "http://localhost:80"
         mock_get_config.return_value = mock_config
@@ -276,7 +276,7 @@ class TestIngestWebCommand:
         # Mock config
         mock_config = Mock()
         mock_config.collection_name = "documents"
-        mock_config.firecrawl_api_url = "http://localhost:3002"
+        mock_config.firecrawl_api_url = "http://localhost:4200"
         mock_config.qdrant_url = "http://localhost:6333"
         mock_config.tei_embedding_url = "http://localhost:80"
         mock_get_config.return_value = mock_config
@@ -315,7 +315,7 @@ class TestIngestWebCommand:
         # Mock config
         mock_config = Mock()
         mock_config.collection_name = "documents"
-        mock_config.firecrawl_api_url = "http://localhost:3002"
+        mock_config.firecrawl_api_url = "http://localhost:4200"
         mock_config.qdrant_url = "http://localhost:6333"
         mock_config.tei_embedding_url = "http://localhost:80"
         mock_get_config.return_value = mock_config
@@ -368,7 +368,7 @@ class TestIngestWebCommand:
         # Mock config
         mock_config = Mock()
         mock_config.collection_name = "documents"
-        mock_config.firecrawl_api_url = "http://localhost:3002"
+        mock_config.firecrawl_api_url = "http://localhost:4200"
         mock_config.qdrant_url = "http://localhost:6333"
         mock_config.tei_embedding_url = "http://localhost:80"
         mock_get_config.return_value = mock_config

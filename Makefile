@@ -17,9 +17,9 @@ LOG_DIR := .logs
 PID_DIR := .pids
 
 # Default service ports (services load .env themselves via python-dotenv/Next.js)
-API_PORT := 8000
+API_PORT := 4209
 WEB_PORT := 3005
-RERANK_PORT := 8081
+RERANK_PORT := 4208
 
 help: ## Show this help message
 	@echo "$(CYAN)Taboot Local Development Makefile$(RESET)"
@@ -46,7 +46,7 @@ $(PID_DIR):
 	@mkdir -p $(PID_DIR)
 
 # ==========================================
-# API Service (FastAPI - Port 8000)
+# API Service (FastAPI - Port 4209)
 # ==========================================
 
 start-api: $(LOG_DIR) $(PID_DIR) ## Start the FastAPI service
@@ -88,14 +88,14 @@ logs-api: ## Tail API service logs
 	@tail -f $(LOG_DIR)/api.log
 
 # ==========================================
-# Web Service (Next.js - Port 3000)
+# Web Service (Next.js - Port 4211)
 # ==========================================
 
 start-web: $(LOG_DIR) $(PID_DIR) ## Start the Next.js web service
 	@if [ -f $(PID_DIR)/web.pid ] && kill -0 $$(cat $(PID_DIR)/web.pid) 2>/dev/null; then \
 		echo "$(YELLOW)Web service already running (PID: $$(cat $(PID_DIR)/web.pid))$(RESET)"; \
 	else \
-		WEB_PORT=$$(grep TABOOT_WEB_PORT .env 2>/dev/null | cut -d'"' -f2 || echo "3000"); \
+        WEB_PORT=$$(grep TABOOT_WEB_PORT .env 2>/dev/null | cut -d'"' -f2 || echo "4211"); \
 		echo "$(CYAN)Starting Web service on port $$WEB_PORT...$(RESET)"; \
 		for pid in $$(lsof -ti :$$WEB_PORT 2>/dev/null); do kill -9 $$pid 2>/dev/null || true; done; \
 		sleep 1; \
@@ -140,8 +140,8 @@ start-rerank: $(LOG_DIR) $(PID_DIR) ## Start the reranker service
 	else \
 		echo "$(CYAN)Starting Reranker service on port $(RERANK_PORT)...$(RESET)"; \
 		for pid in $$(lsof -ti :$(RERANK_PORT) 2>/dev/null); do kill -9 $$pid 2>/dev/null || true; done; \
-		PYTHONPATH=docker/reranker:$$PYTHONPATH uv run uvicorn app:app --host 0.0.0.0 --port $(RERANK_PORT) \
-			--app-dir docker/reranker > $(LOG_DIR)/rerank.log 2>&1 & echo $$! > $(PID_DIR)/rerank.pid; \
+		uv run uvicorn apps.rerank.app:app --host 0.0.0.0 --port $(RERANK_PORT) \
+			> $(LOG_DIR)/rerank.log 2>&1 & echo $$! > $(PID_DIR)/rerank.pid; \
 		sleep 2; \
 		if kill -0 $$(cat $(PID_DIR)/rerank.pid) 2>/dev/null; then \
 			echo "$(GREEN)✓ Reranker service started (PID: $$(cat $(PID_DIR)/rerank.pid))$(RESET)"; \
@@ -255,7 +255,7 @@ status: ## Show status of all services
 		fi
 	@echo ""
 	@echo "$(YELLOW)Ports:$(RESET)"
-	@WEB_PORT_ACTUAL=$$(grep TABOOT_WEB_PORT .env 2>/dev/null | cut -d'"' -f2 || echo "3000"); \
+	@WEB_PORT_ACTUAL=$$(grep TABOOT_WEB_PORT .env 2>/dev/null | cut -d'"' -f2 || echo "4211"); \
 	echo "  API:      http://localhost:$(API_PORT)"; \
 	echo "  Web:      http://localhost:$$WEB_PORT_ACTUAL"; \
 	echo "  Reranker: http://localhost:$(RERANK_PORT)"

@@ -5,7 +5,7 @@ Examples for each endpoint. Replace placeholders.
 ## Create Firecrawl Job
 
 ```bash
-curl -X POST http://localhost:8000/jobs/firecrawl \
+curl -X POST http://localhost:4209/jobs/firecrawl \
   -H 'Content-Type: application/json' \
   -H 'X-API-Key: $API_KEY' \
   -d '{
@@ -25,31 +25,31 @@ curl -X POST http://localhost:8000/jobs/firecrawl \
 ## List Jobs
 
 ```bash
-curl -H 'X-API-Key: $API_KEY' 'http://localhost:8000/jobs?status=running&limit=20'
+curl -H 'X-API-Key: $API_KEY' 'http://localhost:4209/jobs?status=running&limit=20'
 ```
 
 ## Get Job Detail
 
 ```bash
-curl -H 'X-API-Key: $API_KEY' http://localhost:8000/jobs/JOB_ID
+curl -H 'X-API-Key: $API_KEY' http://localhost:4209/jobs/JOB_ID
 ```
 
 ## Stream/Tail Logs
 
 ```bash
-curl -H 'X-API-Key: $API_KEY' 'http://localhost:8000/jobs/JOB_ID/logs?offset=0&limit=100'
+curl -H 'X-API-Key: $API_KEY' 'http://localhost:4209/jobs/JOB_ID/logs?offset=0&limit=100'
 ```
 
 ## Get Result
 
 ```bash
-curl -H 'X-API-Key: $API_KEY' http://localhost:8000/jobs/JOB_ID/result
+curl -H 'X-API-Key: $API_KEY' http://localhost:4209/jobs/JOB_ID/result
 ```
 
 ## Sync Crawl
 
 ```bash
-curl -X POST http://localhost:8000/crawl:sync \
+curl -X POST http://localhost:4209/crawl:sync \
   -H 'Content-Type: application/json' \
   -H 'X-API-Key: $API_KEY' \
   -d '{
@@ -63,7 +63,7 @@ curl -X POST http://localhost:8000/crawl:sync \
 ## Create Ingestion
 
 ```bash
-curl -X POST http://localhost:8000/ingestions \
+curl -X POST http://localhost:4209/ingestions \
   -H 'Content-Type: application/json' \
   -H 'X-API-Key: $API_KEY' \
   -d '{
@@ -81,7 +81,7 @@ curl -X POST http://localhost:8000/ingestions \
 
 ```python
 import requests
-API = "http://localhost:8000"
+API = "http://localhost:4209"
 KEY = {"X-API-Key": "..."}
 
 # Create job

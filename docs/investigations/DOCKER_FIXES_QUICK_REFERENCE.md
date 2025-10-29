@@ -128,10 +128,10 @@ Find the `taboot-worker` `depends_on` section (around line 322) and add at the b
 # CRITICAL: Playwright and Web services use different ports!
 # ============================================================
 # Playwright service (browser automation)
-PLAYWRIGHT_PORT="3000"
+PLAYWRIGHT_PORT="4213"
 
 # Web dashboard (Next.js app) - MUST DIFFER FROM PLAYWRIGHT_PORT!
-TABOOT_WEB_PORT="3005"
+TABOOT_WEB_PORT="4211"
 ```
 
 This is already set correctly in the .env.example but needs better documentation.
@@ -188,8 +188,8 @@ watch -n 5 docker-compose ps
 # STATUS: all showing "healthy" or "Up X seconds"
 
 # Quick health checks
-curl http://localhost:8000/health  # API
-curl http://localhost:3005/api/health  # Web (note: port 3005, not 3000!)
+curl http://localhost:4209/health  # API
+curl http://localhost:4211/api/health  # Web (note: port 4210, not 4211!)
 
 # Verify ports are listening correctly
 lsof -i -P -n | grep -E "(LISTEN|ESTABLISHED)" | grep docker
@@ -203,9 +203,9 @@ lsof -i -P -n | grep -E "(LISTEN|ESTABLISHED)" | grep docker
 **Cause:** Fix #3 not applied
 **Solution:** Add taboot-base-ml service as shown in Fix #3
 
-### Issue: "Address already in use" on port 3000
+### Issue: "Address already in use" on port 4211
 **Cause:** Fix #4 not set correctly in .env
-**Solution:** Ensure TABOOT_WEB_PORT is set to 3005 (not 3000)
+**Solution:** Ensure TABOOT_WEB_PORT is set to 4210 (not 4211)
 
 ### Issue: "COPY --from=packages" fails during build
 **Cause:** Fix #1 or #2 not applied correctly
@@ -282,8 +282,8 @@ docker-compose ps
 docker-compose ps --no-trunc
 
 # 7. Test endpoints
-curl http://localhost:8000/health
-curl http://localhost:3005/api/health
+curl http://localhost:4209/health
+curl http://localhost:4211/api/health
 ```
 
 ---

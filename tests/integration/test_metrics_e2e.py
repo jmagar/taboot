@@ -282,9 +282,9 @@ class TestStatusAPIEndpoint:
             await redis_client.set("metrics:chunks_indexed", 4500)
 
             # Call API endpoint
-            # Note: This assumes the API is running on localhost:8000
+            # Note: This assumes the API is running on localhost:4209
             # In actual CI/CD, this would be the deployed API URL
-            api_url = "http://localhost:8000/status"
+            api_url = "http://localhost:4209/status"
 
             try:
                 async with httpx.AsyncClient() as client:
@@ -335,7 +335,7 @@ class TestStatusAPIEndpoint:
 
             except httpx.ConnectError:
                 # API not running - skip test
-                pytest.skip("API server not running at http://localhost:8000")
+                pytest.skip("API server not running at http://localhost:4209")
 
         finally:
             # Cleanup: Clear test metrics
@@ -355,7 +355,7 @@ class TestStatusAPIEndpoint:
         # Import here to avoid dependency for non-API tests
         import httpx
 
-        api_url = "http://localhost:8000/status"
+        api_url = "http://localhost:4209/status"
 
         try:
             async with httpx.AsyncClient() as client:
@@ -380,7 +380,7 @@ class TestStatusAPIEndpoint:
 
         except httpx.ConnectError:
             # API not running - skip test
-            pytest.skip("API server not running at http://localhost:8000")
+            pytest.skip("API server not running at http://localhost:4209")
 
 
 @pytest.mark.integration

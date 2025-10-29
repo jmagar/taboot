@@ -1,5 +1,7 @@
 """CLI query command implementation."""
 
+from __future__ import annotations
+
 import os
 from datetime import datetime
 
@@ -13,21 +15,14 @@ console = Console()
 
 
 def query_command(
-    question: str = typer.Argument(..., help="Question to answer"),
-    sources: str | None = typer.Option(
-        None, help="Comma-separated source types (e.g., web,docker_compose)"
-    ),
-    after: str | None = typer.Option(
-        None, help="Filter by ingestion date (ISO format: 2025-10-15)"
-    ),
-    top_k: int = typer.Option(20, help="Number of candidates from vector search"),
-    qdrant_url: str | None = typer.Option(None, help="Qdrant URL (default from env)"),
-    neo4j_uri: str | None = typer.Option(None, help="Neo4j URI (default from env)"),
+    question: str,
+    sources: str | None = None,
+    after: str | None = None,
+    top_k: int = 20,
+    qdrant_url: str | None = None,
+    neo4j_uri: str | None = None,
 ) -> None:
-    """
-
-from __future__ import annotations
-    Query the knowledge base with natural language.
+    """Query the knowledge base with natural language.
 
     Example:
 
@@ -55,15 +50,17 @@ from __future__ import annotations
 
     # Get config from environment - ensure all required strings are non-None
     resolved_qdrant_url: str = (
-        qdrant_url if qdrant_url is not None else os.getenv("QDRANT_URL") or "http://localhost:6333"
+        qdrant_url if qdrant_url is not None else os.getenv("QDRANT_URL") or "http://localhost:4203"
     )
     resolved_neo4j_uri: str = (
-        neo4j_uri if neo4j_uri is not None else os.getenv("NEO4J_URI") or "bolt://localhost:7687"
+        neo4j_uri if neo4j_uri is not None else os.getenv("NEO4J_URI") or "bolt://localhost:4206"
     )
     neo4j_user: str = os.getenv("NEO4J_USER") or "neo4j"
     neo4j_password: str = os.getenv("NEO4J_PASSWORD") or "changeme"
-    ollama_url: str = os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434"
-    reranker_url: str = os.getenv("RERANKER_URL") or "http://localhost:8000"
+    qdrant_collection: str = os.getenv("COLLECTION_NAME") or "documents"
+    tei_url: str = os.getenv("TEI_EMBEDDING_URL") or "http://localhost:4207"
+    ollama_url: str = os.getenv("OLLAMA_BASE_URL") or "http://localhost:4214"
+    reranker_url: str = os.getenv("RERANKER_URL") or "http://localhost:4208"
     reranker_timeout: float = float(os.getenv("RERANKER_TIMEOUT", "30"))
     reranker_model: str = os.getenv("RERANKER_MODEL") or "Qwen/Qwen3-Reranker-0.6B"
     reranker_device: str = os.getenv("RERANKER_DEVICE") or "auto"
@@ -75,9 +72,11 @@ from __future__ import annotations
             result = execute_query(
                 query=question,
                 qdrant_url=resolved_qdrant_url,
+                qdrant_collection=qdrant_collection,
                 neo4j_uri=resolved_neo4j_uri,
                 neo4j_username=neo4j_user,
                 neo4j_password=neo4j_password,
+                tei_embedding_url=tei_url,
                 ollama_base_url=ollama_url,
                 reranker_url=reranker_url,
                 reranker_timeout=reranker_timeout,

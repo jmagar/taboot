@@ -1490,7 +1490,7 @@ uv run apps/cli graph query "
 
 2. **Constraint necessity review:** All 7 new constraints enforce critical data integrity (no removal candidates)
 
-3. **Batch size tuning:** May need to increase batch size from 2000 to 3000 if overhead exceeds 20%
+3. **Batch size tuning:** May need to increase batch size from 2000 to 4211 if overhead exceeds 20%
 
 ### Risk 3: Dynamic Cypher Construction (SQL Injection Analog)
 

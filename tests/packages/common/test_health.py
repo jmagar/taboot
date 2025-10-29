@@ -24,16 +24,16 @@ from packages.common.health import (
 def mock_config() -> TabootConfig:
     """Provide a test configuration."""
     return TabootConfig(
-        neo4j_uri="bolt://localhost:7687",
+        neo4j_uri="bolt://localhost:4206",
         neo4j_user="neo4j",
         neo4j_password="test",
-        qdrant_url="http://localhost:6333",
-        redis_url="redis://localhost:6379",
-        tei_embedding_url="http://localhost:80",
-        ollama_url="http://localhost:11434",
-        ollama_port=11434,
-        firecrawl_api_url="http://localhost:3002",
-        playwright_microservice_url="http://localhost:3000/scrape",
+        qdrant_url="http://localhost:4203",
+        redis_url="redis://localhost:4202",
+        tei_embedding_url="http://localhost:4207",
+        ollama_url="http://localhost:4214",
+        ollama_port=4214,
+        firecrawl_api_url="http://localhost:4200",
+        playwright_microservice_url="http://localhost:4213/scrape",
         reranker_batch_size=16,
     )
 

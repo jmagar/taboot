@@ -21,20 +21,21 @@ classifiers = [
 # ---------- Runtime Dependencies ----------
 dependencies = [
   # LlamaIndex core + readers + stores
-  "llama-index-core>=0.14.4,<1",
+  "llama-index-core>=0.14.6,<1",
   "llama-index-readers-web>=0.5.5,<1",
-  "llama-index-readers-github>=0.8.2,<1",
+  "llama-index-readers-github>=0.9.0,<1",
   "llama-index-readers-file>=0.5.4,<1",
   "llama-index-readers-youtube-transcript>=0.4.1,<1",
+  "llama-index-readers-reddit>=0.4.1,<1",
   "llama-index-vector-stores-qdrant>=0.8.6,<1",
   "llama-index-graph-stores-neo4j>=0.5.1,<1",
-  "llama-index-workflows>=2,<3",
+  "llama-index-workflows>=2.9.0,<3",
   "llama-index-storage-docstore-redis>=0.4.1,<1",
   # LLM + embeddings adapters (self-hosted)
-  "llama-index-llms-ollama>=0.3.0,<1",
+  "llama-index-llms-ollama>=0.9.0,<1",
   "llama-index-embeddings-huggingface>=0.3.0,<1",
   # Optional OpenAI (used by Firecrawl extract, can be disabled)
-  "llama-index-llms-openai>=0.6.4,<1",
+  "llama-index-llms-openai>=0.6.6,<1",
   # Data & external APIs
   "firecrawl-py>=4.4.0,<5",
   "qdrant-client>=1.15.1,<2",

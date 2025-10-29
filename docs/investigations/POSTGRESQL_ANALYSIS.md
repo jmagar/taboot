@@ -36,7 +36,7 @@ taboot-db:
   volumes:
     - taboot-db:/var/lib/postgresql/data
   ports:
-    - "${POSTGRES_PORT:-5432}:5432"
+    - "${POSTGRES_PORT:-4201}:5432"
   healthcheck:
     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-taboot}"]
 ```
@@ -109,7 +109,7 @@ class TabootConfig(BaseSettings):
     postgres_user: str = "taboot"
     postgres_password: str = "changeme"
     postgres_db: str = "taboot"
-    postgres_port: int = 5432
+    postgres_port: int = 4201
     
     @property
     def postgres_connection_string(self) -> str:
@@ -143,7 +143,7 @@ Two locations attempt to import `get_postgres_client()`:
 ```python
 from packages.common.db_schema import get_postgres_client
 
-postgres_url = os.getenv("POSTGRES_URL", "postgresql://taboot:changeme@localhost:5432/taboot")
+postgres_url = os.getenv("POSTGRES_URL", "postgresql://taboot:changeme@localhost:4201/taboot")
 db_client = get_postgres_client(postgres_url)
 
 async with db_client as client:
@@ -154,7 +154,7 @@ async with db_client as client:
 ```python
 from packages.common.db_schema import get_postgres_client
 
-postgres_url = os.getenv("POSTGRES_URL", "postgresql://taboot:changeme@localhost:5432/taboot")
+postgres_url = os.getenv("POSTGRES_URL", "postgresql://taboot:changeme@localhost:4201/taboot")
 db_client = get_postgres_client(postgres_url)
 
 async with db_client as client:
@@ -197,7 +197,7 @@ __all__ = ["load_schema_file", "create_schema", "verify_schema", "create_postgre
 
 **Scenario 1**: When endpoint called:
 ```bash
-curl http://localhost:8000/documents
+curl http://localhost:4209/documents
 # ImportError: cannot import name 'get_postgres_client' from 'packages.common.db_schema'
 ```
 

@@ -268,8 +268,8 @@ class TabootConfig(BaseSettings):
     taboot_http_port: int = 8000
     host: str = "0.0.0.0"
     cors_allow_origins: list[str] = [
-        "http://localhost:3000",
-        "http://localhost:3003",
+        "http://localhost:4211",
+        "http://localhost:4213",
     ]  # Override via CORS_ALLOW_ORIGINS env var (comma-separated)
 
     def model_post_init(self, __context: object) -> None:
@@ -283,13 +283,13 @@ class TabootConfig(BaseSettings):
         if not _is_running_in_container():
             # Rewrite URLs to use localhost with mapped ports
             self.postgres_host = "localhost"
-            self.tei_embedding_url = "http://localhost:8080"
-            self.qdrant_url = "http://localhost:7000"
-            self.neo4j_uri = "bolt://localhost:7687"
-            self.redis_url = "redis://localhost:6379"
-            self.reranker_url = "http://localhost:8081"
-            self.firecrawl_api_url = "http://localhost:3002"
-            self.playwright_microservice_url = "http://localhost:3000/scrape"
+            self.tei_embedding_url = "http://localhost:4207"
+            self.qdrant_url = "http://localhost:4203"
+            self.neo4j_uri = "bolt://localhost:4206"
+            self.redis_url = "redis://localhost:4202"
+            self.reranker_url = "http://localhost:4208"
+            self.firecrawl_api_url = "http://localhost:4200"
+            self.playwright_microservice_url = "http://localhost:4213/scrape"
 
     @field_validator("embedding_batch_size")
     @classmethod

@@ -1135,7 +1135,7 @@ class SpacyExtractionCache:
 
     def __init__(
         self,
-        redis_url: str = "redis://localhost:6379",
+        redis_url: str = "redis://localhost:4202",
         ttl_days: int = 7,
         extractor_version: str = "1.0.0"
     ):
@@ -1410,7 +1410,7 @@ def caching_example():
     """Example usage of extraction cache with DLQ."""
     nlp = initialize_nlp_with_entity_ruler()  # From section 1
     cache = SpacyExtractionCache(
-        redis_url="redis://localhost:6379",
+        redis_url="redis://localhost:4202",
         ttl_days=7,
         extractor_version="1.0.0"
     )
@@ -1477,7 +1477,7 @@ class TierBExtractor:
     def __init__(
         self,
         model: str = "en_core_web_md",
-        redis_url: str = "redis://localhost:6379",
+        redis_url: str = "redis://localhost:4202",
         batch_size: int = 1000,
         cache_ttl_days: int = 7,
         extractor_version: str = "1.0.0"
@@ -1731,7 +1731,7 @@ def tier_b_integration_example():
     """Complete Tier B integration example."""
     extractor = TierBExtractor(
         model="en_core_web_md",
-        redis_url="redis://localhost:6379",
+        redis_url="redis://localhost:4202",
         batch_size=1000
     )
 

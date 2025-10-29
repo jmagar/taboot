@@ -229,16 +229,16 @@ Admin → Admin Dashboard → Users → [user] → "Erase Account"
 
 ```bash
 # 1. Sign in as user
-curl -X POST http://localhost:3000/api/auth/sign-in \
+curl -X POST http://localhost:4211/api/auth/sign-in \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"..."}'
 
 # 2. Preview erasure
-curl http://localhost:3000/api/users/{user-id}/erase \
+curl http://localhost:4211/api/users/{user-id}/erase \
   -H "Authorization: Bearer {token}"
 
 # 3. Perform erasure
-curl -X POST http://localhost:3000/api/users/{user-id}/erase \
+curl -X POST http://localhost:4211/api/users/{user-id}/erase \
   -H "Authorization: Bearer {token}"
 
 # 4. Verify email anonymized

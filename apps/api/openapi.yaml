@@ -4,7 +4,7 @@ info:
   version: "1.0.0"
   description: FastAPI surface for orchestrating Firecrawl jobs and ingesting results into Qdrant, Neo4j, or both.
 servers:
-  - url: http://localhost:8000
+  - url: http://localhost:4209
 security:
   - ApiKeyAuth: []
 paths:

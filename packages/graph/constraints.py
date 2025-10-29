@@ -119,7 +119,7 @@ def create_constraints(driver: Driver) -> None:
 
     Example:
         >>> from neo4j import GraphDatabase
-        >>> driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
+        >>> driver = GraphDatabase.driver("bolt://localhost:4206", auth=("neo4j", "password"))
         >>> create_constraints(driver)
         >>> driver.close()
     """

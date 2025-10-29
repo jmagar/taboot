@@ -111,8 +111,8 @@ docker compose logs -f <service-name>
 docker compose ps
 
 # Test health endpoints
-curl http://localhost:8000/health        # API health
-curl http://localhost:3000/api/health    # Web health
+curl http://localhost:4209/health        # API health
+curl http://localhost:4211/api/health    # Web health
 ```
 
 ### Debugging
@@ -384,8 +384,8 @@ All services in `docker-compose.yaml`:
 | `taboot-db` | PostgreSQL 16 (Firecrawl metadata) | ❌ |
 | `taboot-playwright` | Playwright browser microservice | ❌ |
 | `taboot-crawler` | Firecrawl v2 API | ❌ |
-| `taboot-api` | FastAPI service (port 8000) | ❌ |
-| `taboot-web` | Next.js web dashboard (port 3000) | ❌ |
+| `taboot-api` | FastAPI service (port 4209) | ❌ |
+| `taboot-web` | Next.js web dashboard (port 4211) | ❌ |
 | `taboot-worker` | Extraction worker (spaCy tiers + LLM windows) | ❌ |
 
 **Service Separation Benefits:**
@@ -413,8 +413,8 @@ RERANKER_URL=http://taboot-rerank:8000
 RERANKER_MODEL=Qwen/Qwen3-Reranker-0.6B
 RERANKER_BATCH_SIZE=16
 RERANKER_DEVICE=auto
-OLLAMA_PORT=11434
-LLAMACRAWL_API_URL=http://localhost:8000
+OLLAMA_PORT=4214
+LLAMACRAWL_API_URL=http://localhost:4209
 
 # Firecrawl URL path filtering (Firecrawl v2 feature)
 FIRECRAWL_INCLUDE_PATHS=""  # Comma-separated regex patterns (whitelist)
@@ -564,7 +564,7 @@ If deploying behind Cloudflare, nginx, or other reverse proxy:
 
    ```nginx
    location / {
-     proxy_pass http://localhost:3000;
+     proxy_pass http://localhost:4211;
      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
      proxy_set_header X-Real-IP $remote_addr;
      proxy_set_header Host $host;

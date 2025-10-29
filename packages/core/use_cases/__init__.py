@@ -13,15 +13,21 @@ from packages.core.use_cases.get_status import (
     ServiceHealth,
     SystemStatus,
 )
+from packages.core.use_cases.ingest_docker_compose import (
+    DockerComposeIngestionResult,
+    IngestDockerComposeUseCase,
+)
 from packages.core.use_cases.ingest_web import IngestWebUseCase
 
 __all__ = [
     "DocumentStore",
     "ExtractPendingUseCase",
     "GetStatusUseCase",
+    "IngestDockerComposeUseCase",
     "IngestWebUseCase",
     "MetricsSnapshot",
     "QueueDepth",
     "ServiceHealth",
     "SystemStatus",
+    "DockerComposeIngestionResult",
 ]

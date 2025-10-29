@@ -29,9 +29,9 @@ $EDITOR .env
 | Key | Default | Description |
 | --- | --- | --- |
 | `HOST` | `0.0.0.0` | Bind address for the Firecrawl API container |
-| `PORT` | `3002` | External HTTP port exposed by the API container |
-| `INTERNAL_PORT` | `3002` | Internal port used by workers to reach the API |
-| `WORKER_PORT` | `3005` | Queue worker metrics/debug port |
+| `PORT` | `4200` | External HTTP port exposed by the API container |
+| `INTERNAL_PORT` | `4200` | Internal port used by workers to reach the API |
+| `WORKER_PORT` | `4210` | Queue worker metrics/debug port |
 | `FIRECRAWL_API_URL` | `http://taboot-crawler:3002` | Base URL used by adapters |
 | `FIRECRAWL_API_KEY` | `changeme` | Rotate per environment |
 | `NUM_WORKERS_PER_QUEUE` | `16` | Worker processes per queue |
@@ -49,7 +49,7 @@ $EDITOR .env
 | `POSTGRES_USER` | `taboot` | Database user consumed by Firecrawl |
 | `POSTGRES_PASSWORD` | `changeme` | Rotate in prod and update secrets |
 | `POSTGRES_DB` | `taboot` | Application database |
-| `POSTGRES_PORT` | `5432` | Host port mapped to container |
+| `POSTGRES_PORT` | `4201` | Host port mapped to container |
 | `NUQ_DATABASE_URL` | derived | Full DSN used by queue services |
 
 ### Search & External AI Integrations
@@ -67,14 +67,14 @@ $EDITOR .env
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `PLAYWRIGHT_PORT` | `3000` | Host port mapped to the scraping service |
+| `PLAYWRIGHT_PORT` | `4211` | Host port mapped to the scraping service |
 | `PLAYWRIGHT_MICROSERVICE_URL` | `http://taboot-playwright:3000/scrape` | Internal base URL |
 
 ### Redis
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `REDIS_PORT` | `6379` | Host port for Redis CLI access |
+| `REDIS_PORT` | `4202` | Host port for Redis CLI access |
 | `REDIS_URL` | `redis://taboot-cache:6379` | Primary connection string |
 | `REDIS_RATE_LIMIT_URL` | `redis://taboot-cache:6379` | Bucket store for throttling |
 
@@ -82,8 +82,8 @@ $EDITOR .env
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `QDRANT_HTTP_PORT` | `7000` | Host port forwarded to 6333 inside container |
-| `QDRANT_GRPC_PORT` | `7001` | Host port forwarded to 6334 inside container |
+| `QDRANT_HTTP_PORT` | `4203` | Host port forwarded to 6333 inside container |
+| `QDRANT_GRPC_PORT` | `4204` | Host port forwarded to 6334 inside container |
 | `QDRANT_URL` | `http://taboot-vectors:6333` | In-cluster HTTP endpoint |
 | `QDRANT_LOG_LEVEL` | `INFO` | Optional runtime logging level |
 
@@ -94,15 +94,15 @@ $EDITOR .env
 | `NEO4J_USER` | `neo4j` | Admin username |
 | `NEO4J_PASSWORD` | `changeme` | Rotate immediately in non-local envs |
 | `NEO4J_DB` | `neo4j` | Default database name |
-| `NEO4J_HTTP_PORT` | `7474` | Host port mapped to browser/UI |
-| `NEO4J_BOLT_PORT` | `7687` | Host port mapped to Bolt driver |
+| `NEO4J_HTTP_PORT` | `4205` | Host port mapped to browser/UI |
+| `NEO4J_BOLT_PORT` | `4206` | Host port mapped to Bolt driver |
 | `NEO4J_URI` | `bolt://taboot-graph:7687` | Driver URI used by adapters |
 
 ### Text Embeddings Inference (TEI)
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `TEI_HTTP_PORT` | `8080` | Host port for embedding service |
+| `TEI_HTTP_PORT` | `4207` | Host port for embedding service |
 | `TEI_EMBEDDING_URL` | `http://taboot-embed:80` | In-cluster endpoint |
 | `TEI_EMBEDDING_MODEL` | `Qwen/Qwen3-Embedding-0.6B` | Model ID pulled at runtime |
 
@@ -110,7 +110,7 @@ $EDITOR .env
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `RERANKER_HTTP_PORT` | `8081` | Host port exposed by the reranker service |
+| `RERANKER_HTTP_PORT` | `4208` | Host port exposed by the reranker service |
 | `RERANKER_URL` | `http://taboot-rerank:8000` | In-cluster endpoint |
 | `RERANKER_MODEL` | `Qwen/Qwen3-Reranker-0.6B` | Cross-encoder loaded via `sentence-transformers` |
 | `RERANKER_BATCH_SIZE` | `16` | Pair scoring batch size |
@@ -127,7 +127,7 @@ command in `docker-compose.yaml` if you wire your own orchestration entrypoint (
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `OLLAMA_PORT` | `11434` | Host port exposed by Ollama |
+| `OLLAMA_PORT` | `4214` | Host port exposed by Ollama |
 | `OLLAMA_FLASH_ATTENTION` | `true` | GPU optimization toggle |
 | `OLLAMA_KEEP_ALIVE` | `30m` | Keep idle models in memory |
 | `OLLAMA_USE_MMAP` | `true` | Memory-mapping for faster load |
@@ -139,7 +139,7 @@ command in `docker-compose.yaml` if you wire your own orchestration entrypoint (
 | --- | --- | --- |
 | `LOG_LEVEL` | `INFO` | Global logging threshold for apps |
 | `FASTTEXT_HOME` | `.cache/fasttext` | Local cache path |
-| `LLAMACRAWL_API_URL` | `http://localhost:8000` | API base URL for clients |
+| `LLAMACRAWL_API_URL` | `http://localhost:4209` | API base URL for clients |
 
 ---
 

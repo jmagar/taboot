@@ -173,7 +173,7 @@ Complete infrastructure audit for Taboot's docker-compose configuration, coverin
   - Bind PostgreSQL, Redis, Neo4j, Qdrant to 127.0.0.1
   - Estimate: 30 minutes
   - File: `docker-compose.yaml`
-  - Validate with: `nc -zv localhost 5432` (should fail)
+  - Validate with: `nc -zv localhost 4201` (should fail)
 
 - [ ] **Add memory limits to all services**
   - Apply limits per QUICK_FIX_GUIDE.md
@@ -244,7 +244,7 @@ New files created:
 
 ```bash
 # 1. Check port exposure fixed
-nc -zv localhost 5432 2>&1 | grep refused && echo "✓ Protected" || echo "✗ Exposed"
+nc -zv localhost 4201 2>&1 | grep refused && echo "✓ Protected" || echo "✗ Exposed"
 
 # 2. Check memory limits
 docker inspect taboot-db | grep '"Memory":' | grep -o '[0-9]*' | head -1 | \

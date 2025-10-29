@@ -252,10 +252,10 @@ Start FastAPI server for HTTP access:
 docker compose up -d taboot-app
 
 # Check API health
-curl http://localhost:8000/status
+curl http://localhost:4209/status
 
 # Ingest via API
-curl -X POST http://localhost:8000/ingest \
+curl -X POST http://localhost:4209/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "source_type": "web",
@@ -264,14 +264,14 @@ curl -X POST http://localhost:8000/ingest \
   }'
 
 # Query via API
-curl -X POST http://localhost:8000/query \
+curl -X POST http://localhost:4209/query \
   -H "Content-Type: application/json" \
   -d '{
     "question": "Which services expose port 8080?",
     "top_k": 10
   }'
 
-# API documentation: http://localhost:8000/docs (OpenAPI/Swagger UI)
+# API documentation: http://localhost:4209/docs (OpenAPI/Swagger UI)
 ```
 
 ---

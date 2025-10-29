@@ -16,14 +16,14 @@
 # BEFORE:
 taboot-graph:
   ports:
-    - "${NEO4J_HTTP_PORT:-7474}:7474"
-    - "${NEO4J_BOLT_PORT:-7687}:7687"
+    - "${NEO4J_HTTP_PORT:-4205}:7474"
+    - "${NEO4J_BOLT_PORT:-4206}:7687"
 
 # AFTER:
 taboot-graph:
   ports:
-    - "127.0.0.1:${NEO4J_HTTP_PORT:-7474}:7474"
-    - "127.0.0.1:${NEO4J_BOLT_PORT:-7687}:7687"
+    - "127.0.0.1:${NEO4J_HTTP_PORT:-4205}:7474"
+    - "127.0.0.1:${NEO4J_BOLT_PORT:-4206}:7687"
 
 # Repeat for:
 # - taboot-vectors (Qdrant)
@@ -34,7 +34,7 @@ taboot-graph:
 **Verify:**
 ```bash
 # Should fail to connect (good!)
-nc -zv localhost 5432
+nc -zv localhost 4201
 
 # Should work locally
 psql -h 127.0.0.1 -U taboot -d taboot
@@ -291,7 +291,7 @@ nvidia-smi --query-gpu=index,name,memory.used,memory.total --format=csv,noheader
 echo "Testing port binding security..."
 
 # These should ALL FAIL (good!)
-for port in 5432 6379 7474 7687 6333; do
+for port in 4201 4202 4205 4206 6333; do
   echo -n "Port $port: "
   nc -zv 0.0.0.0 $port 2>/dev/null && echo "EXPOSED (BAD!)" || echo "✓ Protected"
 done
@@ -355,7 +355,7 @@ Use this checklist after each fix:
 
 ```
 [ ] Database ports bound to 127.0.0.1 only
-  [ ] Test: nc -zv localhost 5432 fails
+  [ ] Test: nc -zv localhost 4201 fails
 
 [ ] Memory limits added to all services
   [ ] Test: docker inspect container | grep Memory

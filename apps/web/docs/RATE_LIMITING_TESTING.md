@@ -28,7 +28,7 @@
 **Test**: Send single request to password endpoint
 
 ```bash
-curl -X GET http://localhost:3000/api/auth/password \
+curl -X GET http://localhost:4211/api/auth/password \
   -H "Cookie: better-auth.session_token=YOUR_SESSION_TOKEN" \
   -v 2>&1 | grep X-RateLimit
 ```
@@ -54,7 +54,7 @@ SESSION_TOKEN="your-session-token-here"
 
 for i in {1..6}; do
   echo "Request $i:"
-  curl -X GET http://localhost:3000/api/auth/password \
+  curl -X GET http://localhost:4211/api/auth/password \
     -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
     -s -o /dev/null -w "Status: %{http_code}\n"
   sleep 0.5
@@ -90,7 +90,7 @@ Status: 429
 **Test**: Send request after hitting rate limit
 
 ```bash
-curl -X GET http://localhost:3000/api/auth/password \
+curl -X GET http://localhost:4211/api/auth/password \
   -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
   -s | jq
 ```
@@ -115,14 +115,14 @@ curl -X GET http://localhost:3000/api/auth/password \
 ```bash
 # IP 1: Send 5 requests
 for i in {1..5}; do
-  curl -X GET http://localhost:3000/api/auth/password \
+  curl -X GET http://localhost:4211/api/auth/password \
     -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
     -H "x-forwarded-for: 192.168.1.1" \
     -s -o /dev/null -w "IP1 Request $i: %{http_code}\n"
 done
 
 # IP 2: Should still have 5 requests available
-curl -X GET http://localhost:3000/api/auth/password \
+curl -X GET http://localhost:4211/api/auth/password \
   -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
   -H "x-forwarded-for: 192.168.1.2" \
   -s -o /dev/null -w "IP2 Request 1: %{http_code}\n"
@@ -151,13 +151,13 @@ IP2 Request 1: 200  ✓ (separate limit)
 ```bash
 # Exhaust limit
 for i in {1..5}; do
-  curl -X GET http://localhost:3000/api/auth/password \
+  curl -X GET http://localhost:4211/api/auth/password \
     -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
     -s -o /dev/null
 done
 
 # Should fail (429)
-curl -X GET http://localhost:3000/api/auth/password \
+curl -X GET http://localhost:4211/api/auth/password \
   -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
   -s -o /dev/null -w "Before wait: %{http_code}\n"
 
@@ -166,7 +166,7 @@ echo "Waiting 10 minutes..."
 sleep 600
 
 # Should succeed (200)
-curl -X GET http://localhost:3000/api/auth/password \
+curl -X GET http://localhost:4211/api/auth/password \
   -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
   -s -o /dev/null -w "After wait: %{http_code}\n"
 ```
@@ -198,7 +198,7 @@ After wait: 200
 ```bash
 # Trigger rate limit
 for i in {1..6}; do
-  curl -X GET http://localhost:3000/api/auth/password \
+  curl -X GET http://localhost:4211/api/auth/password \
     -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
     -s -o /dev/null
 done
@@ -244,7 +244,7 @@ export UPSTASH_REDIS_REST_TOKEN="invalid"
 docker compose restart taboot-app
 
 # Send request - should succeed despite Redis error
-curl -X GET http://localhost:3000/api/auth/password \
+curl -X GET http://localhost:4211/api/auth/password \
   -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
   -s -o /dev/null -w "Status: %{http_code}\n"
 
@@ -282,7 +282,7 @@ Status: 200  ✓ (request allowed)
 ```bash
 for i in {1..6}; do
   echo "Request $i:"
-  curl -X POST http://localhost:3000/api/auth/password \
+  curl -X POST http://localhost:4211/api/auth/password \
     -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{"newPassword":"TestPass123!"}' \
@@ -328,12 +328,12 @@ pnpm test lib/__tests__/rate-limit.test.ts
 
 ```bash
 # Without rate limiting (baseline - requires code change to disable)
-time curl -X GET http://localhost:3000/api/auth/password \
+time curl -X GET http://localhost:4211/api/auth/password \
   -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
   -s -o /dev/null
 
 # With rate limiting
-time curl -X GET http://localhost:3000/api/auth/password \
+time curl -X GET http://localhost:4211/api/auth/password \
   -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
   -s -o /dev/null
 ```
@@ -349,7 +349,7 @@ time curl -X GET http://localhost:3000/api/auth/password \
 ```bash
 # Send 10 concurrent requests
 for i in {1..10}; do
-  curl -X GET http://localhost:3000/api/auth/password \
+  curl -X GET http://localhost:4211/api/auth/password \
     -H "Cookie: better-auth.session_token=$SESSION_TOKEN" \
     -s -o /dev/null -w "Status: %{http_code}\n" &
 done

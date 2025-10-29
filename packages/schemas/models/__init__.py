@@ -156,7 +156,7 @@ class Chunk(BaseModel):
 
     chunk_id: UUID = Field(..., description="Chunk UUID (Qdrant point ID)")
     doc_id: UUID = Field(..., description="Foreign key to Document")
-    content: str = Field(..., min_length=1, max_length=4096, description="Chunk text content")
+    content: str = Field(..., min_length=1, max_length=8192, description="Chunk text content")
     section: str | None = Field(default=None, max_length=512, description="Heading/path context")
     position: int = Field(..., ge=0, description="Offset in document (0-indexed)")
     token_count: int = Field(..., ge=1, le=512, description="Token count in chunk")

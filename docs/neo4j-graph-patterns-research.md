@@ -254,7 +254,7 @@ ON MATCH SET
 
 ### Performance Notes
 - **MERGE**: ~500-1000 ops/sec (with index lookup)
-- **CREATE**: ~2000-3000 ops/sec (no existence check)
+- **CREATE**: ~2000-4211 ops/sec (no existence check)
 - MERGE on relationships: ensure relationship type is indexed if filtering on properties
 - Use MERGE for ≤10k ops, consider CREATE + client-side deduplication for >100k ops
 
@@ -562,7 +562,7 @@ class Neo4jWriter:
 ```python
 # High-throughput configuration (20k edges/min)
 driver = GraphDatabase.driver(
-    "bolt://localhost:7687",
+    "bolt://localhost:4206",
     auth=("neo4j", "password"),
     max_connection_pool_size=50,       # 2-3x worker count
     connection_acquisition_timeout=60.0,  # Wait up to 60s for connection
@@ -967,7 +967,7 @@ RETURN DISTINCT dep.name;
 from neo4j import GraphDatabase
 
 driver = GraphDatabase.driver(
-    "bolt://localhost:7687",
+    "bolt://localhost:4206",
     auth=("neo4j", "password"),
     max_connection_pool_size=50,
 )

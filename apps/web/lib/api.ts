@@ -82,7 +82,7 @@ class CsrfAwareAPIClient extends TabootAPIClient {
 
   constructor(config?: TabootAPIClientConfig) {
     super(config);
-    this._baseUrl = config?.baseUrl || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    this._baseUrl = config?.baseUrl || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4209";
     this._credentials = config?.credentials || "include";
   }
 
@@ -214,7 +214,7 @@ class CsrfAwareAPIClient extends TabootAPIClient {
  * Singleton API client instance.
  *
  * Configuration:
- * - baseUrl: NEXT_PUBLIC_API_URL (defaults to http://localhost:8000)
+ * - baseUrl: NEXT_PUBLIC_API_URL (defaults to http://localhost:4209)
  * - credentials: 'include' (required for JWT cookies)
  * - CSRF protection: Automatic token inclusion for POST/PUT/PATCH/DELETE
  *

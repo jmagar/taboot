@@ -8,7 +8,7 @@ describe('TabootAPIClient', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', mockFetch);
     client = new TabootAPIClient({
-      baseUrl: 'http://localhost:8000',
+      baseUrl: 'http://localhost:4209',
       credentials: 'include',
     });
   });
@@ -28,7 +28,7 @@ describe('TabootAPIClient', () => {
 
       const result = await client.get('/api/test');
 
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:8000/api/test', {
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4209/api/test', {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -65,7 +65,7 @@ describe('TabootAPIClient', () => {
 
       await client.post('/api/items', payload);
 
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:8000/api/items', {
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4209/api/items', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -159,7 +159,7 @@ describe('TabootAPIClient', () => {
 
       await client.put('/api/items/1', payload);
 
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:8000/api/items/1', {
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4209/api/items/1', {
         method: 'PUT',
         credentials: 'include',
         headers: {
@@ -181,7 +181,7 @@ describe('TabootAPIClient', () => {
 
       await client.patch('/api/items/1', payload);
 
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:8000/api/items/1', {
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4209/api/items/1', {
         method: 'PATCH',
         credentials: 'include',
         headers: {
@@ -202,7 +202,7 @@ describe('TabootAPIClient', () => {
 
       await client.delete('/api/items/1');
 
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:8000/api/items/1', {
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4209/api/items/1', {
         method: 'DELETE',
         credentials: 'include',
         headers: {

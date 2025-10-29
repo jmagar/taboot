@@ -175,7 +175,7 @@ Your extraction requirements are ALL extractable from nginx config:
         Exmaple:
         ```
         set $upstream_app 100.74.16.82;
-        set $upstream_port 3005;
+        set $upstream_port 4210;
         set $upstream_proto http;
         proxy_pass $upstream_proto://$upstream_app:$upstream_port;
         ```

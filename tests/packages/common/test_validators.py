@@ -114,7 +114,7 @@ class TestValidateURL:
         with pytest.raises(URLValidationError, match="internal hostname"):
             validate_url("http://localhost")
         with pytest.raises(URLValidationError, match="internal hostname"):
-            validate_url("https://localhost:8080")
+            validate_url("https://localhost:4207")
 
     def test_rejects_zero_address(self) -> None:
         """Should reject 0.0.0.0 address."""

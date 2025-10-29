@@ -1,140 +1,341 @@
 // Neo4j Constraints and Indexes for Taboot Graph Schema
 // Execute these queries during initialization (taboot init command)
-// All constraints ensure uniqueness and enable fast lookups
+// All constraints ensure uniqueness and enable fast lookups for the new graph model
 
 // === CORE ENTITY CONSTRAINTS ===
-// These entities span multiple data sources and need unique identification
 
-// Person node constraints (email is unique identifier)
 CREATE CONSTRAINT person_email_unique
 IF NOT EXISTS
 FOR (p:Person)
 REQUIRE p.email IS UNIQUE;
 
-// Organization node constraints (name is unique identifier)
 CREATE CONSTRAINT organization_name_unique
 IF NOT EXISTS
 FOR (o:Organization)
 REQUIRE o.name IS UNIQUE;
 
-// Place node constraints (name is unique identifier)
 CREATE CONSTRAINT place_name_unique
 IF NOT EXISTS
 FOR (pl:Place)
 REQUIRE pl.name IS UNIQUE;
 
-// Event node constraints
-// Note: For events with same name at different times, consider composite uniqueness
-// Current implementation: simple name uniqueness
 CREATE CONSTRAINT event_name_unique
 IF NOT EXISTS
 FOR (e:Event)
 REQUIRE e.name IS UNIQUE;
 
-// Event composite index for temporal queries
-CREATE INDEX event_composite_idx
-IF NOT EXISTS
-FOR (e:Event)
-ON (e.name, e.start_time);
-
-// File node constraints
 CREATE CONSTRAINT file_id_unique
 IF NOT EXISTS
 FOR (f:File)
 REQUIRE f.file_id IS UNIQUE;
 
-// File composite index for source-scoped queries
-CREATE INDEX file_composite_idx
-IF NOT EXISTS
-FOR (f:File)
-ON (f.file_id, f.source);
+// === DOCKER COMPOSE ENTITY CONSTRAINTS ===
 
-// === LEGACY ENTITY CONSTRAINTS (TO BE DEPRECATED) ===
-// Service node constraints
-CREATE CONSTRAINT service_name_unique
+CREATE CONSTRAINT compose_file_path_unique
 IF NOT EXISTS
-FOR (s:Service)
-REQUIRE s.name IS UNIQUE;
+FOR (f:ComposeFile)
+REQUIRE f.file_path IS UNIQUE;
 
-// Host node constraints
-CREATE CONSTRAINT host_hostname_unique
+CREATE CONSTRAINT compose_project_key_unique
 IF NOT EXISTS
-FOR (h:Host)
-REQUIRE h.hostname IS UNIQUE;
+FOR (p:ComposeProject)
+REQUIRE (p.file_path, p.name) IS UNIQUE;
 
-// IP node constraints
-CREATE CONSTRAINT ip_addr_unique
+CREATE CONSTRAINT compose_service_key_unique
 IF NOT EXISTS
-FOR (ip:IP)
-REQUIRE ip.addr IS UNIQUE;
+FOR (s:ComposeService)
+REQUIRE (s.compose_file_path, s.name) IS UNIQUE;
 
-// Proxy node constraints
-CREATE CONSTRAINT proxy_name_unique
+CREATE CONSTRAINT compose_network_key_unique
+IF NOT EXISTS
+FOR (n:ComposeNetwork)
+REQUIRE (n.compose_file_path, n.name) IS UNIQUE;
+
+CREATE CONSTRAINT compose_volume_key_unique
+IF NOT EXISTS
+FOR (v:ComposeVolume)
+REQUIRE (v.compose_file_path, v.name) IS UNIQUE;
+
+CREATE CONSTRAINT port_binding_key_unique
+IF NOT EXISTS
+FOR (p:PortBinding)
+REQUIRE (p.compose_file_path, p.service_name, p.host_ip, p.host_port, p.container_port, p.protocol) IS UNIQUE;
+
+CREATE CONSTRAINT environment_variable_key_unique
+IF NOT EXISTS
+FOR (e:EnvironmentVariable)
+REQUIRE (e.compose_file_path, e.service_name, e.key) IS UNIQUE;
+
+CREATE CONSTRAINT service_dependency_key_unique
+IF NOT EXISTS
+FOR (d:ServiceDependency)
+REQUIRE (d.compose_file_path, d.source_service, d.target_service, d.condition) IS UNIQUE;
+
+CREATE CONSTRAINT image_details_key_unique
+IF NOT EXISTS
+FOR (i:ImageDetails)
+REQUIRE (i.compose_file_path, i.service_name, i.image_name, i.tag, i.registry) IS UNIQUE;
+
+CREATE CONSTRAINT health_check_key_unique
+IF NOT EXISTS
+FOR (h:HealthCheck)
+REQUIRE (h.compose_file_path, h.service_name, h.test) IS UNIQUE;
+
+CREATE CONSTRAINT build_context_key_unique
+IF NOT EXISTS
+FOR (b:BuildContext)
+REQUIRE (b.compose_file_path, b.service_name, b.context_path, b.dockerfile) IS UNIQUE;
+
+CREATE CONSTRAINT device_mapping_key_unique
+IF NOT EXISTS
+FOR (d:DeviceMapping)
+REQUIRE (d.compose_file_path, d.service_name, d.host_device, d.container_device) IS UNIQUE;
+
+// === SWAG ENTITY CONSTRAINTS ===
+
+CREATE CONSTRAINT swag_config_file_path_unique
+IF NOT EXISTS
+FOR (c:SwagConfigFile)
+REQUIRE c.file_path IS UNIQUE;
+
+CREATE CONSTRAINT proxy_key_unique
 IF NOT EXISTS
 FOR (p:Proxy)
-REQUIRE p.name IS UNIQUE;
+REQUIRE (p.config_path, p.name) IS UNIQUE;
 
-// Endpoint composite index (service + method + path uniqueness)
-CREATE INDEX endpoint_composite_idx
+CREATE CONSTRAINT proxy_route_key_unique
 IF NOT EXISTS
-FOR (e:Endpoint)
-ON (e.service, e.method, e.path);
+FOR (r:ProxyRoute)
+REQUIRE (r.server_name, r.upstream_app, r.upstream_port, r.upstream_proto) IS UNIQUE;
 
-// === CORE ENTITY PERFORMANCE INDEXES ===
-
-// Extraction tier indexes for reprocessing queries
-CREATE INDEX person_extraction_tier_idx
+CREATE CONSTRAINT location_block_path_unique
 IF NOT EXISTS
-FOR (p:Person)
-ON (p.extraction_tier);
+FOR (l:LocationBlock)
+REQUIRE (l.path, l.proxy_pass_url) IS UNIQUE;
 
-CREATE INDEX organization_extraction_tier_idx
+CREATE CONSTRAINT upstream_config_key_unique
 IF NOT EXISTS
-FOR (o:Organization)
-ON (o.extraction_tier);
+FOR (u:UpstreamConfig)
+REQUIRE (u.app, u.port, u.proto) IS UNIQUE;
 
-CREATE INDEX place_extraction_tier_idx
+CREATE CONSTRAINT proxy_header_key_unique
 IF NOT EXISTS
-FOR (pl:Place)
-ON (pl.extraction_tier);
+FOR (h:ProxyHeader)
+REQUIRE (h.header_type, h.header_name, h.header_value) IS UNIQUE;
 
-CREATE INDEX event_extraction_tier_idx
+// === GITHUB ENTITY CONSTRAINTS ===
+
+CREATE CONSTRAINT repository_full_name_unique
 IF NOT EXISTS
-FOR (e:Event)
-ON (e.extraction_tier);
+FOR (r:Repository)
+REQUIRE r.full_name IS UNIQUE;
 
-CREATE INDEX file_extraction_tier_idx
+CREATE CONSTRAINT issue_number_unique
 IF NOT EXISTS
-FOR (f:File)
-ON (f.extraction_tier);
+FOR (i:Issue)
+REQUIRE i.number IS UNIQUE;
 
-// Extraction version indexes for reprocessing queries
-CREATE INDEX person_extraction_version_idx
+CREATE CONSTRAINT pull_request_number_unique
 IF NOT EXISTS
-FOR (p:Person)
-ON (p.extractor_version);
+FOR (p:PullRequest)
+REQUIRE p.number IS UNIQUE;
 
-CREATE INDEX organization_extraction_version_idx
+CREATE CONSTRAINT commit_sha_unique
 IF NOT EXISTS
-FOR (o:Organization)
-ON (o.extractor_version);
+FOR (c:Commit)
+REQUIRE c.sha IS UNIQUE;
 
-CREATE INDEX place_extraction_version_idx
+CREATE CONSTRAINT branch_ref_unique
 IF NOT EXISTS
-FOR (pl:Place)
-ON (pl.extractor_version);
+FOR (b:Branch)
+REQUIRE b.ref IS UNIQUE;
 
-CREATE INDEX event_extraction_version_idx
+CREATE CONSTRAINT tag_ref_unique
 IF NOT EXISTS
-FOR (e:Event)
-ON (e.extractor_version);
+FOR (t:Tag)
+REQUIRE t.ref IS UNIQUE;
 
-CREATE INDEX file_extraction_version_idx
+CREATE CONSTRAINT github_label_name_unique
 IF NOT EXISTS
-FOR (f:File)
-ON (f.extractor_version);
+FOR (l:GitHubLabel)
+REQUIRE l.name IS UNIQUE;
 
-// Updated_at indexes for time-based queries
+CREATE CONSTRAINT milestone_number_unique
+IF NOT EXISTS
+FOR (m:Milestone)
+REQUIRE m.number IS UNIQUE;
+
+CREATE CONSTRAINT github_comment_id_unique
+IF NOT EXISTS
+FOR (c:Comment)
+REQUIRE c.id IS UNIQUE;
+
+CREATE CONSTRAINT release_tag_unique
+IF NOT EXISTS
+FOR (r:Release)
+REQUIRE r.tag_name IS UNIQUE;
+
+CREATE CONSTRAINT documentation_path_unique
+IF NOT EXISTS
+FOR (d:Documentation)
+REQUIRE d.file_path IS UNIQUE;
+
+CREATE CONSTRAINT binary_asset_path_unique
+IF NOT EXISTS
+FOR (b:BinaryAsset)
+REQUIRE b.file_path IS UNIQUE;
+
+// === GMAIL ENTITY CONSTRAINTS ===
+
+CREATE CONSTRAINT email_message_id_unique
+IF NOT EXISTS
+FOR (e:Email)
+REQUIRE e.message_id IS UNIQUE;
+
+CREATE CONSTRAINT thread_id_unique
+IF NOT EXISTS
+FOR (t:Thread)
+REQUIRE t.thread_id IS UNIQUE;
+
+CREATE CONSTRAINT gmail_label_id_unique
+IF NOT EXISTS
+FOR (l:GmailLabel)
+REQUIRE l.label_id IS UNIQUE;
+
+CREATE CONSTRAINT attachment_id_unique
+IF NOT EXISTS
+FOR (a:Attachment)
+REQUIRE a.attachment_id IS UNIQUE;
+
+// === REDDIT ENTITY CONSTRAINTS ===
+
+CREATE CONSTRAINT subreddit_name_unique
+IF NOT EXISTS
+FOR (s:Subreddit)
+REQUIRE s.name IS UNIQUE;
+
+CREATE CONSTRAINT reddit_post_id_unique
+IF NOT EXISTS
+FOR (p:RedditPost)
+REQUIRE p.post_id IS UNIQUE;
+
+CREATE CONSTRAINT reddit_comment_id_unique
+IF NOT EXISTS
+FOR (c:RedditComment)
+REQUIRE c.comment_id IS UNIQUE;
+
+// === YOUTUBE ENTITY CONSTRAINTS ===
+
+CREATE CONSTRAINT youtube_video_id_unique
+IF NOT EXISTS
+FOR (v:Video)
+REQUIRE v.video_id IS UNIQUE;
+
+CREATE CONSTRAINT youtube_channel_id_unique
+IF NOT EXISTS
+FOR (c:Channel)
+REQUIRE c.channel_id IS UNIQUE;
+
+CREATE CONSTRAINT transcript_key_unique
+IF NOT EXISTS
+FOR (t:Transcript)
+REQUIRE (t.video_id, t.language) IS UNIQUE;
+
+// === TAILSCALE ENTITY CONSTRAINTS ===
+
+CREATE CONSTRAINT tailscale_device_id_unique
+IF NOT EXISTS
+FOR (d:TailscaleDevice)
+REQUIRE d.device_id IS UNIQUE;
+
+CREATE CONSTRAINT tailscale_network_id_unique
+IF NOT EXISTS
+FOR (n:TailscaleNetwork)
+REQUIRE n.network_id IS UNIQUE;
+
+CREATE CONSTRAINT tailscale_acl_id_unique
+IF NOT EXISTS
+FOR (a:TailscaleACL)
+REQUIRE a.rule_id IS UNIQUE;
+
+// === UNIFI ENTITY CONSTRAINTS ===
+
+CREATE CONSTRAINT unifi_device_mac_unique
+IF NOT EXISTS
+FOR (d:UnifiDevice)
+REQUIRE d.mac IS UNIQUE;
+
+CREATE CONSTRAINT unifi_client_mac_unique
+IF NOT EXISTS
+FOR (c:UnifiClient)
+REQUIRE c.mac IS UNIQUE;
+
+CREATE CONSTRAINT unifi_network_id_unique
+IF NOT EXISTS
+FOR (n:UnifiNetwork)
+REQUIRE n.network_id IS UNIQUE;
+
+CREATE CONSTRAINT unifi_site_id_unique
+IF NOT EXISTS
+FOR (s:UnifiSite)
+REQUIRE s.site_id IS UNIQUE;
+
+CREATE CONSTRAINT port_forwarding_rule_id_unique
+IF NOT EXISTS
+FOR (r:PortForwardingRule)
+REQUIRE r.rule_id IS UNIQUE;
+
+CREATE CONSTRAINT firewall_rule_id_unique
+IF NOT EXISTS
+FOR (r:FirewallRule)
+REQUIRE r.rule_id IS UNIQUE;
+
+CREATE CONSTRAINT traffic_rule_id_unique
+IF NOT EXISTS
+FOR (r:TrafficRule)
+REQUIRE r.rule_id IS UNIQUE;
+
+CREATE CONSTRAINT traffic_route_id_unique
+IF NOT EXISTS
+FOR (r:TrafficRoute)
+REQUIRE r.route_id IS UNIQUE;
+
+CREATE CONSTRAINT nat_rule_id_unique
+IF NOT EXISTS
+FOR (r:NATRule)
+REQUIRE r.rule_id IS UNIQUE;
+
+// === WEB ENTITY CONSTRAINTS ===
+
+CREATE CONSTRAINT document_id_unique
+IF NOT EXISTS
+FOR (d:Document)
+REQUIRE d.doc_id IS UNIQUE;
+
+// === RELATIONSHIP PROPERTY INDEXES ===
+
+CREATE INDEX depends_on_confidence_idx
+IF NOT EXISTS
+FOR ()-[r:DEPENDS_ON]-()
+ON (r.confidence);
+
+CREATE INDEX routes_to_host_idx
+IF NOT EXISTS
+FOR ()-[r:ROUTES_TO]-()
+ON (r.host);
+
+CREATE INDEX mentions_chunk_id_idx
+IF NOT EXISTS
+FOR ()-[r:MENTIONS]-()
+ON (r.chunk_id);
+
+CREATE INDEX mentions_doc_id_idx
+IF NOT EXISTS
+FOR ()-[r:MENTIONS]-()
+ON (r.doc_id);
+
+// === CORE PERFORMANCE INDEXES ===
+
 CREATE INDEX person_updated_at_idx
 IF NOT EXISTS
 FOR (p:Person)
@@ -160,106 +361,7 @@ IF NOT EXISTS
 FOR (f:File)
 ON (f.updated_at);
 
-// === LEGACY ENTITY PERFORMANCE INDEXES ===
+// Verification helpers
 
-// Index on Service.version for version filtering
-CREATE INDEX service_version_idx
-IF NOT EXISTS
-FOR (s:Service)
-ON (s.version);
-
-// Index on extraction_version for reprocessing queries
-CREATE INDEX service_extraction_version_idx
-IF NOT EXISTS
-FOR (s:Service)
-ON (s.extraction_version);
-
-CREATE INDEX host_extraction_version_idx
-IF NOT EXISTS
-FOR (h:Host)
-ON (h.extraction_version);
-
-CREATE INDEX ip_extraction_version_idx
-IF NOT EXISTS
-FOR (ip:IP)
-ON (ip.extraction_version);
-
-CREATE INDEX proxy_extraction_version_idx
-IF NOT EXISTS
-FOR (p:Proxy)
-ON (p.extraction_version);
-
-// Index on updated_at for time-based queries
-CREATE INDEX service_updated_at_idx
-IF NOT EXISTS
-FOR (s:Service)
-ON (s.updated_at);
-
-CREATE INDEX host_updated_at_idx
-IF NOT EXISTS
-FOR (h:Host)
-ON (h.updated_at);
-
-// Relationship indexes for traversal performance
-
-// Index on DEPENDS_ON relationship properties
-CREATE INDEX depends_on_confidence_idx
-IF NOT EXISTS
-FOR ()-[r:DEPENDS_ON]-()
-ON (r.confidence);
-
-// Index on ROUTES_TO relationship properties
-CREATE INDEX routes_to_host_idx
-IF NOT EXISTS
-FOR ()-[r:ROUTES_TO]-()
-ON (r.host);
-
-// Index on MENTIONS relationship properties (for chunk lookups)
-CREATE INDEX mentions_chunk_id_idx
-IF NOT EXISTS
-FOR ()-[r:MENTIONS]-()
-ON (r.chunk_id);
-
-CREATE INDEX mentions_doc_id_idx
-IF NOT EXISTS
-FOR ()-[r:MENTIONS]-()
-ON (r.doc_id);
-
-// Full-text index on Service names and descriptions for search
-CREATE FULLTEXT INDEX service_fulltext_idx
-IF NOT EXISTS
-FOR (s:Service)
-ON EACH [s.name, s.description];
-
-// Full-text index on Host hostnames for search
-CREATE FULLTEXT INDEX host_fulltext_idx
-IF NOT EXISTS
-FOR (h:Host)
-ON EACH [h.hostname];
-
-// Verification queries (run after constraint creation to confirm)
-
-// Count constraints
 SHOW CONSTRAINTS;
-
-// Count indexes
 SHOW INDEXES;
-
-// Expected output after Phase 1 implementation:
-// === CORE ENTITIES (Phase 1) ===
-// - 5 unique constraints (Person.email, Organization.name, Place.name, Event.name, File.file_id)
-// - 2 composite indexes (Event: name+start_time, File: file_id+source)
-// - 15 property indexes (5 entities × 3 fields: extraction_tier, extractor_version, updated_at)
-//
-// === LEGACY ENTITIES (Pre-refactor, to be deprecated) ===
-// - 4 unique constraints (Service.name, Host.hostname, IP.addr, Proxy.name)
-// - 1 composite index (Endpoint)
-// - 11 property indexes (version, extraction_version, updated_at, confidence, host, chunk_id, doc_id)
-// - 2 full-text indexes (Service, Host)
-//
-// === TOTAL ===
-// - 9 unique constraints
-// - 3 composite indexes
-// - 26 property indexes
-// - 3 relationship property indexes
-// - 2 full-text indexes

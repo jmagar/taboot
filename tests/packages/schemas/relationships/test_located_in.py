@@ -17,11 +17,13 @@ class TestLocatedInRelationship:
 
         rel = LocatedInRelationship(
             created_at=now,
+            updated_at=now,
             source="tailscale_reader",
             extractor_version="1.0.0",
         )
 
         assert rel.created_at == now
+        assert rel.updated_at == now
         assert rel.source == "tailscale_reader"
         assert rel.confidence == 1.0
         assert rel.extractor_version == "1.0.0"
@@ -33,6 +35,7 @@ class TestLocatedInRelationship:
 
         rel = LocatedInRelationship(
             created_at=now,
+            updated_at=now,
             source_timestamp=source_time,
             source="unifi_reader",
             confidence=0.97,
@@ -47,6 +50,7 @@ class TestLocatedInRelationship:
         """Test LocatedInRelationship validation fails without created_at."""
         with pytest.raises(ValidationError) as exc_info:
             LocatedInRelationship(
+                updated_at=datetime.now(UTC),
                 source="tailscale_reader",
                 extractor_version="1.0.0",
             )
@@ -61,6 +65,7 @@ class TestLocatedInRelationship:
         with pytest.raises(ValidationError) as exc_info:
             LocatedInRelationship(
                 created_at=now,
+                updated_at=now,
                 extractor_version="1.0.0",
             )
 
@@ -74,6 +79,7 @@ class TestLocatedInRelationship:
         with pytest.raises(ValidationError) as exc_info:
             LocatedInRelationship(
                 created_at=now,
+                updated_at=now,
                 source="tailscale_reader",
             )
 
@@ -86,6 +92,7 @@ class TestLocatedInRelationship:
 
         rel = LocatedInRelationship(
             created_at=now,
+            updated_at=now,
             source="tailscale_reader",
             extractor_version="1.0.0",
         )

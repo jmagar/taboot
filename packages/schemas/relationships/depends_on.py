@@ -17,6 +17,7 @@ class DependsOnRelationship(BaseRelationship):
         >>> rel = DependsOnRelationship(
         ...     condition="service_healthy",
         ...     created_at=datetime.now(UTC),
+        ...     updated_at=datetime.now(UTC),
         ...     source="docker_compose_reader",
         ...     extractor_version="1.0.0",
         ... )

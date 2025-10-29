@@ -20,6 +20,7 @@ class RoutesToRelationship(BaseRelationship):
         ...     tls=True,
         ...     auth_enabled=True,
         ...     created_at=datetime.now(UTC),
+        ...     updated_at=datetime.now(UTC),
         ...     source="swag_reader",
         ...     extractor_version="1.0.0",
         ... )

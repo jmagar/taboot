@@ -14,6 +14,7 @@ class InThreadRelationship(BaseRelationship):
         >>> from datetime import datetime, UTC
         >>> rel = InThreadRelationship(
         ...     created_at=datetime.now(UTC),
+        ...     updated_at=datetime.now(UTC),
         ...     source="gmail_reader",
         ...     extractor_version="1.0.0",
         ... )

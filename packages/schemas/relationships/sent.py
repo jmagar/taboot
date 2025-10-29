@@ -19,6 +19,7 @@ class SentRelationship(BaseRelationship):
         >>> rel = SentRelationship(
         ...     sent_at=datetime(2024, 1, 15, 10, 0, 0, tzinfo=UTC),
         ...     created_at=datetime.now(UTC),
+        ...     updated_at=datetime.now(UTC),
         ...     source="gmail_reader",
         ...     extractor_version="1.0.0",
         ... )

@@ -16,6 +16,7 @@ class TestComposeVolumeEntity:
         now = datetime.now(UTC)
         volume = ComposeVolume(
             name="data",
+            compose_file_path="/tmp/docker-compose.yml",
             created_at=now,
             updated_at=now,
             extraction_tier="A",
@@ -25,6 +26,7 @@ class TestComposeVolumeEntity:
         )
 
         assert volume.name == "data"
+        assert volume.compose_file_path == "/tmp/docker-compose.yml"
         assert volume.driver is None
         assert volume.external is None
 
@@ -33,6 +35,7 @@ class TestComposeVolumeEntity:
         now = datetime.now(UTC)
         volume = ComposeVolume(
             name="postgres-data",
+            compose_file_path="/tmp/docker-compose.yml",
             driver="local",
             external=False,
             driver_opts={"type": "nfs", "device": ":/mnt/data"},
@@ -45,6 +48,7 @@ class TestComposeVolumeEntity:
         )
 
         assert volume.name == "postgres-data"
+        assert volume.compose_file_path == "/tmp/docker-compose.yml"
         assert volume.driver == "local"
         assert volume.driver_opts == {"type": "nfs", "device": ":/mnt/data"}
 
@@ -64,3 +68,4 @@ class TestComposeVolumeEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("name",) for e in errors)
+        assert any(e["loc"] == ("compose_file_path",) for e in errors)

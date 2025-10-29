@@ -45,6 +45,7 @@ class HybridRetriever:
             tei_embedding_url: TEI API URL for query embedding.
             reranker: Optional preconfigured reranker instance (useful for tests).
         """
+
         self.qdrant_url = qdrant_url
         self.neo4j_uri = neo4j_uri
 

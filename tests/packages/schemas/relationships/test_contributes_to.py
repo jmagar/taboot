@@ -22,6 +22,7 @@ class TestContributesToRelationship:
             first_commit_at=first_commit,
             last_commit_at=last_commit,
             created_at=now,
+            updated_at=now,
             source="github_reader",
             extractor_version="1.0.0",
         )
@@ -46,6 +47,7 @@ class TestContributesToRelationship:
             first_commit_at=first_commit,
             last_commit_at=last_commit,
             created_at=now,
+            updated_at=now,
             source_timestamp=source_time,
             source="github_reader",
             confidence=0.98,
@@ -68,6 +70,7 @@ class TestContributesToRelationship:
             first_commit_at=commit_time,
             last_commit_at=commit_time,
             created_at=now,
+            updated_at=now,
             source="github_reader",
             extractor_version="1.0.0",
         )
@@ -87,6 +90,7 @@ class TestContributesToRelationship:
             first_commit_at=first_commit,
             last_commit_at=last_commit,
             created_at=now,
+            updated_at=now,
             source="github_reader",
             extractor_version="1.0.0",
         )
@@ -104,6 +108,7 @@ class TestContributesToRelationship:
                 first_commit_at=first_commit,
                 last_commit_at=last_commit,
                 created_at=now,
+                updated_at=now,
                 source="github_reader",
                 extractor_version="1.0.0",
             )
@@ -123,6 +128,7 @@ class TestContributesToRelationship:
                 first_commit_at=first_commit,
                 last_commit_at=last_commit,
                 created_at=now,
+                updated_at=now,
                 source="github_reader",
                 extractor_version="1.0.0",
             )
@@ -142,6 +148,7 @@ class TestContributesToRelationship:
                 first_commit_at=first_commit,
                 last_commit_at=last_commit,
                 created_at=now,
+                updated_at=now,
                 source="github_reader",
                 extractor_version="1.0.0",
             )
@@ -159,6 +166,7 @@ class TestContributesToRelationship:
                 commit_count=150,
                 last_commit_at=last_commit,
                 created_at=now,
+                updated_at=now,
                 source="github_reader",
                 extractor_version="1.0.0",
             )
@@ -176,6 +184,7 @@ class TestContributesToRelationship:
                 commit_count=150,
                 first_commit_at=first_commit,
                 created_at=now,
+                updated_at=now,
                 source="github_reader",
                 extractor_version="1.0.0",
             )
@@ -194,6 +203,7 @@ class TestContributesToRelationship:
             first_commit_at=first_commit,
             last_commit_at=last_commit,
             created_at=now,
+            updated_at=now,
             source="github_reader",
             extractor_version="1.0.0",
         )

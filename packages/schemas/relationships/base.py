@@ -18,6 +18,7 @@ class BaseRelationship(BaseModel):
         >>> from datetime import datetime, UTC
         >>> rel = BaseRelationship(
         ...     created_at=datetime.now(UTC),
+        ...     updated_at=datetime.now(UTC),
         ...     source="job_12345",
         ...     confidence=1.0,
         ...     extractor_version="1.0.0",
@@ -30,6 +31,10 @@ class BaseRelationship(BaseModel):
     created_at: datetime = Field(
         ...,
         description="When we created this relationship in our system",
+    )
+    updated_at: datetime = Field(
+        ...,
+        description="When we last modified this relationship",
     )
     source_timestamp: datetime | None = Field(
         None,
@@ -61,6 +66,7 @@ class BaseRelationship(BaseModel):
             "examples": [
                 {
                     "created_at": "2024-01-15T10:30:00Z",
+                    "updated_at": "2024-01-15T10:30:00Z",
                     "source_timestamp": "2024-01-15T09:00:00Z",
                     "source": "job_12345",
                     "confidence": 1.0,

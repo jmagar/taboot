@@ -33,6 +33,18 @@ class BuildContext(BaseModel):
     """
 
     # Build configuration fields
+    compose_file_path: str = Field(
+        ...,
+        min_length=1,
+        description="Path to the compose file that declared this build context",
+        examples=["/home/user/docker-compose.yml", "./compose.yaml"],
+    )
+    service_name: str = Field(
+        ...,
+        min_length=1,
+        description="Service name that owns this build context",
+        examples=["web", "api"],
+    )
     context_path: str = Field(
         ...,
         min_length=1,

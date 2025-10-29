@@ -313,3 +313,13 @@ class TestGmailLabelEntity:
         assert label.type == "user"
         assert label.color == "#ff0000"
         assert label.message_count == 42
+
+    def test_gmail_label_validate_type_direct(self) -> None:
+        """Ensure the type validator raises for unsupported values."""
+        with pytest.raises(ValueError, match="type must be"):
+            GmailLabel.validate_type("invalid")
+
+    def test_gmail_label_validate_extraction_tier_direct(self) -> None:
+        """Ensure the extraction_tier validator raises for unsupported values."""
+        with pytest.raises(ValueError, match="extraction_tier"):
+            GmailLabel.validate_extraction_tier("Z")

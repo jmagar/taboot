@@ -330,3 +330,8 @@ class TestAttachmentEntity:
         assert attachment.size == 2048000
         assert attachment.content_hash == "sha256:abc123"
         assert attachment.is_inline is True
+
+    def test_attachment_validate_extraction_tier_direct(self) -> None:
+        """Ensure the extraction_tier validator raises for unsupported values."""
+        with pytest.raises(ValueError, match="extraction_tier"):
+            Attachment.validate_extraction_tier("Z")

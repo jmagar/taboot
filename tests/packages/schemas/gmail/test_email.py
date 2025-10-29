@@ -353,3 +353,8 @@ class TestEmailEntity:
         assert email.thread_id == "thread_67890"
         assert email.subject == "Test Subject"
         assert email.labels == ["INBOX", "IMPORTANT"]
+
+    def test_email_validate_extraction_tier_direct(self) -> None:
+        """Ensure the extraction_tier validator raises for unsupported values."""
+        with pytest.raises(ValueError, match="extraction_tier"):
+            Email.validate_extraction_tier("Z")

@@ -34,6 +34,18 @@ class HealthCheck(BaseModel):
     """
 
     # Health check fields
+    compose_file_path: str = Field(
+        ...,
+        min_length=1,
+        description="Path to the compose file that declared this health check",
+        examples=["/home/user/docker-compose.yml", "./compose.yaml"],
+    )
+    service_name: str = Field(
+        ...,
+        min_length=1,
+        description="Service name associated with this health check",
+        examples=["web", "api"],
+    )
     test: str = Field(
         ...,
         min_length=1,

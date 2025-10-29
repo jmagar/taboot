@@ -21,6 +21,7 @@ class TestRoutesToRelationship:
             tls=True,
             auth_enabled=False,
             created_at=now,
+            updated_at=now,
             source="swag_reader",
             extractor_version="1.0.0",
         )
@@ -30,6 +31,7 @@ class TestRoutesToRelationship:
         assert rel.tls is True
         assert rel.auth_enabled is False
         assert rel.created_at == now
+        assert rel.updated_at == now
         assert rel.source == "swag_reader"
         assert rel.confidence == 1.0
         assert rel.extractor_version == "1.0.0"
@@ -45,6 +47,7 @@ class TestRoutesToRelationship:
             tls=True,
             auth_enabled=True,
             created_at=now,
+            updated_at=now,
             source_timestamp=source_time,
             source="swag_reader",
             confidence=0.98,
@@ -68,6 +71,7 @@ class TestRoutesToRelationship:
             tls=False,
             auth_enabled=False,
             created_at=now,
+            updated_at=now,
             source="swag_reader",
             extractor_version="1.0.0",
         )
@@ -85,6 +89,7 @@ class TestRoutesToRelationship:
                 tls=True,
                 auth_enabled=True,
                 created_at=now,
+                updated_at=now,
                 source="swag_reader",
                 extractor_version="1.0.0",
             )
@@ -102,6 +107,7 @@ class TestRoutesToRelationship:
                 tls=True,
                 auth_enabled=True,
                 created_at=now,
+                updated_at=now,
                 source="swag_reader",
                 extractor_version="1.0.0",
             )
@@ -119,6 +125,7 @@ class TestRoutesToRelationship:
                 path="/api",
                 auth_enabled=True,
                 created_at=now,
+                updated_at=now,
                 source="swag_reader",
                 extractor_version="1.0.0",
             )
@@ -136,6 +143,7 @@ class TestRoutesToRelationship:
                 path="/api",
                 tls=True,
                 created_at=now,
+                updated_at=now,
                 source="swag_reader",
                 extractor_version="1.0.0",
             )
@@ -154,6 +162,7 @@ class TestRoutesToRelationship:
                 tls=True,
                 auth_enabled=True,
                 created_at=now,
+                updated_at=now,
                 source="swag_reader",
                 extractor_version="1.0.0",
             )
@@ -172,6 +181,7 @@ class TestRoutesToRelationship:
                 tls=True,
                 auth_enabled=True,
                 created_at=now,
+                updated_at=now,
                 source="swag_reader",
                 extractor_version="1.0.0",
             )
@@ -189,6 +199,7 @@ class TestRoutesToRelationship:
             tls=True,
             auth_enabled=True,
             created_at=now,
+            updated_at=now,
             source="swag_reader",
             extractor_version="1.0.0",
         )

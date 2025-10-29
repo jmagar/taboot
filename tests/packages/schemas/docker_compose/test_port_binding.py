@@ -15,6 +15,8 @@ class TestPortBindingEntity:
         """Test PortBinding with only required fields."""
         now = datetime.now(UTC)
         port = PortBinding(
+            compose_file_path="/tmp/docker-compose.yml",
+            service_name="web",
             container_port=80,
             created_at=now,
             updated_at=now,
@@ -25,6 +27,8 @@ class TestPortBindingEntity:
         )
 
         assert port.container_port == 80
+        assert port.compose_file_path == "/tmp/docker-compose.yml"
+        assert port.service_name == "web"
         assert port.host_ip is None
         assert port.host_port is None
         assert port.protocol is None
@@ -33,6 +37,8 @@ class TestPortBindingEntity:
         """Test PortBinding with all fields populated."""
         now = datetime.now(UTC)
         port = PortBinding(
+            compose_file_path="/tmp/docker-compose.yml",
+            service_name="web",
             host_ip="0.0.0.0",
             host_port=8080,
             container_port=80,
@@ -49,6 +55,8 @@ class TestPortBindingEntity:
         assert port.host_port == 8080
         assert port.container_port == 80
         assert port.protocol == "tcp"
+        assert port.compose_file_path == "/tmp/docker-compose.yml"
+        assert port.service_name == "web"
 
     def test_port_binding_missing_required_container_port(self) -> None:
         """Test PortBinding validation fails without container_port."""
@@ -66,3 +74,5 @@ class TestPortBindingEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("container_port",) for e in errors)
+        assert any(e["loc"] == ("compose_file_path",) for e in errors)
+        assert any(e["loc"] == ("service_name",) for e in errors)

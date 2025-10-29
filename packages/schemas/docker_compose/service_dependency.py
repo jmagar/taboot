@@ -32,6 +32,12 @@ class ServiceDependency(BaseModel):
     """
 
     # Dependency fields
+    compose_file_path: str = Field(
+        ...,
+        min_length=1,
+        description="Path to the compose file that declared this dependency",
+        examples=["/home/user/docker-compose.yml", "./compose.yaml"],
+    )
     source_service: str = Field(
         ...,
         min_length=1,

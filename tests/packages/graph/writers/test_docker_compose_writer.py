@@ -83,6 +83,7 @@ def sample_compose_service() -> ComposeService:
     """Create sample ComposeService entity."""
     return ComposeService(
         name="web",
+        compose_file_path="/home/user/docker-compose.yml",
         image="nginx:alpine",
         restart="unless-stopped",
         created_at=datetime.now(UTC),
@@ -99,6 +100,7 @@ def sample_compose_network() -> ComposeNetwork:
     """Create sample ComposeNetwork entity."""
     return ComposeNetwork(
         name="backend",
+        compose_file_path="/home/user/docker-compose.yml",
         driver="bridge",
         external=False,
         created_at=datetime.now(UTC),
@@ -115,6 +117,7 @@ def sample_compose_volume() -> ComposeVolume:
     """Create sample ComposeVolume entity."""
     return ComposeVolume(
         name="data",
+        compose_file_path="/home/user/docker-compose.yml",
         driver="local",
         external=False,
         created_at=datetime.now(UTC),
@@ -130,6 +133,8 @@ def sample_compose_volume() -> ComposeVolume:
 def sample_port_binding() -> PortBinding:
     """Create sample PortBinding entity."""
     return PortBinding(
+        compose_file_path="/home/user/docker-compose.yml",
+        service_name="web",
         host_ip="0.0.0.0",
         host_port=8080,
         container_port=80,
@@ -147,6 +152,7 @@ def sample_port_binding() -> PortBinding:
 def sample_env_var() -> EnvironmentVariable:
     """Create sample EnvironmentVariable entity."""
     return EnvironmentVariable(
+        compose_file_path="/home/user/docker-compose.yml",
         key="DATABASE_URL",
         value="postgres://localhost/db",
         service_name="api",
@@ -163,6 +169,7 @@ def sample_env_var() -> EnvironmentVariable:
 def sample_service_dependency() -> ServiceDependency:
     """Create sample ServiceDependency entity."""
     return ServiceDependency(
+        compose_file_path="/home/user/docker-compose.yml",
         source_service="web",
         target_service="api",
         condition="service_started",
@@ -179,6 +186,8 @@ def sample_service_dependency() -> ServiceDependency:
 def sample_image_details() -> ImageDetails:
     """Create sample ImageDetails entity."""
     return ImageDetails(
+        compose_file_path="/home/user/docker-compose.yml",
+        service_name="web",
         image_name="nginx",
         tag="alpine",
         registry="docker.io",
@@ -196,6 +205,8 @@ def sample_image_details() -> ImageDetails:
 def sample_health_check() -> HealthCheck:
     """Create sample HealthCheck entity."""
     return HealthCheck(
+        compose_file_path="/home/user/docker-compose.yml",
+        service_name="web",
         test="curl -f http://localhost/ || exit 1",
         interval="30s",
         timeout="10s",
@@ -214,6 +225,8 @@ def sample_health_check() -> HealthCheck:
 def sample_build_context() -> BuildContext:
     """Create sample BuildContext entity."""
     return BuildContext(
+        compose_file_path="/home/user/docker-compose.yml",
+        service_name="web",
         context_path="./web",
         dockerfile="Dockerfile",
         target="production",
@@ -231,6 +244,8 @@ def sample_build_context() -> BuildContext:
 def sample_device_mapping() -> DeviceMapping:
     """Create sample DeviceMapping entity."""
     return DeviceMapping(
+        compose_file_path="/home/user/docker-compose.yml",
+        service_name="web",
         host_device="/dev/video0",
         container_device="/dev/video0",
         permissions="rwm",

@@ -17,11 +17,13 @@ class TestWorksAtRelationship:
 
         rel = WorksAtRelationship(
             created_at=now,
+            updated_at=now,
             source="github_reader",
             extractor_version="1.0.0",
         )
 
         assert rel.created_at == now
+        assert rel.updated_at == now
         assert rel.source == "github_reader"
         assert rel.confidence == 1.0
         assert rel.extractor_version == "1.0.0"
@@ -36,6 +38,7 @@ class TestWorksAtRelationship:
         rel = WorksAtRelationship(
             role="Senior Engineer",
             created_at=now,
+            updated_at=now,
             source="github_reader",
             extractor_version="1.0.0",
         )
@@ -55,6 +58,7 @@ class TestWorksAtRelationship:
             start_date=start,
             end_date=end,
             created_at=now,
+            updated_at=now,
             source_timestamp=start,
             source="linkedin_reader",
             confidence=0.95,
@@ -76,6 +80,7 @@ class TestWorksAtRelationship:
             role="CTO",
             start_date=start,
             created_at=now,
+            updated_at=now,
             source="github_reader",
             extractor_version="1.0.0",
         )
@@ -90,6 +95,7 @@ class TestWorksAtRelationship:
             WorksAtRelationship(
                 role="Engineer",
                 source="github_reader",
+                updated_at=datetime.now(UTC),
                 extractor_version="1.0.0",
             )
 
@@ -104,6 +110,7 @@ class TestWorksAtRelationship:
             WorksAtRelationship(
                 role="Engineer",
                 created_at=now,
+                updated_at=now,
                 extractor_version="1.0.0",
             )
 
@@ -118,6 +125,7 @@ class TestWorksAtRelationship:
             WorksAtRelationship(
                 role="Engineer",
                 created_at=now,
+                updated_at=now,
                 source="github_reader",
             )
 
@@ -133,6 +141,7 @@ class TestWorksAtRelationship:
             role="Senior Engineer",
             start_date=start,
             created_at=now,
+            updated_at=now,
             source="github_reader",
             extractor_version="1.0.0",
         )

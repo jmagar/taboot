@@ -18,12 +18,14 @@ class TestDependsOnRelationship:
         rel = DependsOnRelationship(
             condition="service_started",
             created_at=now,
+            updated_at=now,
             source="docker_compose_reader",
             extractor_version="1.0.0",
         )
 
         assert rel.condition == "service_started"
         assert rel.created_at == now
+        assert rel.updated_at == now
         assert rel.source == "docker_compose_reader"
         assert rel.confidence == 1.0
         assert rel.extractor_version == "1.0.0"
@@ -36,6 +38,7 @@ class TestDependsOnRelationship:
         rel = DependsOnRelationship(
             condition="service_healthy",
             created_at=now,
+            updated_at=now,
             source_timestamp=source_time,
             source="docker_compose_reader",
             confidence=0.99,
@@ -53,6 +56,7 @@ class TestDependsOnRelationship:
         rel = DependsOnRelationship(
             condition="service_completed_successfully",
             created_at=now,
+            updated_at=now,
             source="docker_compose_reader",
             extractor_version="1.0.0",
         )
@@ -66,6 +70,7 @@ class TestDependsOnRelationship:
         with pytest.raises(ValidationError) as exc_info:
             DependsOnRelationship(
                 created_at=now,
+                updated_at=now,
                 source="docker_compose_reader",
                 extractor_version="1.0.0",
             )
@@ -81,6 +86,7 @@ class TestDependsOnRelationship:
             DependsOnRelationship(
                 condition="",
                 created_at=now,
+                updated_at=now,
                 source="docker_compose_reader",
                 extractor_version="1.0.0",
             )
@@ -94,6 +100,7 @@ class TestDependsOnRelationship:
             DependsOnRelationship(
                 condition="service_started",
                 source="docker_compose_reader",
+                updated_at=datetime.now(UTC),
                 extractor_version="1.0.0",
             )
 
@@ -108,6 +115,7 @@ class TestDependsOnRelationship:
             DependsOnRelationship(
                 condition="service_started",
                 created_at=now,
+                updated_at=now,
                 extractor_version="1.0.0",
             )
 
@@ -122,6 +130,7 @@ class TestDependsOnRelationship:
             DependsOnRelationship(
                 condition="service_started",
                 created_at=now,
+                updated_at=now,
                 source="docker_compose_reader",
             )
 
@@ -135,6 +144,7 @@ class TestDependsOnRelationship:
         rel = DependsOnRelationship(
             condition="service_healthy",
             created_at=now,
+            updated_at=now,
             source="docker_compose_reader",
             extractor_version="1.0.0",
         )

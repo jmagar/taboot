@@ -14,6 +14,7 @@ class CreatedRelationship(BaseRelationship):
         >>> from datetime import datetime, UTC
         >>> rel = CreatedRelationship(
         ...     created_at=datetime.now(UTC),
+        ...     updated_at=datetime.now(UTC),
         ...     source="github_reader",
         ...     extractor_version="1.0.0",
         ... )

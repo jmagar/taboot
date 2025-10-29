@@ -6,7 +6,6 @@ Follows the pattern from packages/graph/writers/swag_writer.py.
 Performance target: ≥20k edges/min with 2k-row UNWIND batches.
 """
 
-import json
 import logging
 
 from packages.graph.client import Neo4jClient
@@ -215,6 +214,7 @@ class DockerComposeWriter:
         service_params = [
             {
                 "name": s.name,
+                "compose_file_path": s.compose_file_path,
                 "image": s.image,
                 "command": s.command,
                 "entrypoint": s.entrypoint,
@@ -241,7 +241,7 @@ class DockerComposeWriter:
 
                 query = """
                 UNWIND $rows AS row
-                MERGE (s:ComposeService {name: row.name})
+                MERGE (s:ComposeService {compose_file_path: row.compose_file_path, name: row.name})
                 SET s.image = row.image,
                     s.command = row.command,
                     s.entrypoint = row.entrypoint,
@@ -291,11 +291,12 @@ class DockerComposeWriter:
         network_params = [
             {
                 "name": n.name,
+                "compose_file_path": n.compose_file_path,
                 "driver": n.driver,
                 "external": n.external,
                 "enable_ipv6": n.enable_ipv6,
                 "ipam_driver": n.ipam_driver,
-                "ipam_config": json.dumps(n.ipam_config) if n.ipam_config else None,
+                "ipam_config": n.ipam_config,
                 "created_at": n.created_at.isoformat(),
                 "updated_at": n.updated_at.isoformat(),
                 "source_timestamp": n.source_timestamp.isoformat() if n.source_timestamp else None,
@@ -313,7 +314,7 @@ class DockerComposeWriter:
 
                 query = """
                 UNWIND $rows AS row
-                MERGE (n:ComposeNetwork {name: row.name})
+                MERGE (n:ComposeNetwork {compose_file_path: row.compose_file_path, name: row.name})
                 SET n.driver = row.driver,
                     n.external = row.external,
                     n.enable_ipv6 = row.enable_ipv6,
@@ -359,9 +360,10 @@ class DockerComposeWriter:
         volume_params = [
             {
                 "name": v.name,
+                "compose_file_path": v.compose_file_path,
                 "driver": v.driver,
                 "external": v.external,
-                "driver_opts": json.dumps(v.driver_opts) if v.driver_opts else None,
+                "driver_opts": v.driver_opts,
                 "created_at": v.created_at.isoformat(),
                 "updated_at": v.updated_at.isoformat(),
                 "source_timestamp": v.source_timestamp.isoformat() if v.source_timestamp else None,
@@ -379,7 +381,7 @@ class DockerComposeWriter:
 
                 query = """
                 UNWIND $rows AS row
-                MERGE (v:ComposeVolume {name: row.name})
+                MERGE (v:ComposeVolume {compose_file_path: row.compose_file_path, name: row.name})
                 SET v.driver = row.driver,
                     v.external = row.external,
                     v.driver_opts = row.driver_opts,
@@ -422,10 +424,12 @@ class DockerComposeWriter:
 
         port_params = [
             {
-                "host_ip": p.host_ip,
-                "host_port": p.host_port,
+                "compose_file_path": p.compose_file_path,
+                "service_name": p.service_name,
+                "host_ip": p.host_ip or "0.0.0.0",
+                "host_port": p.host_port if p.host_port is not None else 0,
                 "container_port": p.container_port,
-                "protocol": p.protocol,
+                "protocol": p.protocol or "tcp",
                 "created_at": p.created_at.isoformat(),
                 "updated_at": p.updated_at.isoformat(),
                 "source_timestamp": p.source_timestamp.isoformat() if p.source_timestamp else None,
@@ -443,12 +447,15 @@ class DockerComposeWriter:
 
                 query = """
                 UNWIND $rows AS row
-                CREATE (p:PortBinding)
-                SET p.host_ip = row.host_ip,
-                    p.host_port = row.host_port,
-                    p.container_port = row.container_port,
-                    p.protocol = row.protocol,
-                    p.created_at = row.created_at,
+                MERGE (p:PortBinding {
+                    compose_file_path: row.compose_file_path,
+                    service_name: row.service_name,
+                    host_ip: row.host_ip,
+                    host_port: row.host_port,
+                    container_port: row.container_port,
+                    protocol: row.protocol
+                })
+                SET p.created_at = row.created_at,
                     p.updated_at = row.updated_at,
                     p.source_timestamp = row.source_timestamp,
                     p.extraction_tier = row.extraction_tier,
@@ -489,9 +496,10 @@ class DockerComposeWriter:
 
         env_params = [
             {
+                "compose_file_path": e.compose_file_path,
                 "key": e.key,
                 "value": e.value,
-                "service_name": e.service_name,
+                "service_name": e.service_name or "__global__",
                 "created_at": e.created_at.isoformat(),
                 "updated_at": e.updated_at.isoformat(),
                 "source_timestamp": e.source_timestamp.isoformat() if e.source_timestamp else None,
@@ -509,10 +517,12 @@ class DockerComposeWriter:
 
                 query = """
                 UNWIND $rows AS row
-                CREATE (e:EnvironmentVariable)
-                SET e.key = row.key,
-                    e.value = row.value,
-                    e.service_name = row.service_name,
+                MERGE (e:EnvironmentVariable {
+                    compose_file_path: row.compose_file_path,
+                    service_name: row.service_name,
+                    key: row.key
+                })
+                SET e.value = row.value,
                     e.created_at = row.created_at,
                     e.updated_at = row.updated_at,
                     e.source_timestamp = row.source_timestamp,
@@ -554,6 +564,7 @@ class DockerComposeWriter:
 
         dep_params = [
             {
+                "compose_file_path": d.compose_file_path,
                 "source_service": d.source_service,
                 "target_service": d.target_service,
                 "condition": d.condition,
@@ -576,8 +587,20 @@ class DockerComposeWriter:
 
                 query = """
                 UNWIND $rows AS row
-                MATCH (source:ComposeService {name: row.source_service})
-                MATCH (target:ComposeService {name: row.target_service})
+                OPTIONAL MATCH (
+                    source:ComposeService {
+                        compose_file_path: row.compose_file_path,
+                        name: row.source_service
+                    }
+                )
+                OPTIONAL MATCH (
+                    target:ComposeService {
+                        compose_file_path: row.compose_file_path,
+                        name: row.target_service
+                    }
+                )
+                WITH row, source, target
+                WHERE source IS NOT NULL AND target IS NOT NULL
                 MERGE (source)-[r:DEPENDS_ON]->(target)
                 SET r.condition = row.condition,
                     r.created_at = row.created_at,
@@ -591,10 +614,30 @@ class DockerComposeWriter:
                 """
 
                 result = session.run(query, {"rows": batch})
-                result.consume()
+                created_count = len(batch)
+                if hasattr(result, "single"):
+                    record = result.single()
+                    try:
+                        value = record["created_count"] if record else None
+                        if isinstance(value, (int, float)):
+                            created_count = int(value)
+                    except (KeyError, TypeError):
+                        pass
 
-                total_written += len(batch)
+                total_written += created_count
                 batches_executed += 1
+
+                skipped = max(len(batch) - created_count, 0)
+                if skipped > 0:
+                    affected_files = sorted(
+                        {row["compose_file_path"] for row in batch}
+                    )
+                    logger.warning(
+                        "Skipped %s ServiceDependency relationship(s) because "
+                        "ComposeService nodes were missing (compose_file_path(s)=%s)",
+                        skipped,
+                        ", ".join(affected_files),
+                    )
 
         logger.info(
             f"Wrote {total_written} ServiceDependency relationship(s) "
@@ -620,8 +663,10 @@ class DockerComposeWriter:
 
         image_params = [
             {
+                "compose_file_path": i.compose_file_path,
+                "service_name": i.service_name,
                 "image_name": i.image_name,
-                "tag": i.tag,
+                "tag": i.tag or "latest",
                 "registry": i.registry,
                 "digest": i.digest,
                 "created_at": i.created_at.isoformat(),
@@ -641,9 +686,14 @@ class DockerComposeWriter:
 
                 query = """
                 UNWIND $rows AS row
-                MERGE (i:ImageDetails {image_name: row.image_name, tag: row.tag})
-                SET i.registry = row.registry,
-                    i.digest = row.digest,
+                MERGE (i:ImageDetails {
+                    compose_file_path: row.compose_file_path,
+                    service_name: row.service_name,
+                    image_name: row.image_name,
+                    tag: row.tag,
+                    registry: row.registry
+                })
+                SET i.digest = row.digest,
                     i.created_at = row.created_at,
                     i.updated_at = row.updated_at,
                     i.source_timestamp = row.source_timestamp,
@@ -683,6 +733,8 @@ class DockerComposeWriter:
 
         health_params = [
             {
+                "compose_file_path": h.compose_file_path,
+                "service_name": h.service_name,
                 "test": h.test,
                 "interval": h.interval,
                 "timeout": h.timeout,
@@ -705,9 +757,12 @@ class DockerComposeWriter:
 
                 query = """
                 UNWIND $rows AS row
-                CREATE (h:HealthCheck)
-                SET h.test = row.test,
-                    h.interval = row.interval,
+                MERGE (h:HealthCheck {
+                    compose_file_path: row.compose_file_path,
+                    service_name: row.service_name,
+                    test: row.test
+                })
+                SET h.interval = row.interval,
                     h.timeout = row.timeout,
                     h.retries = row.retries,
                     h.start_period = row.start_period,
@@ -748,22 +803,28 @@ class DockerComposeWriter:
         total_written = 0
         batches_executed = 0
 
-        build_params = [
-            {
-                "context_path": b.context_path,
-                "dockerfile": b.dockerfile,
-                "target": b.target,
-                "args": json.dumps(b.args) if b.args else None,
-                "created_at": b.created_at.isoformat(),
-                "updated_at": b.updated_at.isoformat(),
-                "source_timestamp": b.source_timestamp.isoformat() if b.source_timestamp else None,
-                "extraction_tier": b.extraction_tier,
-                "extraction_method": b.extraction_method,
-                "confidence": b.confidence,
-                "extractor_version": b.extractor_version,
-            }
-            for b in build_contexts
-        ]
+        build_params = []
+        for b in build_contexts:
+            dockerfile = b.dockerfile or "Dockerfile"
+            build_params.append(
+                {
+                    "compose_file_path": b.compose_file_path,
+                    "service_name": b.service_name,
+                    "context_path": b.context_path,
+                    "dockerfile": dockerfile,
+                    "target": b.target,
+                    "args": b.args,
+                    "created_at": b.created_at.isoformat(),
+                    "updated_at": b.updated_at.isoformat(),
+                    "source_timestamp": b.source_timestamp.isoformat()
+                    if b.source_timestamp
+                    else None,
+                    "extraction_tier": b.extraction_tier,
+                    "extraction_method": b.extraction_method,
+                    "confidence": b.confidence,
+                    "extractor_version": b.extractor_version,
+                }
+            )
 
         with self.neo4j_client.session() as session:
             for i in range(0, len(build_params), self.batch_size):
@@ -771,7 +832,12 @@ class DockerComposeWriter:
 
                 query = """
                 UNWIND $rows AS row
-                MERGE (b:BuildContext {context_path: row.context_path})
+                MERGE (b:BuildContext {
+                    compose_file_path: row.compose_file_path,
+                    service_name: row.service_name,
+                    context_path: row.context_path,
+                    dockerfile: row.dockerfile
+                })
                 SET b.dockerfile = row.dockerfile,
                     b.target = row.target,
                     b.args = row.args,
@@ -814,6 +880,8 @@ class DockerComposeWriter:
 
         device_params = [
             {
+                "compose_file_path": d.compose_file_path,
+                "service_name": d.service_name,
                 "host_device": d.host_device,
                 "container_device": d.container_device,
                 "permissions": d.permissions,
@@ -834,10 +902,13 @@ class DockerComposeWriter:
 
                 query = """
                 UNWIND $rows AS row
-                CREATE (d:DeviceMapping)
-                SET d.host_device = row.host_device,
-                    d.container_device = row.container_device,
-                    d.permissions = row.permissions,
+                MERGE (d:DeviceMapping {
+                    compose_file_path: row.compose_file_path,
+                    service_name: row.service_name,
+                    host_device: row.host_device,
+                    container_device: row.container_device
+                })
+                SET d.permissions = row.permissions,
                     d.created_at = row.created_at,
                     d.updated_at = row.updated_at,
                     d.source_timestamp = row.source_timestamp,

@@ -14,6 +14,7 @@ class LocatedInRelationship(BaseRelationship):
         >>> from datetime import datetime, UTC
         >>> rel = LocatedInRelationship(
         ...     created_at=datetime.now(UTC),
+        ...     updated_at=datetime.now(UTC),
         ...     source="tailscale_reader",
         ...     extractor_version="1.0.0",
         ... )

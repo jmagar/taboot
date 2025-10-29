@@ -22,6 +22,7 @@ class TestMentionsRelationship:
             section="Introduction",
             chunk_id=chunk_id,
             created_at=now,
+            updated_at=now,
             source="job_12345",
             extractor_version="1.0.0",
         )
@@ -30,6 +31,7 @@ class TestMentionsRelationship:
         assert rel.section == "Introduction"
         assert rel.chunk_id == chunk_id
         assert rel.created_at == now
+        assert rel.updated_at == now
         assert rel.source == "job_12345"
         assert rel.confidence == 1.0
         assert rel.extractor_version == "1.0.0"
@@ -45,6 +47,7 @@ class TestMentionsRelationship:
             section="Contributors",
             chunk_id=chunk_id,
             created_at=now,
+            updated_at=now,
             source_timestamp=source_time,
             source="github_reader",
             confidence=0.95,
@@ -67,6 +70,7 @@ class TestMentionsRelationship:
                 section="Introduction",
                 chunk_id=chunk_id,
                 created_at=now,
+                updated_at=now,
                 source="job_12345",
                 extractor_version="1.0.0",
             )
@@ -84,6 +88,7 @@ class TestMentionsRelationship:
                 span="Test text",
                 chunk_id=chunk_id,
                 created_at=now,
+                updated_at=now,
                 source="job_12345",
                 extractor_version="1.0.0",
             )
@@ -100,6 +105,7 @@ class TestMentionsRelationship:
                 span="Test text",
                 section="Introduction",
                 created_at=now,
+                updated_at=now,
                 source="job_12345",
                 extractor_version="1.0.0",
             )
@@ -117,6 +123,7 @@ class TestMentionsRelationship:
             section="Body",
             chunk_id=chunk_id,
             created_at=now,
+            updated_at=now,
             source="job_12345",
             extractor_version="1.0.0",
         )

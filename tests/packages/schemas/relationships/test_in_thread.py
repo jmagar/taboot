@@ -17,11 +17,13 @@ class TestInThreadRelationship:
 
         rel = InThreadRelationship(
             created_at=now,
+            updated_at=now,
             source="gmail_reader",
             extractor_version="1.0.0",
         )
 
         assert rel.created_at == now
+        assert rel.updated_at == now
         assert rel.source == "gmail_reader"
         assert rel.confidence == 1.0
         assert rel.extractor_version == "1.0.0"
@@ -33,6 +35,7 @@ class TestInThreadRelationship:
 
         rel = InThreadRelationship(
             created_at=now,
+            updated_at=now,
             source_timestamp=source_time,
             source="gmail_reader",
             confidence=0.99,
@@ -46,6 +49,7 @@ class TestInThreadRelationship:
         """Test InThreadRelationship validation fails without created_at."""
         with pytest.raises(ValidationError) as exc_info:
             InThreadRelationship(
+                updated_at=datetime.now(UTC),
                 source="gmail_reader",
                 extractor_version="1.0.0",
             )
@@ -60,6 +64,7 @@ class TestInThreadRelationship:
         with pytest.raises(ValidationError) as exc_info:
             InThreadRelationship(
                 created_at=now,
+                updated_at=now,
                 extractor_version="1.0.0",
             )
 
@@ -73,6 +78,7 @@ class TestInThreadRelationship:
         with pytest.raises(ValidationError) as exc_info:
             InThreadRelationship(
                 created_at=now,
+                updated_at=now,
                 source="gmail_reader",
             )
 
@@ -85,6 +91,7 @@ class TestInThreadRelationship:
 
         rel = InThreadRelationship(
             created_at=now,
+            updated_at=now,
             source="gmail_reader",
             extractor_version="1.0.0",
         )

@@ -93,6 +93,7 @@ class RelationshipWriter:
                 # Build base properties (common to all relationships)
                 props = {
                     "created_at": rel_instance.created_at.isoformat(),
+                    "updated_at": rel_instance.updated_at.isoformat(),
                     "source_timestamp": (
                         rel_instance.source_timestamp.isoformat()
                         if rel_instance.source_timestamp
@@ -107,6 +108,7 @@ class RelationshipWriter:
                 for field_name, field_value in rel_instance.model_dump().items():
                     if field_name not in (
                         "created_at",
+                        "updated_at",
                         "source_timestamp",
                         "source",
                         "confidence",

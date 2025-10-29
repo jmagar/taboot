@@ -379,3 +379,8 @@ class TestThreadEntity:
         assert thread.subject == "Project Discussion"
         assert thread.message_count == 3
         assert thread.labels == ["INBOX"]
+
+    def test_thread_validate_extraction_tier_direct(self) -> None:
+        """Ensure the extraction_tier validator raises for unsupported values."""
+        with pytest.raises(ValueError, match="extraction_tier"):
+            Thread.validate_extraction_tier("Z")

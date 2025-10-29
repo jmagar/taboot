@@ -16,6 +16,7 @@ class TestComposeProjectEntity:
         now = datetime.now(UTC)
         project = ComposeProject(
             name="my-project",
+            file_path="/tmp/docker-compose.yml",
             created_at=now,
             updated_at=now,
             extraction_tier="A",
@@ -26,7 +27,7 @@ class TestComposeProjectEntity:
 
         assert project.name == "my-project"
         assert project.version is None
-        assert project.file_path is None
+        assert project.file_path == "/tmp/docker-compose.yml"
 
     def test_compose_project_full_valid(self) -> None:
         """Test ComposeProject with all fields populated."""
@@ -63,6 +64,7 @@ class TestComposeProjectEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("name",) for e in errors)
+        assert any(e["loc"] == ("file_path",) for e in errors)
 
     def test_compose_project_serialization(self) -> None:
         """Test ComposeProject can be serialized to dict."""
@@ -70,6 +72,7 @@ class TestComposeProjectEntity:
         project = ComposeProject(
             name="test-project",
             version="3.8",
+            file_path="/tmp/docker-compose.yml",
             created_at=now,
             updated_at=now,
             extraction_tier="A",
@@ -81,3 +84,4 @@ class TestComposeProjectEntity:
         data = project.model_dump()
         assert data["name"] == "test-project"
         assert data["version"] == "3.8"
+        assert data["file_path"] == "/tmp/docker-compose.yml"

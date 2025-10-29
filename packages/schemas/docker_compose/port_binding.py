@@ -33,6 +33,18 @@ class PortBinding(BaseModel):
     """
 
     # Port mapping fields
+    compose_file_path: str = Field(
+        ...,
+        min_length=1,
+        description="Path to the compose file that declared this port binding",
+        examples=["/home/user/docker-compose.yml", "./compose.yaml"],
+    )
+    service_name: str = Field(
+        ...,
+        min_length=1,
+        description="Service name this port binding is associated with",
+        examples=["web", "api"],
+    )
     host_ip: str | None = Field(
         None,
         description="Host IP to bind to (0.0.0.0 = all interfaces)",

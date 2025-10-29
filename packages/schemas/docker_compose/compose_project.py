@@ -45,8 +45,9 @@ class ComposeProject(BaseModel):
         description="Docker Compose file format version",
         examples=["3.8", "3.9", "2.4"],
     )
-    file_path: str | None = Field(
-        None,
+    file_path: str = Field(
+        ...,
+        min_length=1,
         description="Path to the Docker Compose file",
         examples=["/opt/docker-compose.yml", "./compose.yaml"],
     )

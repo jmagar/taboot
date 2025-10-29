@@ -16,6 +16,7 @@ class TestComposeServiceEntity:
         now = datetime.now(UTC)
         service = ComposeService(
             name="web",
+            compose_file_path="/tmp/docker-compose.yml",
             created_at=now,
             updated_at=now,
             extraction_tier="A",
@@ -25,6 +26,7 @@ class TestComposeServiceEntity:
         )
 
         assert service.name == "web"
+        assert service.compose_file_path == "/tmp/docker-compose.yml"
         assert service.image is None
         assert service.command is None
         assert service.restart is None
@@ -34,6 +36,7 @@ class TestComposeServiceEntity:
         now = datetime.now(UTC)
         service = ComposeService(
             name="api",
+            compose_file_path="/tmp/docker-compose.yml",
             image="nginx:alpine",
             command="nginx -g 'daemon off;'",
             entrypoint="/docker-entrypoint.sh",
@@ -52,6 +55,7 @@ class TestComposeServiceEntity:
         )
 
         assert service.name == "api"
+        assert service.compose_file_path == "/tmp/docker-compose.yml"
         assert service.image == "nginx:alpine"
         assert service.command == "nginx -g 'daemon off;'"
         assert service.cpus == 2.0
@@ -73,12 +77,14 @@ class TestComposeServiceEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("name",) for e in errors)
+        assert any(e["loc"] == ("compose_file_path",) for e in errors)
 
     def test_compose_service_serialization(self) -> None:
         """Test ComposeService can be serialized to dict."""
         now = datetime.now(UTC)
         service = ComposeService(
             name="db",
+            compose_file_path="/tmp/docker-compose.yml",
             image="postgres:14",
             restart="always",
             created_at=now,
@@ -93,3 +99,4 @@ class TestComposeServiceEntity:
         assert data["name"] == "db"
         assert data["image"] == "postgres:14"
         assert data["restart"] == "always"
+        assert data["compose_file_path"] == "/tmp/docker-compose.yml"

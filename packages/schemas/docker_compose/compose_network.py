@@ -38,6 +38,12 @@ class ComposeNetwork(BaseModel):
         description="Network name (key in networks block)",
         examples=["backend", "frontend", "database-net", "default"],
     )
+    compose_file_path: str = Field(
+        ...,
+        min_length=1,
+        description="Path to the compose file that declared this network",
+        examples=["/home/user/docker-compose.yml", "./compose.yaml"],
+    )
 
     # Network configuration (optional)
     driver: str | None = Field(

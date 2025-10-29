@@ -38,6 +38,12 @@ class ComposeVolume(BaseModel):
         description="Volume name (key in volumes block)",
         examples=["data", "postgres-data", "app-logs", "config"],
     )
+    compose_file_path: str = Field(
+        ...,
+        min_length=1,
+        description="Path to the compose file that declared this volume",
+        examples=["/home/user/docker-compose.yml", "./compose.yaml"],
+    )
 
     # Volume configuration (optional)
     driver: str | None = Field(

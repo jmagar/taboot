@@ -19,12 +19,14 @@ class TestSentRelationship:
         rel = SentRelationship(
             sent_at=sent_time,
             created_at=now,
+            updated_at=now,
             source="gmail_reader",
             extractor_version="1.0.0",
         )
 
         assert rel.sent_at == sent_time
         assert rel.created_at == now
+        assert rel.updated_at == now
         assert rel.source == "gmail_reader"
         assert rel.confidence == 1.0
         assert rel.extractor_version == "1.0.0"
@@ -38,6 +40,7 @@ class TestSentRelationship:
         rel = SentRelationship(
             sent_at=sent_time,
             created_at=now,
+            updated_at=now,
             source_timestamp=source_time,
             source="gmail_reader",
             confidence=0.99,
@@ -56,6 +59,7 @@ class TestSentRelationship:
         rel = SentRelationship(
             sent_at=sent_time,
             created_at=now,
+            updated_at=now,
             source="gmail_reader",
             extractor_version="1.0.0",
         )
@@ -72,6 +76,7 @@ class TestSentRelationship:
         with pytest.raises(ValidationError) as exc_info:
             SentRelationship(
                 created_at=now,
+                updated_at=now,
                 source="gmail_reader",
                 extractor_version="1.0.0",
             )
@@ -86,6 +91,7 @@ class TestSentRelationship:
         with pytest.raises(ValidationError) as exc_info:
             SentRelationship(
                 sent_at=sent_time,
+                updated_at=datetime.now(UTC),
                 source="gmail_reader",
                 extractor_version="1.0.0",
             )
@@ -102,6 +108,7 @@ class TestSentRelationship:
             SentRelationship(
                 sent_at=sent_time,
                 created_at=now,
+                updated_at=now,
                 extractor_version="1.0.0",
             )
 
@@ -117,6 +124,7 @@ class TestSentRelationship:
             SentRelationship(
                 sent_at=sent_time,
                 created_at=now,
+                updated_at=now,
                 source="gmail_reader",
             )
 
@@ -131,6 +139,7 @@ class TestSentRelationship:
         rel = SentRelationship(
             sent_at=sent_time,
             created_at=now,
+            updated_at=now,
             source="gmail_reader",
             extractor_version="1.0.0",
         )

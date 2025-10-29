@@ -99,13 +99,13 @@ class PersonWriter:
                     query = """
                     UNWIND $rows AS row
                     MERGE (p:Person {email: row.email})
+                    ON CREATE SET p.created_at = row.created_at
                     SET p.name = row.name,
                         p.role = row.role,
                         p.bio = row.bio,
                         p.github_username = row.github_username,
                         p.reddit_username = row.reddit_username,
                         p.youtube_channel = row.youtube_channel,
-                        p.created_at = row.created_at,
                         p.updated_at = row.updated_at,
                         p.source_timestamp = row.source_timestamp,
                         p.extraction_tier = row.extraction_tier,

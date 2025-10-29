@@ -15,6 +15,8 @@ class TestImageDetailsEntity:
         """Test ImageDetails with only required fields."""
         now = datetime.now(UTC)
         image = ImageDetails(
+            compose_file_path="/tmp/docker-compose.yml",
+            service_name="web",
             image_name="nginx",
             created_at=now,
             updated_at=now,
@@ -25,6 +27,8 @@ class TestImageDetailsEntity:
         )
 
         assert image.image_name == "nginx"
+        assert image.compose_file_path == "/tmp/docker-compose.yml"
+        assert image.service_name == "web"
         assert image.tag is None
         assert image.registry is None
 
@@ -32,6 +36,8 @@ class TestImageDetailsEntity:
         """Test ImageDetails with all fields populated."""
         now = datetime.now(UTC)
         image = ImageDetails(
+            compose_file_path="/tmp/docker-compose.yml",
+            service_name="api",
             image_name="myapp",
             tag="1.2.3",
             registry="gcr.io/myproject",
@@ -48,6 +54,8 @@ class TestImageDetailsEntity:
         assert image.tag == "1.2.3"
         assert image.registry == "gcr.io/myproject"
         assert image.digest == "sha256:abcdef123456"
+        assert image.compose_file_path == "/tmp/docker-compose.yml"
+        assert image.service_name == "api"
 
     def test_image_details_missing_required_name(self) -> None:
         """Test ImageDetails validation fails without image_name."""
@@ -65,3 +73,5 @@ class TestImageDetailsEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("image_name",) for e in errors)
+        assert any(e["loc"] == ("compose_file_path",) for e in errors)
+        assert any(e["loc"] == ("service_name",) for e in errors)

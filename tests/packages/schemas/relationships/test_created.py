@@ -17,11 +17,13 @@ class TestCreatedRelationship:
 
         rel = CreatedRelationship(
             created_at=now,
+            updated_at=now,
             source="github_reader",
             extractor_version="1.0.0",
         )
 
         assert rel.created_at == now
+        assert rel.updated_at == now
         assert rel.source == "github_reader"
         assert rel.confidence == 1.0
         assert rel.extractor_version == "1.0.0"
@@ -33,6 +35,7 @@ class TestCreatedRelationship:
 
         rel = CreatedRelationship(
             created_at=now,
+            updated_at=now,
             source_timestamp=source_time,
             source="github_reader",
             confidence=0.95,
@@ -46,6 +49,7 @@ class TestCreatedRelationship:
         """Test CreatedRelationship validation fails without created_at."""
         with pytest.raises(ValidationError) as exc_info:
             CreatedRelationship(
+                updated_at=datetime.now(UTC),
                 source="github_reader",
                 extractor_version="1.0.0",
             )
@@ -60,6 +64,7 @@ class TestCreatedRelationship:
         with pytest.raises(ValidationError) as exc_info:
             CreatedRelationship(
                 created_at=now,
+                updated_at=now,
                 extractor_version="1.0.0",
             )
 
@@ -73,6 +78,7 @@ class TestCreatedRelationship:
         with pytest.raises(ValidationError) as exc_info:
             CreatedRelationship(
                 created_at=now,
+                updated_at=now,
                 source="github_reader",
             )
 
@@ -85,6 +91,7 @@ class TestCreatedRelationship:
 
         rel = CreatedRelationship(
             created_at=now,
+            updated_at=now,
             source="github_reader",
             extractor_version="1.0.0",
         )

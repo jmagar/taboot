@@ -24,11 +24,13 @@ class TestBaseRelationship:
         now = datetime.now(UTC)
         rel = BaseRelationship(
             created_at=now,
+            updated_at=now,
             source="job_12345",
             extractor_version="1.0.0",
         )
 
         assert rel.created_at == now
+        assert rel.updated_at == now
         assert rel.source_timestamp is None
         assert rel.source == "job_12345"
         assert rel.confidence == 1.0  # Default value
@@ -41,6 +43,7 @@ class TestBaseRelationship:
 
         rel = BaseRelationship(
             created_at=now,
+            updated_at=now,
             source_timestamp=source_time,
             source="github_reader",
             confidence=0.85,
@@ -48,6 +51,7 @@ class TestBaseRelationship:
         )
 
         assert rel.created_at == now
+        assert rel.updated_at == now
         assert rel.source_timestamp == source_time
         assert rel.source == "github_reader"
         assert rel.confidence == 0.85
@@ -57,6 +61,7 @@ class TestBaseRelationship:
         """Test BaseRelationship validation fails without created_at."""
         with pytest.raises(ValidationError) as exc_info:
             BaseRelationship(
+                updated_at=datetime.now(UTC),
                 source="job_12345",
                 extractor_version="1.0.0",
             )
@@ -71,6 +76,7 @@ class TestBaseRelationship:
         with pytest.raises(ValidationError) as exc_info:
             BaseRelationship(
                 created_at=now,
+                updated_at=now,
                 extractor_version="1.0.0",
             )
 
@@ -84,11 +90,26 @@ class TestBaseRelationship:
         with pytest.raises(ValidationError) as exc_info:
             BaseRelationship(
                 created_at=now,
+                updated_at=now,
                 source="job_12345",
             )
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("extractor_version",) for e in errors)
+
+    def test_base_relationship_missing_required_updated_at(self) -> None:
+        """Test BaseRelationship validation fails without updated_at."""
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            BaseRelationship(
+                created_at=now,
+                source="job_12345",
+                extractor_version="1.0.0",
+            )
+
+        errors = exc_info.value.errors()
+        assert any(e["loc"] == ("updated_at",) for e in errors)
 
     def test_base_relationship_confidence_validation_below_zero(self) -> None:
         """Test confidence must be >= 0.0."""
@@ -97,6 +118,7 @@ class TestBaseRelationship:
         with pytest.raises(ValidationError) as exc_info:
             BaseRelationship(
                 created_at=now,
+                updated_at=now,
                 source="job_12345",
                 confidence=-0.1,
                 extractor_version="1.0.0",
@@ -112,6 +134,7 @@ class TestBaseRelationship:
         with pytest.raises(ValidationError) as exc_info:
             BaseRelationship(
                 created_at=now,
+                updated_at=now,
                 source="job_12345",
                 confidence=1.1,
                 extractor_version="1.0.0",
@@ -125,6 +148,7 @@ class TestBaseRelationship:
         now = datetime.now(UTC)
         rel = BaseRelationship(
             created_at=now,
+            updated_at=now,
             source="job_12345",
             extractor_version="1.0.0",
         )
@@ -136,6 +160,7 @@ class TestBaseRelationship:
         now = datetime.now(UTC)
         rel = BaseRelationship(
             created_at=now,
+            updated_at=now,
             source="job_12345",
             confidence=0.90,
             extractor_version="1.0.0",
@@ -144,6 +169,7 @@ class TestBaseRelationship:
         data = rel.model_dump()
         assert data["source"] == "job_12345"
         assert data["confidence"] == 0.90
+        assert data["updated_at"] == now
         assert data["extractor_version"] == "1.0.0"
 
     def test_base_relationship_deserialization(self) -> None:
@@ -151,6 +177,7 @@ class TestBaseRelationship:
         now = datetime.now(UTC)
         data = {
             "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
             "source": "job_12345",
             "confidence": 0.90,
             "extractor_version": "1.0.0",
@@ -159,4 +186,5 @@ class TestBaseRelationship:
         rel = BaseRelationship.model_validate(data)
         assert rel.source == "job_12345"
         assert rel.confidence == 0.90
+        assert rel.updated_at == now
         assert rel.extractor_version == "1.0.0"

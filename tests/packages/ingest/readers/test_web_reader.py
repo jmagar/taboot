@@ -8,83 +8,9 @@ import pytest
 from llama_index.core import Document
 
 
-class TestParameterNormalization:
-    """Tests for snake_case to camelCase parameter normalization."""
-
-    def test_normalize_firecrawl_params_converts_exclude_paths(self) -> None:
-        """Test that exclude_paths is converted to excludePaths."""
-        from packages.ingest.readers.web import _normalize_firecrawl_params
-
-        params = {"exclude_paths": ["^/de/.*$", "^/fr/.*$"]}
-        normalized = _normalize_firecrawl_params(params)
-
-        assert "excludePaths" in normalized
-        assert normalized["excludePaths"] == ["^/de/.*$", "^/fr/.*$"]
-        assert "exclude_paths" not in normalized
-
-    def test_normalize_firecrawl_params_converts_include_paths(self) -> None:
-        """Test that include_paths is converted to includePaths."""
-        from packages.ingest.readers.web import _normalize_firecrawl_params
-
-        params = {"include_paths": ["^/en/.*$", "^/docs/.*$"]}
-        normalized = _normalize_firecrawl_params(params)
-
-        assert "includePaths" in normalized
-        assert normalized["includePaths"] == ["^/en/.*$", "^/docs/.*$"]
-        assert "include_paths" not in normalized
-
-    def test_normalize_firecrawl_params_converts_scrape_options(self) -> None:
-        """Test that scrape_options is converted to scrapeOptions."""
-        from packages.ingest.readers.web import _normalize_firecrawl_params
-
-        params = {"scrape_options": {"formats": ["markdown"]}}
-        normalized = _normalize_firecrawl_params(params)
-
-        assert "scrapeOptions" in normalized
-        assert normalized["scrapeOptions"] == {"formats": ["markdown"]}
-        assert "scrape_options" not in normalized
-
-    def test_normalize_firecrawl_params_preserves_camel_case(self) -> None:
-        """Test that already camelCase params are preserved."""
-        from packages.ingest.readers.web import _normalize_firecrawl_params
-
-        params = {"limit": 10, "integration": "llamaindex"}
-        normalized = _normalize_firecrawl_params(params)
-
-        assert normalized["limit"] == 10
-        assert normalized["integration"] == "llamaindex"
-
-    def test_normalize_firecrawl_params_handles_mixed_case(self) -> None:
-        """Test normalization with both snake_case and camelCase params."""
-        from packages.ingest.readers.web import _normalize_firecrawl_params
-
-        params = {
-            "exclude_paths": ["^/de/.*$"],
-            "limit": 10,
-            "scrape_options": {"formats": ["markdown"]},
-        }
-        normalized = _normalize_firecrawl_params(params)
-
-        assert "excludePaths" in normalized
-        assert "limit" in normalized
-        assert "scrapeOptions" in normalized
-        assert "exclude_paths" not in normalized
-        assert "scrape_options" not in normalized
-
-    def test_to_camel_case_basic(self) -> None:
-        """Test basic snake_case to camelCase conversion."""
-        from packages.ingest.readers.web import _to_camel_case
-
-        assert _to_camel_case("exclude_paths") == "excludePaths"
-        assert _to_camel_case("include_paths") == "includePaths"
-        assert _to_camel_case("scrape_options") == "scrapeOptions"
-
-    def test_to_camel_case_single_word(self) -> None:
-        """Test that single words remain unchanged."""
-        from packages.ingest.readers.web import _to_camel_case
-
-        assert _to_camel_case("limit") == "limit"
-        assert _to_camel_case("integration") == "integration"
+# NOTE: TestParameterNormalization class removed
+# The Firecrawl Python SDK expects snake_case parameters (exclude_paths, include_paths)
+# and handles conversion to the HTTP API format internally. No normalization needed in WebReader.
 
 
 class TestWebReader:
@@ -195,9 +121,9 @@ class TestWebReader:
             assert "en-US" in location["languages"], "en-US should be in languages"
 
     def test_web_reader_passes_exclude_paths_to_firecrawl(self) -> None:
-        """Test that WebReader passes excludePaths parameter to Firecrawl in camelCase.
+        """Test that WebReader passes exclude_paths parameter to Firecrawl in camelCase.
 
-        Firecrawl v2 expects camelCase (excludePaths), not snake_case (exclude_paths).
+        Firecrawl v2 SDK expects snake_case (excludePaths) (SDK handles conversion).
         Patterns match against URL pathname only (not full URL).
         """
         from unittest.mock import MagicMock, patch
@@ -215,22 +141,19 @@ class TestWebReader:
             # Call load_data
             web_reader.load_data("https://docs.anthropic.com/en/docs", limit=5)
 
-            # Verify excludePaths parameter was passed in camelCase
+            # Verify exclude_paths parameter was passed in camelCase
             call_kwargs = mock_reader_class.call_args[1]
             params = call_kwargs["params"]
 
             # Must be camelCase for Firecrawl v2 API
-            assert "excludePaths" in params, "excludePaths (camelCase) should be in params"
-            assert isinstance(params["excludePaths"], list), "excludePaths should be a list"
-            assert len(params["excludePaths"]) > 0, "excludePaths should not be empty by default"
-
-            # Verify snake_case was NOT used
-            assert "exclude_paths" not in params, "exclude_paths (snake_case) should be normalized to excludePaths"
+            assert "exclude_paths" in params, "exclude_paths (snake_case) should be in params"
+            assert isinstance(params["exclude_paths"], list), "excludePaths should be a list"
+            assert len(params["exclude_paths"]) > 0, "excludePaths should not be empty by default"
 
     def test_web_reader_passes_include_paths_to_firecrawl(self) -> None:
-        """Test that WebReader passes includePaths parameter in camelCase when configured.
+        """Test that WebReader passes include_paths parameter in camelCase when configured.
 
-        Firecrawl v2 expects camelCase (includePaths), not snake_case (include_paths).
+        Firecrawl v2 SDK expects snake_case (includePaths) (SDK handles conversion).
         """
         from unittest.mock import MagicMock, Mock, patch
 
@@ -257,18 +180,15 @@ class TestWebReader:
 
                 web_reader.load_data("https://docs.anthropic.com/en/docs", limit=5)
 
-                # Verify includePaths parameter (camelCase)
+                # Verify include_paths parameter (camelCase)
                 call_kwargs = mock_reader_class.call_args[1]
                 params = call_kwargs["params"]
 
-                assert "includePaths" in params, "includePaths (camelCase) should be in params"
-                assert isinstance(params["includePaths"], list), "includePaths should be a list"
-                assert len(params["includePaths"]) == 2, "Should have 2 include patterns"
-                assert "^.*/en/.*$" in params["includePaths"]
-                assert "^.*/docs/.*$" in params["includePaths"]
-
-                # Verify snake_case was NOT used
-                assert "include_paths" not in params, "include_paths (snake_case) should be normalized to includePaths"
+                assert "include_paths" in params, "include_paths (snake_case) should be in params"
+                assert isinstance(params["include_paths"], list), "includePaths should be a list"
+                assert len(params["include_paths"]) == 2, "Should have 2 include patterns"
+                assert "^.*/en/.*$" in params["include_paths"]
+                assert "^.*/docs/.*$" in params["include_paths"]
 
     def test_web_reader_exclude_paths_defaults_to_common_languages(self) -> None:
         """Test that excludePaths defaults block common non-English languages.
@@ -290,7 +210,7 @@ class TestWebReader:
 
             call_kwargs = mock_reader_class.call_args[1]
             params = call_kwargs["params"]
-            exclude_patterns = params.get("excludePaths", [])  # Changed to camelCase
+            exclude_patterns = params.get("exclude_paths", [])  # Changed to camelCase
 
             # Verify pattern blocks common languages
             assert len(exclude_patterns) > 0, "Should have default exclude patterns"
@@ -338,14 +258,14 @@ class TestWebReader:
                 params = call_kwargs["params"]
 
                 # Verify parsing with whitespace handling (camelCase keys)
-                assert len(params["includePaths"]) == 3, "Should parse 3 include patterns"
-                assert "^.*/en/.*$" in params["includePaths"]
-                assert "^.*/docs/.*$" in params["includePaths"]
-                assert "^.*/api/.*$" in params["includePaths"]
+                assert len(params["include_paths"]) == 3, "Should parse 3 include patterns"
+                assert "^.*/en/.*$" in params["include_paths"]
+                assert "^.*/docs/.*$" in params["include_paths"]
+                assert "^.*/api/.*$" in params["include_paths"]
 
-                assert len(params["excludePaths"]) == 2, "Should parse 2 exclude patterns"
-                assert "^.*/de/.*$" in params["excludePaths"]
-                assert "^.*/fr/.*$" in params["excludePaths"]
+                assert len(params["exclude_paths"]) == 2, "Should parse 2 exclude patterns"
+                assert "^.*/de/.*$" in params["exclude_paths"]
+                assert "^.*/fr/.*$" in params["exclude_paths"]
 
     def test_web_reader_empty_patterns_not_included(self) -> None:
         """Test that empty pattern strings don't result in empty list items.
@@ -360,8 +280,8 @@ class TestWebReader:
             mock_cfg = Mock()
             mock_cfg.firecrawl_default_country = "US"
             mock_cfg.firecrawl_default_languages = "en-US"
-            mock_cfg.firecrawl_include_paths = "^/en/.*$,,"  # Trailing commas
-            mock_cfg.firecrawl_exclude_paths = ""  # Empty string
+            mock_cfg.firecrawl_include_paths = ""  # Test empty patterns handling
+            mock_cfg.firecrawl_exclude_paths = "^.*/(de|fr)/.*$,,"  # Trailing commas
             mock_config.return_value = mock_cfg
 
             with patch("packages.ingest.readers.web.FireCrawlWebReader") as mock_reader_class:
@@ -373,19 +293,20 @@ class TestWebReader:
                     firecrawl_url="http://test:3002", firecrawl_api_key="test-key"
                 )
 
-                web_reader.load_data("https://example.com", limit=5)
+                # URL won't be filtered since we're only testing empty pattern handling
+                web_reader.load_data("https://example.com/en/docs", limit=5)
 
                 call_kwargs = mock_reader_class.call_args[1]
                 params = call_kwargs["params"]
 
-                # Verify no empty strings in lists (camelCase keys)
-                include_paths = params.get("includePaths", [])
-                for pattern in include_paths:
-                    assert pattern.strip() != "", "No empty patterns should be in includePaths"
+                # Verify no empty strings in lists (snake_case keys from SDK)
+                exclude_paths = params.get("exclude_paths", [])
+                for pattern in exclude_paths:
+                    assert pattern.strip() != "", "No empty patterns should be in exclude_paths"
 
-                # Verify empty config doesn't add key (camelCase)
-                assert "excludePaths" not in params or params["excludePaths"] == [], (
-                    "Empty excludePaths config should not add parameter"
+                # Verify empty config doesn't add key (snake_case)
+                assert "include_paths" not in params or params["include_paths"] == [], (
+                    "Empty include_paths config should not add parameter"
                 )
 
     def test_web_reader_rejects_excluded_url_preemptively(self) -> None:

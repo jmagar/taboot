@@ -15,6 +15,8 @@ class TestBuildContextEntity:
         """Test BuildContext with only required fields."""
         now = datetime.now(UTC)
         build = BuildContext(
+            compose_file_path="/tmp/docker-compose.yml",
+            service_name="web",
             context_path=".",
             created_at=now,
             updated_at=now,
@@ -25,6 +27,8 @@ class TestBuildContextEntity:
         )
 
         assert build.context_path == "."
+        assert build.compose_file_path == "/tmp/docker-compose.yml"
+        assert build.service_name == "web"
         assert build.dockerfile is None
         assert build.target is None
 
@@ -32,6 +36,8 @@ class TestBuildContextEntity:
         """Test BuildContext with all fields populated."""
         now = datetime.now(UTC)
         build = BuildContext(
+            compose_file_path="/tmp/docker-compose.yml",
+            service_name="api",
             context_path="./api",
             dockerfile="Dockerfile.prod",
             target="production",
@@ -48,6 +54,8 @@ class TestBuildContextEntity:
         assert build.dockerfile == "Dockerfile.prod"
         assert build.target == "production"
         assert build.args == {"NODE_ENV": "production", "VERSION": "1.2.3"}
+        assert build.compose_file_path == "/tmp/docker-compose.yml"
+        assert build.service_name == "api"
 
     def test_build_context_missing_required_context_path(self) -> None:
         """Test BuildContext validation fails without context_path."""
@@ -65,3 +73,5 @@ class TestBuildContextEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("context_path",) for e in errors)
+        assert any(e["loc"] == ("compose_file_path",) for e in errors)
+        assert any(e["loc"] == ("service_name",) for e in errors)

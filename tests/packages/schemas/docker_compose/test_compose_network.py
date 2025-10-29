@@ -16,6 +16,7 @@ class TestComposeNetworkEntity:
         now = datetime.now(UTC)
         network = ComposeNetwork(
             name="backend",
+            compose_file_path="/tmp/docker-compose.yml",
             created_at=now,
             updated_at=now,
             extraction_tier="A",
@@ -25,6 +26,7 @@ class TestComposeNetworkEntity:
         )
 
         assert network.name == "backend"
+        assert network.compose_file_path == "/tmp/docker-compose.yml"
         assert network.driver is None
         assert network.external is None
 
@@ -33,6 +35,7 @@ class TestComposeNetworkEntity:
         now = datetime.now(UTC)
         network = ComposeNetwork(
             name="frontend",
+            compose_file_path="/tmp/docker-compose.yml",
             driver="bridge",
             external=False,
             enable_ipv6=True,
@@ -47,6 +50,7 @@ class TestComposeNetworkEntity:
         )
 
         assert network.name == "frontend"
+        assert network.compose_file_path == "/tmp/docker-compose.yml"
         assert network.driver == "bridge"
         assert network.enable_ipv6 is True
 
@@ -66,3 +70,4 @@ class TestComposeNetworkEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("name",) for e in errors)
+        assert any(e["loc"] == ("compose_file_path",) for e in errors)

@@ -22,6 +22,7 @@ class MentionsRelationship(BaseRelationship):
         ...     section="Introduction",
         ...     chunk_id=uuid4(),
         ...     created_at=datetime.now(UTC),
+        ...     updated_at=datetime.now(UTC),
         ...     source="job_12345",
         ...     extractor_version="1.0.0",
         ... )

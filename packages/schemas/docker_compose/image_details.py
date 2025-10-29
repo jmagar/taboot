@@ -33,6 +33,18 @@ class ImageDetails(BaseModel):
     """
 
     # Image fields
+    compose_file_path: str = Field(
+        ...,
+        min_length=1,
+        description="Path to the compose file that declared this image",
+        examples=["/home/user/docker-compose.yml", "./compose.yaml"],
+    )
+    service_name: str = Field(
+        ...,
+        min_length=1,
+        description="Service name that uses this image",
+        examples=["web", "api"],
+    )
     image_name: str = Field(
         ...,
         min_length=1,

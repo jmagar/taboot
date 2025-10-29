@@ -15,6 +15,7 @@ class TestServiceDependencyEntity:
         """Test ServiceDependency with only required fields."""
         now = datetime.now(UTC)
         dep = ServiceDependency(
+            compose_file_path="/tmp/docker-compose.yml",
             source_service="web",
             target_service="db",
             created_at=now,
@@ -28,11 +29,13 @@ class TestServiceDependencyEntity:
         assert dep.source_service == "web"
         assert dep.target_service == "db"
         assert dep.condition is None
+        assert dep.compose_file_path == "/tmp/docker-compose.yml"
 
     def test_service_dependency_with_condition(self) -> None:
         """Test ServiceDependency with condition."""
         now = datetime.now(UTC)
         dep = ServiceDependency(
+            compose_file_path="/tmp/docker-compose.yml",
             source_service="api",
             target_service="postgres",
             condition="service_healthy",
@@ -45,6 +48,7 @@ class TestServiceDependencyEntity:
         )
 
         assert dep.condition == "service_healthy"
+        assert dep.compose_file_path == "/tmp/docker-compose.yml"
 
     def test_service_dependency_missing_required_source(self) -> None:
         """Test ServiceDependency validation fails without source_service."""
@@ -63,3 +67,4 @@ class TestServiceDependencyEntity:
 
         errors = exc_info.value.errors()
         assert any(e["loc"] == ("source_service",) for e in errors)
+        assert any(e["loc"] == ("compose_file_path",) for e in errors)

@@ -409,3 +409,13 @@ class TestDocumentEntity:
         assert doc.source_type == "web"
         assert doc.content_hash == "abc123def456"
         assert doc.extraction_state == "pending"
+
+    def test_document_validate_extraction_state_direct(self) -> None:
+        """Ensure the extraction_state validator raises for invalid input."""
+        with pytest.raises(ValueError, match="extraction_state"):
+            Document.validate_extraction_state("bogus")
+
+    def test_document_validate_extraction_tier_direct(self) -> None:
+        """Ensure the extraction_tier validator raises for invalid input."""
+        with pytest.raises(ValueError, match="extraction_tier"):
+            Document.validate_extraction_tier("Z")

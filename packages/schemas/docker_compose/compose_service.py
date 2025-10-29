@@ -40,6 +40,12 @@ class ComposeService(BaseModel):
         description="Service name (key in services block)",
         examples=["web", "api", "db", "redis", "worker"],
     )
+    compose_file_path: str = Field(
+        ...,
+        min_length=1,
+        description="Path to the compose file that defined this service",
+        examples=["/home/user/project/docker-compose.yml", "./compose.yaml"],
+    )
 
     # Container configuration (optional)
     image: str | None = Field(

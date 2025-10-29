@@ -123,6 +123,7 @@ def test_write_works_at_relationship(
         start_date=datetime(2020, 1, 1, tzinfo=UTC),
         end_date=None,
         created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         source="github_reader",
         confidence=1.0,
         extractor_version="1.0.0",
@@ -169,6 +170,7 @@ def test_write_mentions_relationship(
         section="Introduction",
         chunk_id=uuid4(),
         created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         source="job_123",
         confidence=0.95,
         extractor_version="1.0.0",
@@ -225,6 +227,7 @@ def test_write_routes_to_relationship(
         tls=True,
         auth_enabled=True,
         created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         source="swag_reader",
         confidence=1.0,
         extractor_version="1.0.0",
@@ -277,6 +280,7 @@ def test_write_depends_on_relationship(
     rel = DependsOnRelationship(
         condition="service_healthy",
         created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         source="docker_compose_reader",
         confidence=1.0,
         extractor_version="1.0.0",
@@ -307,6 +311,7 @@ def test_write_sent_relationship(
     rel = SentRelationship(
         sent_at=datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC),
         created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         source="gmail_reader",
         confidence=1.0,
         extractor_version="1.0.0",
@@ -339,6 +344,7 @@ def test_write_contributes_to_relationship(
         first_commit_at=datetime(2020, 1, 1, tzinfo=UTC),
         last_commit_at=datetime(2024, 1, 1, tzinfo=UTC),
         created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         source="github_reader",
         confidence=1.0,
         extractor_version="1.0.0",
@@ -368,6 +374,7 @@ def test_write_created_relationship(
     """Test writing CREATED relationship."""
     rel = CreatedRelationship(
         created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         source="github_reader",
         confidence=1.0,
         extractor_version="1.0.0",
@@ -397,6 +404,7 @@ def test_write_belongs_to_relationship(
     """Test writing BELONGS_TO relationship."""
     rel = BelongsToRelationship(
         created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         source="github_reader",
         confidence=1.0,
         extractor_version="1.0.0",
@@ -426,6 +434,7 @@ def test_write_in_thread_relationship(
     """Test writing IN_THREAD relationship."""
     rel = InThreadRelationship(
         created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         source="gmail_reader",
         confidence=1.0,
         extractor_version="1.0.0",
@@ -455,6 +464,7 @@ def test_write_located_in_relationship(
     """Test writing LOCATED_IN relationship."""
     rel = LocatedInRelationship(
         created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         source="github_reader",
         confidence=1.0,
         extractor_version="1.0.0",
@@ -498,6 +508,7 @@ def test_write_relationships_batch_2000(
         rel = WorksAtRelationship(
             role=f"Role {i}",
             created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
             source="test",
             confidence=1.0,
             extractor_version="1.0.0",
@@ -534,6 +545,7 @@ def test_write_relationships_idempotent(
     rel = WorksAtRelationship(
         role="Engineer",
         created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         source="test",
         confidence=1.0,
         extractor_version="1.0.0",
@@ -584,6 +596,7 @@ def test_write_mixed_relationship_types(
             "relationship": WorksAtRelationship(
                 role="Engineer",
                 created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
                 source="test",
                 confidence=1.0,
                 extractor_version="1.0.0",
@@ -600,6 +613,7 @@ def test_write_mixed_relationship_types(
             "relationship": SentRelationship(
                 sent_at=datetime.now(UTC),
                 created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
                 source="test",
                 confidence=1.0,
                 extractor_version="1.0.0",
@@ -640,6 +654,7 @@ def test_write_relationships_batch_size_configuration(neo4j_client: Neo4jClient)
         rel = WorksAtRelationship(
             role="Test",
             created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
             source="test",
             confidence=1.0,
             extractor_version="1.0.0",

@@ -58,7 +58,7 @@ This task list implements the complete refactor from domain-specific entities (S
 - [X] All core entity tests pass
 - [X] All relationship schema tests pass
 - [X] Neo4j constraints applied successfully
-- [ ] Coverage ≥95% (pending verification)
+- [X] Coverage ≥95% (verified via `uv run pytest --cov=packages/schemas/core tests/packages/schemas/core`)
 
 ### Core Entity Implementation (RED-GREEN-REFACTOR)
 
@@ -155,10 +155,10 @@ For each entity type:
 ```
 
 **Completion Criteria (per agent)**:
-- [ ] All entity tests pass
-- [ ] Constraints added to neo4j-constraints.cypher
-- [ ] Coverage ≥95%
-- [ ] Progress checkboxes marked
+- [X] All entity tests pass (see `uv run pytest --cov=...` runs for docker_compose, swag, github, gmail, reddit, youtube, tailscale, unifi, web)
+- [X] Constraints added to neo4j-constraints.cypher
+- [X] Coverage ≥95% (all schema suites at ≥96% after direct validator tests)
+- [X] Progress checkboxes marked
 
 ### Agent 1: Docker Compose Entities (12 models)
 
@@ -788,8 +788,8 @@ These features will be implemented after core refactor is complete and stable.
 ## Next Steps
 
 1. ✅ Review this tasks.md document
-2. ⏳ Execute Phase 1 (core schemas) - Sequential
-3. ⏳ Execute Phase 2 (reader-specific schemas) - 8 parallel agents
+2. ✅ Execute Phase 1 (core schemas) - Sequential
+3. ⏳ Execute Phase 2 (reader-specific schemas) - 8 parallel agents (next focus)
 4. ⏳ Execute Phase 3 (graph writers) - 10 parallel agents
 5. ⏳ Execute Phase 4 (reader updates) - 8 parallel agents
 6. ⏳ Execute Phase 5 (use-case updates) - 8 parallel agents

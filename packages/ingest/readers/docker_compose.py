@@ -136,7 +136,9 @@ class DockerComposeReader:
         if isinstance(networks_data, dict):
             for network_name, network_config in networks_data.items():
                 result["compose_networks"].append(
-                    self._create_compose_network_entity(network_name, network_config, now)
+                    self._create_compose_network_entity(
+                        network_name, network_config, file_path, now
+                    )
                 )
 
         # Extract volumes
@@ -144,7 +146,9 @@ class DockerComposeReader:
         if isinstance(volumes_data, dict):
             for volume_name, volume_config in volumes_data.items():
                 result["compose_volumes"].append(
-                    self._create_compose_volume_entity(volume_name, volume_config, now)
+                    self._create_compose_volume_entity(
+                        volume_name, volume_config, file_path, now
+                    )
                 )
 
         # Extract services and related entities
@@ -159,14 +163,16 @@ class DockerComposeReader:
 
             # Extract service entity
             result["compose_services"].append(
-                self._create_compose_service_entity(service_name, service_config, now)
+                self._create_compose_service_entity(
+                    service_name, service_config, file_path, now
+                )
             )
 
             # Extract image details
             image = service_config.get("image", "")
             if image:
                 result["image_details"].append(
-                    self._create_image_details_entity(image, service_name, now)
+                    self._create_image_details_entity(image, service_name, file_path, now)
                 )
 
             # Extract port bindings
@@ -174,7 +180,7 @@ class DockerComposeReader:
             if isinstance(ports, list):
                 for port_mapping in ports:
                     port_binding = self._create_port_binding_entity(
-                        port_mapping, service_name, now
+                        port_mapping, service_name, file_path, now
                     )
                     if port_binding:
                         result["port_bindings"].append(port_binding)
@@ -186,7 +192,7 @@ class DockerComposeReader:
                 for key, value in environment.items():
                     result["environment_variables"].append(
                         self._create_environment_variable_entity(
-                            key, str(value), service_name, now
+                            key, str(value), service_name, file_path, now
                         )
                     )
             elif isinstance(environment, list):
@@ -195,7 +201,9 @@ class DockerComposeReader:
                     if isinstance(env_item, str) and "=" in env_item:
                         key, value = env_item.split("=", 1)
                         result["environment_variables"].append(
-                            self._create_environment_variable_entity(key, value, service_name, now)
+                        self._create_environment_variable_entity(
+                            key, value, service_name, file_path, now
+                        )
                         )
 
             # Extract service dependencies
@@ -205,7 +213,7 @@ class DockerComposeReader:
                 for target in depends_on:
                     result["service_dependencies"].append(
                         self._create_service_dependency_entity(
-                            service_name, target, None, now
+                            service_name, target, None, file_path, now
                         )
                     )
             elif isinstance(depends_on, dict):
@@ -216,7 +224,7 @@ class DockerComposeReader:
                         condition = dep_config.get("condition")
                     result["service_dependencies"].append(
                         self._create_service_dependency_entity(
-                            service_name, target, condition, now
+                            service_name, target, condition, file_path, now
                         )
                     )
 
@@ -224,21 +232,27 @@ class DockerComposeReader:
             healthcheck = service_config.get("healthcheck")
             if healthcheck and isinstance(healthcheck, dict):
                 result["health_checks"].append(
-                    self._create_health_check_entity(healthcheck, service_name, now)
+                    self._create_health_check_entity(
+                        healthcheck, service_name, file_path, now
+                    )
                 )
 
             # Extract build context
             build = service_config.get("build")
             if build:
                 result["build_contexts"].append(
-                    self._create_build_context_entity(build, service_name, now)
+                    self._create_build_context_entity(
+                        build, service_name, file_path, now
+                    )
                 )
 
             # Extract device mappings
             devices = service_config.get("devices", [])
             if isinstance(devices, list):
                 for device_mapping in devices:
-                    device = self._create_device_mapping_entity(device_mapping, service_name, now)
+                    device = self._create_device_mapping_entity(
+                        device_mapping, service_name, file_path, now
+                    )
                     if device:
                         result["device_mappings"].append(device)
 
@@ -303,7 +317,11 @@ class DockerComposeReader:
         }
 
     def _create_compose_service_entity(
-        self, service_name: str, service_config: dict[str, Any], now: datetime
+        self,
+        service_name: str,
+        service_config: dict[str, Any],
+        compose_file_path: str,
+        now: datetime,
     ) -> dict[str, Any]:
         """Create ComposeService entity."""
         # Extract resource limits
@@ -323,6 +341,7 @@ class DockerComposeReader:
 
         return {
             "name": service_name,
+            "compose_file_path": compose_file_path,
             "image": service_config.get("image"),
             "command": service_config.get("command"),
             "entrypoint": service_config.get("entrypoint"),
@@ -336,7 +355,11 @@ class DockerComposeReader:
         }
 
     def _create_compose_network_entity(
-        self, network_name: str, network_config: dict[str, Any] | None, now: datetime
+        self,
+        network_name: str,
+        network_config: dict[str, Any] | None,
+        compose_file_path: str,
+        now: datetime,
     ) -> dict[str, Any]:
         """Create ComposeNetwork entity."""
         if network_config is None:
@@ -355,6 +378,7 @@ class DockerComposeReader:
 
         return {
             "name": network_name,
+            "compose_file_path": compose_file_path,
             "driver": network_config.get("driver"),
             "external": network_config.get("external"),
             "enable_ipv6": network_config.get("enable_ipv6"),
@@ -364,7 +388,11 @@ class DockerComposeReader:
         }
 
     def _create_compose_volume_entity(
-        self, volume_name: str, volume_config: dict[str, Any] | None, now: datetime
+        self,
+        volume_name: str,
+        volume_config: dict[str, Any] | None,
+        compose_file_path: str,
+        now: datetime,
     ) -> dict[str, Any]:
         """Create ComposeVolume entity."""
         if volume_config is None:
@@ -372,6 +400,7 @@ class DockerComposeReader:
 
         return {
             "name": volume_name,
+            "compose_file_path": compose_file_path,
             "driver": volume_config.get("driver"),
             "external": volume_config.get("external"),
             "driver_opts": volume_config.get("driver_opts"),
@@ -379,7 +408,11 @@ class DockerComposeReader:
         }
 
     def _create_port_binding_entity(
-        self, port_mapping: str | int, service_name: str, now: datetime
+        self,
+        port_mapping: str | int,
+        service_name: str,
+        compose_file_path: str,
+        now: datetime,
     ) -> dict[str, Any] | None:
         """Create PortBinding entity."""
         host_ip = None
@@ -465,39 +498,59 @@ class DockerComposeReader:
         if host_port and (host_port < 1 or host_port > 65535):
             raise InvalidPortError(f"Port {host_port} must be between 1 and 65535")
 
+        if host_ip is None:
+            host_ip = "0.0.0.0"
+        if host_port is None:
+            host_port = 0
+        if protocol is None:
+            protocol = "tcp"
+
         return {
+            "compose_file_path": compose_file_path,
+            "service_name": service_name,
             "host_ip": host_ip,
             "host_port": host_port,
             "container_port": container_port,
             "protocol": protocol,
-            "service_name": service_name,
             **self._create_base_metadata(now),
         }
 
     def _create_environment_variable_entity(
-        self, key: str, value: str, service_name: str, now: datetime
+        self,
+        key: str,
+        value: str,
+        service_name: str | None,
+        compose_file_path: str,
+        now: datetime,
     ) -> dict[str, Any]:
         """Create EnvironmentVariable entity."""
         return {
+            "compose_file_path": compose_file_path,
             "key": key,
             "value": value,
-            "service_name": service_name,
+            "service_name": service_name or "__global__",
             **self._create_base_metadata(now),
         }
 
     def _create_service_dependency_entity(
-        self, source_service: str, target_service: str, condition: str | None, now: datetime
+        self,
+        source_service: str,
+        target_service: str,
+        condition: str | None,
+        compose_file_path: str,
+        now: datetime,
     ) -> dict[str, Any]:
         """Create ServiceDependency entity."""
         return {
+            "compose_file_path": compose_file_path,
             "source_service": source_service,
             "target_service": target_service,
-            "condition": condition,
+            "condition": condition or "service_started",
             **self._create_base_metadata(now),
         }
 
     def _create_image_details_entity(
-        self, image: str, service_name: str, now: datetime
+        self, image: str, service_name: str, compose_file_path: str, now: datetime
     ) -> dict[str, Any]:
         """Create ImageDetails entity."""
         # Parse image string: [registry/]name[:tag][@digest]
@@ -524,17 +577,28 @@ class DockerComposeReader:
                 registry = parts[0]
                 image_name = "/".join(parts[1:])
 
+        if not tag:
+            tag = "latest"
+
+        if registry is None:
+            registry = "docker.io"
+
         return {
+            "compose_file_path": compose_file_path,
+            "service_name": service_name,
             "image_name": image_name,
             "tag": tag,
             "registry": registry,
             "digest": digest,
-            "service_name": service_name,
             **self._create_base_metadata(now),
         }
 
     def _create_health_check_entity(
-        self, healthcheck: dict[str, Any], service_name: str, now: datetime
+        self,
+        healthcheck: dict[str, Any],
+        service_name: str,
+        compose_file_path: str,
+        now: datetime,
     ) -> dict[str, Any]:
         """Create HealthCheck entity."""
         # Test can be a list or string
@@ -543,17 +607,22 @@ class DockerComposeReader:
             test = " ".join(test)
 
         return {
+            "compose_file_path": compose_file_path,
+            "service_name": service_name,
             "test": test or "",
             "interval": healthcheck.get("interval"),
             "timeout": healthcheck.get("timeout"),
             "retries": healthcheck.get("retries"),
             "start_period": healthcheck.get("start_period"),
-            "service_name": service_name,
             **self._create_base_metadata(now),
         }
 
     def _create_build_context_entity(
-        self, build: str | dict[str, Any], service_name: str, now: datetime
+        self,
+        build: str | dict[str, Any],
+        service_name: str,
+        compose_file_path: str,
+        now: datetime,
     ) -> dict[str, Any]:
         """Create BuildContext entity."""
         if isinstance(build, str):
@@ -575,16 +644,21 @@ class DockerComposeReader:
             args = None
 
         return {
+            "compose_file_path": compose_file_path,
+            "service_name": service_name,
             "context_path": context_path,
             "dockerfile": dockerfile,
             "target": target,
             "args": args,
-            "service_name": service_name,
             **self._create_base_metadata(now),
         }
 
     def _create_device_mapping_entity(
-        self, device_mapping: str, service_name: str, now: datetime
+        self,
+        device_mapping: str,
+        service_name: str,
+        compose_file_path: str,
+        now: datetime,
     ) -> dict[str, Any] | None:
         """Create DeviceMapping entity."""
         if not isinstance(device_mapping, str):
@@ -603,9 +677,10 @@ class DockerComposeReader:
         permissions = parts[2] if len(parts) >= 3 else None
 
         return {
+            "compose_file_path": compose_file_path,
+            "service_name": service_name,
             "host_device": host_device,
             "container_device": container_device,
             "permissions": permissions,
-            "service_name": service_name,
             **self._create_base_metadata(now),
         }

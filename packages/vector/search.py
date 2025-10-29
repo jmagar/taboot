@@ -27,7 +27,7 @@ class VectorSearch:
         """
         self.qdrant_url = qdrant_url
         self.collection_name = collection_name
-        self.client = QdrantClient(url=qdrant_url)
+        self.client = QdrantClient(url=qdrant_url, prefer_grpc=False)
 
     def build_metadata_filter(
         self, source_types: list[str] | None = None, after: datetime | None = None
